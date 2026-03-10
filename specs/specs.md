@@ -13,7 +13,7 @@ The application acts as a real-time (or near real-time) node-based or iterative 
 ### 1.2 I/O & Metadata
 * **Image Import:** Support for standard image formats (PNG, JPG, GIF, BMP) via the `image` crate.
 * **Live Preview Canvas:** A responsive display that scales the image to the Sixel viewport. Mathematical operations during UI interaction are strictly applied to a downscaled proxy asset.
-* **Metadata Readout:** Live TUI display of original dimensions, proxy dimensions, active crop, and current pipeline execution time.
+* **Metadata Readout:** Live TUI display of original dimensions, proxy dimensions, active crop, current pipeline execution time, and preview scale.
 * **Export Subsystem:**
   * Still image export (lossless PNG).
   * Animation export (GIF natively, MP4/WebP via FFmpeg bindings or external shell).
@@ -123,19 +123,23 @@ Post-processing filters designed to simulate retro hardware output.
 pub enum BlendMode { Normal, Multiply, Screen, Overlay }
 ```
 
-## 8. Animation Workflow
+## 8. Geometry & Cropping
+* **Four-Edge Crop:** Independent trim values for the top, bottom, left, and right bounds.
+* **Aspect Ratio Forcing:** Automatic locking of crop bounds to standard or user-defined aspect ratios (e.g., 1:1, 16:9).
+
+## 9. Animation Workflow
 Frame Capture: Captures the current preview_buffer state and pushes it to AppState::animation_frames (held in RAM).
 
 Timeline Strip: TUI visual representation of captured frames (e.g., a horizontally scrollable list of miniature Sixel block renders or text indices).
 
 Sequence Rendering: Stitches the captured frames into a defined frame rate container (GIF/MP4) via the Export Thread.
 
-## 9. Randomization Engine
+## 10. Randomization Engine
 Global Randomization: An instant TUI trigger (e.g., R key) to randomly populate the numeric values/toggles for all active Effect parameters.
 
 Targeted Randomization: A configuration matrix/menu allowing the user to exclude specific parameters (like crop bounds or specific color shifts) from the global randomization roll.
 
-## 10. Pipeline Execution Logic
+## 11. Pipeline Execution Logic
 The user dictates the order of operations via external configurations (YAML/JSON mapped to the Pipeline struct). If no custom configuration is provided, the standard opinionated top-down pipeline executes as follows:
 
 Geometry/Crop: Establish the bounds.
