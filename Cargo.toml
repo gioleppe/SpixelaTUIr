@@ -1,0 +1,25 @@
+[package]
+name = "spixelatuir"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# TUI & Terminal
+ratatui = "0.26"
+crossterm = "0.27"
+ratatui-image = { version = "0.6", features = ["crossterm"] }
+
+# Image Processing & Math
+image = "0.24"
+imageproc = "0.23"
+
+# Concurrency
+rayon = "1.8"
+
+# State & Configuration
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+
+# Error Handling
+anyhow = "1.0"
+thiserror = "1.0"
