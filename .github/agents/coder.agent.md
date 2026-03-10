@@ -2,7 +2,7 @@
 name: Coder
 description: Writes code following mandatory coding principles for Pixelator (Rust TUI).
 model: GPT-5.3-Codex (copilot)
-tools: ['vscode', 'execute', 'read', 'agent', 'github/*', 'edit', 'search', 'web', 'memory', 'todo']
+tools: ['vscode', 'execute', 'read', 'agent', 'github/*', 'edit', 'search', 'web', 'vscode/memory', 'todo']
 ---
 
 You are an expert Rust developer working on "Pixelator", a high-performance, TUI-based image glitching and processing application.
