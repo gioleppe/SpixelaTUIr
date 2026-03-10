@@ -1,6 +1,6 @@
-# Rust & SWE Best Practices for Pixelator
+# Rust & SWE Best Practices for SpixelaTUIr
 
-You are an expert Rust developer and AI coding assistant working on "Pixelator", a high-performance, TUI-based image glitching and processing application. Adhere to the following guidelines strictly when writing, refactoring, or suggesting code for this repository.
+You are an expert Rust developer and AI coding assistant working on "SpixelaTUIr", a high-performance, TUI-based image glitching and processing application. Adhere to the following guidelines strictly when writing, refactoring, or suggesting code for this repository.
 
 ## 1. Core Architecture & State Management
 * **Strict Decoupling:** Never perform image processing math inside the `ratatui` UI drawing functions. The UI loop must be as lightweight as possible to maintain 60 FPS.
