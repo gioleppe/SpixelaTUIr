@@ -41,7 +41,7 @@ fn process_image(
     use rayon::prelude::*;
 
     let img = image::open(&image_path)?;
-    let mut pixels: Vec<image::Rgba<u8>> = img
+    let pixels: Vec<image::Rgba<u8>> = img
         .to_rgba8()
         .pixels()
         .copied()

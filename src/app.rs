@@ -31,7 +31,10 @@ impl AppState {
 }
 
 /// Entry point for the application event loop.
-pub fn run<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
+pub fn run<B: Backend>(terminal: &mut Terminal<B>) -> Result<()>
+where
+    <B as Backend>::Error: Send + Sync + 'static,
+{
     // Set up the worker thread channel
     let (worker_tx, worker_rx) = mpsc::channel::<WorkerCommand>();
 
