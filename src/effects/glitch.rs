@@ -34,8 +34,6 @@ impl GlitchEffect {
 // ── Pixelate ─────────────────────────────────────────────────────────────────
 
 fn pixelate(img: DynamicImage, block_size: u32) -> DynamicImage {
-    use rayon::prelude::*;
-
     if block_size <= 1 {
         return img;
     }
@@ -49,10 +47,11 @@ fn pixelate(img: DynamicImage, block_size: u32) -> DynamicImage {
     let raw = rgba.into_raw();
     let mut out_raw = vec![0u8; raw.len()];
 
-    // Each horizontal strip of `block_size` rows is fully independent, so
-    // rayon can process all strips in parallel without any shared mutable state.
+    // Each horizontal strip of `block_size` rows is fully independent.
+    // The tight inner loops over contiguous byte slices allow LLVM to
+    // auto-vectorise this with SIMD when compiling with optimisations.
     out_raw
-        .par_chunks_mut(strip_stride)
+        .chunks_mut(strip_stride)
         .enumerate()
         .for_each(|(strip_idx, strip)| {
             let by = strip_idx * bsize;
@@ -97,8 +96,6 @@ fn pixelate(img: DynamicImage, block_size: u32) -> DynamicImage {
 // ── Row Jitter ────────────────────────────────────────────────────────────────
 
 fn row_jitter(img: DynamicImage, magnitude: f32) -> DynamicImage {
-    use rayon::prelude::*;
-
     let (w, h) = img.dimensions();
     let rgba = img.to_rgba8();
     let max_shift = (w as f32 * magnitude.abs()) as i32;
@@ -108,9 +105,9 @@ fn row_jitter(img: DynamicImage, magnitude: f32) -> DynamicImage {
         .map(|y| (0..w).map(|x| *rgba.get_pixel(x, y)).collect())
         .collect();
 
-    // Shift each row independently and in parallel.
+    // Shift each row with a deterministic per-row hash.
     let shifted_rows: Vec<Vec<image::Rgba<u8>>> = rows
-        .par_iter()
+        .iter()
         .enumerate()
         .map(|(y, row)| {
             let hash = (y as u32).wrapping_mul(2654435761) ^ (y as u32).wrapping_mul(2246822519);
@@ -137,18 +134,15 @@ fn row_jitter(img: DynamicImage, magnitude: f32) -> DynamicImage {
 // ── Block Shift ───────────────────────────────────────────────────────────────
 
 fn block_shift(img: DynamicImage, shift_x: i32, shift_y: i32) -> DynamicImage {
-    use rayon::prelude::*;
-
     let rgba = img.into_rgba8();
     let (w, h) = rgba.dimensions();
     let w_usize = w as usize;
     let raw = rgba.into_raw();
     let mut out_raw = vec![0u8; raw.len()];
 
-    // Each destination row is filled from a (possibly different) source row,
-    // and rows never overlap, so all rows can be processed in parallel.
+    // Each destination row is filled from a (possibly different) source row.
     out_raw
-        .par_chunks_mut(w_usize * 4)
+        .chunks_mut(w_usize * 4)
         .enumerate()
         .for_each(|(y, row)| {
             let src_y = ((y as i32 + shift_y).rem_euclid(h as i32)) as usize;
@@ -171,17 +165,15 @@ fn luminance(p: &Rgba<u8>) -> f32 {
 }
 
 fn pixel_sort(img: DynamicImage, threshold: f32) -> DynamicImage {
-    use rayon::prelude::*;
-
     let (w, h) = img.dimensions();
     let rgba = img.to_rgba8();
     let thresh = threshold * 255.0;
 
-    // Process each row independently and in parallel.
+    // Process each row sequentially, sorting above-threshold pixel runs by luminance.
     let sorted_rows: Vec<Vec<Rgba<u8>>> = (0..h)
         .map(|y| (0..w).map(|x| *rgba.get_pixel(x, y)).collect::<Vec<_>>())
         .collect::<Vec<_>>()
-        .into_par_iter()
+        .into_iter()
         .map(|row| {
             let mut sorted = row.clone();
             let mut seg_start: Option<usize> = None;
