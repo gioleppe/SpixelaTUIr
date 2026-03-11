@@ -44,6 +44,8 @@ A high-performance, terminal-based image glitching and processing tool written i
 | `J` / `Shift+↓` | Move selected effect one position down in the pipeline |
 | `r` | Randomise all effect parameter values |
 | `e` | Export the current preview as a PNG |
+| `[` | Decrease preview resolution tier (1024 → 768 → 512 → 256 px) |
+| `]` | Increase preview resolution tier (256 → 512 → 768 → 1024 px) |
 | `Ctrl+S` | Save the current pipeline to a JSON file |
 | `Ctrl+L` | Load / import a pipeline from a JSON or YAML file (file browser) |
 | `q` / `Esc` | Quit |

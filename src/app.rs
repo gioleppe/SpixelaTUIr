@@ -235,6 +235,8 @@ pub struct AppState {
     pub edit_params: Vec<String>,
     /// State for the export dialog when in ExportDialog mode.
     pub export_dialog: ExportDialogState,
+    /// Index into `PROXY_RESOLUTIONS` – controls live-preview quality.
+    pub proxy_resolution_index: usize,
 }
 
 impl AppState {
@@ -273,6 +275,8 @@ impl AppState {
                 format_index: 0,
                 focused_field: 1,
             },
+            // Default to index 1 (512 px) — preserves prior behaviour.
+            proxy_resolution_index: 1,
         }
     }
 
@@ -280,10 +284,8 @@ impl AppState {
     pub fn load_image(&mut self, path: std::path::PathBuf) {
         match image::open(&path) {
             Ok(img) => {
-                // Cap the proxy at 512 px on the long edge — this is large enough
-                // for a crisp Sixel preview while keeping pixel counts low enough
-                // for fast pipeline iterations.
-                let proxy = img.thumbnail(512, 512);
+                let size = PROXY_RESOLUTIONS[self.proxy_resolution_index];
+                let proxy = img.thumbnail(size, size);
                 self.image_path = Some(path.clone());
                 self.source_asset = Some(img);
                 self.proxy_asset = Some(proxy);
@@ -309,6 +311,21 @@ impl AppState {
                 pipeline: self.pipeline.clone(),
                 response_tx: self.worker_resp_tx.clone(),
             });
+        }
+    }
+
+    /// Re-scale the proxy from `source_asset` at the current resolution tier and
+    /// re-dispatch the pipeline.  Calls from keyboard shortcuts `[` / `]`.
+    pub fn reload_proxy(&mut self) {
+        if let Some(source) = self.source_asset.take() {
+            let size = PROXY_RESOLUTIONS[self.proxy_resolution_index];
+            let proxy = source.thumbnail(size, size);
+            self.source_asset = Some(source);
+            self.proxy_asset = Some(proxy);
+            self.preview_buffer = None;
+            self.image_protocol = None;
+            self.dispatch_process();
+            self.status_message = format!("Preview resolution: {size}px — Re-processing…");
         }
     }
 
@@ -344,6 +361,9 @@ impl AppState {
 pub const FILE_BROWSER_HINT: &str =
     "↑↓/jk: navigate  Enter: open  Backspace/-: up  Esc: cancel";
 
+/// Available proxy resolution tiers (max pixels on the long edge).
+/// Index 1 (512 px) is the default — matches the previous hardcoded value.
+pub const PROXY_RESOLUTIONS: &[u32] = &[256, 512, 768, 1024];
 /// Keyboard hint shown when the file browser is open to load a pipeline.
 pub const PIPELINE_BROWSER_HINT: &str =
     "↑↓/jk: navigate  Enter: load  Backspace/-: up  Esc: cancel";
@@ -548,6 +568,21 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
                 state.status_message = "No processed image to export.".to_string();
             }
         }
+        // Decrease preview resolution.
+        KeyCode::Char('[') => {
+            if state.source_asset.is_some() && state.proxy_resolution_index > 0 {
+                state.proxy_resolution_index -= 1;
+                state.reload_proxy();
+            }
+        }
+        // Increase preview resolution.
+        KeyCode::Char(']') => {
+            if state.source_asset.is_some()
+                && state.proxy_resolution_index < PROXY_RESOLUTIONS.len() - 1
+            {
+                state.proxy_resolution_index += 1;
+                state.reload_proxy();
+            }
         // Save the current pipeline to a JSON file (Ctrl+S).
         KeyCode::Char('s') if modifiers.contains(KeyModifiers::CONTROL) => {
             if state.pipeline.effects.is_empty() {
