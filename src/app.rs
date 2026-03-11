@@ -1102,6 +1102,43 @@ fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
                 buf.pop();
             }
         }
+        KeyCode::Left | KeyCode::Right => {
+            if !state.pipeline.effects.is_empty() {
+                let descriptors = state.pipeline.effects[state.selected_effect]
+                    .effect
+                    .param_descriptors();
+                if let Some(d) = descriptors.get(field_idx) {
+                    // For "preset" fields, we allow arrow-key cycling.
+                    if d.name == "preset" {
+                        let current = state.edit_params[field_idx].parse::<f32>().unwrap_or(d.value);
+                        let n = color::GRADIENT_PRESETS.len() as f32;
+                        let next = if matches!(code, KeyCode::Left) {
+                            (current + n - 1.0) % n
+                        } else {
+                            (current + 1.0) % n
+                        };
+                        state.edit_params[field_idx] = format_param_value(next);
+                        
+                        // Auto-apply preset changes immediately so the user sees the colors change.
+                        let values: Vec<f32> = state
+                            .edit_params
+                            .iter()
+                            .zip(descriptors.iter())
+                            .map(|(s, d)| s.parse::<f32>().unwrap_or(d.value).clamp(d.min, d.max))
+                            .collect();
+                        let updated = state.pipeline.effects[state.selected_effect].effect.apply_params(&values);
+                        
+                        state.pipeline.effects[state.selected_effect].effect = updated;
+                        state.image_protocol = None;
+                        state.dispatch_process();
+                        
+                        // Refresh edit_params in case new fields (RGB) were revealed.
+                        let new_descriptors = state.pipeline.effects[state.selected_effect].effect.param_descriptors();
+                        state.edit_params = new_descriptors.iter().map(|d| format_param_value(d.value)).collect();
+                    }
+                }
+            }
+        }
         KeyCode::Char(c) if c.is_ascii_digit() || c == '.' || c == '-' => {
             if let Some(buf) = state.edit_params.get_mut(field_idx) {
                 buf.push(c);
@@ -1118,15 +1155,34 @@ fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
                     .zip(descriptors.iter())
                     .map(|(s, d)| s.parse::<f32>().unwrap_or(d.value).clamp(d.min, d.max))
                     .collect();
-                let updated = state.pipeline.effects[state.selected_effect]
-                    .effect
-                    .apply_params(&values);
+                
+                let old_effect = &state.pipeline.effects[state.selected_effect].effect;
+                let updated = old_effect.apply_params(&values);
+                
+                // If it's a GradientMap and the preset just changed to "Custom" (last one),
+                // we keep the modal open so the user can edit the newly revealed RGB fields.
+                let mut keep_open = false;
+                if let (Effect::Color(ColorEffect::GradientMap { preset_idx: old_p, .. }), 
+                        Effect::Color(ColorEffect::GradientMap { preset_idx: new_p, .. })) = (old_effect, &updated) {
+                    if *old_p != *new_p && *new_p == color::GRADIENT_PRESETS.len() - 1 {
+                        keep_open = true;
+                    }
+                }
+
                 state.push_undo();
                 state.pipeline.effects[state.selected_effect].effect = updated;
                 state.pipeline_dirty = true;
                 state.status_message = "Effect updated. Re-processing…".to_string();
                 state.image_protocol = None;
                 state.dispatch_process();
+
+                if keep_open {
+                    // Refresh edit_params so the new RGB fields are visible.
+                    let new_descriptors = state.pipeline.effects[state.selected_effect].effect.param_descriptors();
+                    state.edit_params = new_descriptors.iter().map(|d| format_param_value(d.value)).collect();
+                    // Stay in EditEffect mode.
+                    return;
+                }
             }
             state.input_mode = InputMode::Normal;
             state.edit_params.clear();

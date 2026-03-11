@@ -21,7 +21,7 @@ PNG, JPEG, GIF, BMP
 | Category | Effect | Description |
 |----------|--------|-------------|
 | **Color** | `HueShift` | Rotate the colour spectrum by N degrees (HSL) |
-| | `GradientMap` | Remaps luminance to a custom colour gradient |
+| | `GradientMap` | Remaps luminance to a custom colour gradient (Synthwave, Sepia, Cyberpunk, Night Vision, or Custom) |
 | | `Saturation` | Scale colour intensity (HSL) |
 | | `Contrast` | Expand or compress the tonal range |
 | | `Invert` | Mathematical RGB inversion |
@@ -45,7 +45,7 @@ PNG, JPEG, GIF, BMP
 | `↓` / `j` | Navigate effect list down (requires Effects panel focus) |
 | `a` | Add an effect from the preset menu (requires Effects panel focus) |
 | `d` / `Delete` | Delete the selected effect and re-process (requires Effects panel focus) |
-| `Enter` | Edit parameters of the selected effect (requires Effects panel focus) |
+| `Enter` | Edit parameters of the selected effect (requires Effects panel focus). For effects with presets (like `GradientMap`), use `←` / `→` (Left/Right) to cycle between them. |
 | `Space` | Toggle the selected effect on/off (requires Effects panel focus); disabled effects are skipped during rendering but stay in the pipeline |
 | `K` / `Shift+↑` | Move selected effect one position up in the pipeline (cyan highlight while dragging) |
 | `J` / `Shift+↓` | Move selected effect one position down in the pipeline (cyan highlight while dragging) |

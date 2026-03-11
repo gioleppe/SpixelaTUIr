@@ -1,0 +1,98 @@
+{
+  "effects": [
+    {
+      "enabled": true,
+      "effect": {
+        "Color": {
+          "GradientMap": {
+            "preset_idx": 2,
+            "stops": [
+              [
+                0.0,
+                [
+                  5,
+                  5,
+                  20
+                ]
+              ],
+              [
+                0.2,
+                [
+                  60,
+                  0,
+                  120
+                ]
+              ],
+              [
+                0.5,
+                [
+                  255,
+                  0,
+                  180
+                ]
+              ],
+              [
+                0.8,
+                [
+                  0,
+                  255,
+                  255
+                ]
+              ],
+              [
+                1.0,
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Glitch": {
+          "Pixelate": {
+            "block_size": 2
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Glitch": {
+          "PixelSort": {
+            "threshold": 0.2
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Crt": {
+          "Scanlines": {
+            "spacing": 2,
+            "opacity": 0.5
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Glitch": {
+          "BlockShift": {
+            "shift_x": 200,
+            "shift_y": 80
+          }
+        }
+      }
+    }
+  ]
+}

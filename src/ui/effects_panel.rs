@@ -197,11 +197,23 @@ pub fn render_edit_effect_modal(frame: &mut Frame, state: &AppState) {
             } else {
                 Style::default().fg(Color::White)
             };
-            let value_display = if focused {
+            let mut value_display = if focused {
                 format!("[ {value_str}_ ]")
             } else {
                 format!("  {value_str}  ")
             };
+
+            // Custom formatting for GradientMap's "preset" parameter.
+            if d.name == "preset" {
+                if let Some((preset_name, _)) = color::GRADIENT_PRESETS.get(d.value as usize) {
+                    value_display = if focused {
+                        format!("[ {preset_name} ]")
+                    } else {
+                        format!("  {preset_name}  ")
+                    };
+                }
+            }
+
             ListItem::new(Line::from(vec![
                 Span::styled(format!("  {:<14}", d.name), style),
                 Span::styled(value_display, style),
@@ -256,15 +268,9 @@ fn effect_label(e: &Effect) -> String {
     match e {
         Effect::Color(c) => match c {
             ColorEffect::Invert => "Invert".to_string(),
-            ColorEffect::GradientMap { preset_idx, stops } => {
+            ColorEffect::GradientMap { preset_idx, .. } => {
                 let name = color::GRADIENT_PRESETS.get(*preset_idx).map(|(n, _)| *n).unwrap_or("Unknown");
-                if name == "Custom" && stops.len() >= 2 {
-                    let c1 = stops[0].1;
-                    let c2 = stops[1].1;
-                    format!("Gradient Custom #{:02x}{:02x}{:02x}→#{:02x}{:02x}{:02x}", c1[0], c1[1], c1[2], c2[0], c2[1], c2[2])
-                } else {
-                    format!("Gradient {name}")
-                }
+                format!("Gradient {name}")
             },
             ColorEffect::HueShift { degrees } => format!("HueShift {degrees:.0}°"),
             ColorEffect::Contrast { factor } => format!("Contrast ×{factor:.2}"),
