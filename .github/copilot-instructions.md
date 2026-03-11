@@ -25,6 +25,7 @@ You are an expert Rust developer and AI coding assistant working on "SpixelaTUIr
 ## 5. Code Style & Tooling
 * **Formatting:** Ensure all code adheres to standard `rustfmt`.
 * **Linting:** Code must pass `cargo clippy` without warnings. Address clippy suggestions actively.
+* **Pre-commit Checks:** Always run `cargo fmt` and `cargo clippy` before committing code to ensure formatting and linting standards are met.
 * **Idiomatic Rust:** Use `match` statements over `if let` when handling complex enums (like the `Effect` enum). Derive standard traits (`Debug`, `Clone`, `Serialize`, `Deserialize`, `Default`) where appropriate.
 
 ## 6. Project Structure Adherence
