@@ -1,5 +1,9 @@
+use std::fmt;
+
 use image::Rgba;
 use serde::{Deserialize, Serialize};
+
+use super::ParamDescriptor;
 
 /// Color manipulation effects: hue shift, contrast, invert, saturation, quantization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,8 +25,11 @@ pub enum ColorEffect {
     },
 }
 
+/// A single gradient color stop: position (0.0–1.0) and RGB color.
+pub type GradientStop = (f32, [u8; 3]);
+
 /// Predefined color gradients for the GradientMap effect.
-pub const GRADIENT_PRESETS: &[(&str, &[(f32, [u8; 3])])] = &[
+pub const GRADIENT_PRESETS: &[(&str, &[GradientStop])] = &[
     (
         "Synthwave",
         &[
@@ -82,7 +89,7 @@ impl ColorEffect {
                 let luma = 0.2126 * (pixel[0] as f32 / 255.0)
                     + 0.7152 * (pixel[1] as f32 / 255.0)
                     + 0.0722 * (pixel[2] as f32 / 255.0);
-                
+
                 if stops.len() == 1 || luma <= stops[0].0 {
                     let c = stops[0].1;
                     return Rgba([c[0], c[1], c[2], pixel[3]]);
@@ -91,7 +98,7 @@ impl ColorEffect {
                     let c = stops.last().unwrap().1;
                     return Rgba([c[0], c[1], c[2], pixel[3]]);
                 }
-                
+
                 let mut lower = &stops[0];
                 let mut upper = &stops[stops.len() - 1];
                 for i in 0..stops.len() - 1 {
@@ -101,14 +108,18 @@ impl ColorEffect {
                         break;
                     }
                 }
-                
+
                 let range = upper.0 - lower.0;
-                let t = if range > 0.0 { (luma - lower.0) / range } else { 0.0 };
-                
+                let t = if range > 0.0 {
+                    (luma - lower.0) / range
+                } else {
+                    0.0
+                };
+
                 let r = (lower.1[0] as f32 * (1.0 - t) + upper.1[0] as f32 * t) as u8;
                 let g = (lower.1[1] as f32 * (1.0 - t) + upper.1[1] as f32 * t) as u8;
                 let b = (lower.1[2] as f32 * (1.0 - t) + upper.1[2] as f32 * t) as u8;
-                
+
                 Rgba([r, g, b, pixel[3]])
             }
             ColorEffect::HueShift { degrees } => {
@@ -157,6 +168,161 @@ impl ColorEffect {
                     pixel[3],
                 ])
             }
+        }
+    }
+
+    /// Return descriptors for all editable numeric parameters.
+    pub fn param_descriptors(&self) -> Vec<ParamDescriptor> {
+        match self {
+            ColorEffect::Invert => vec![],
+            ColorEffect::GradientMap { preset_idx, stops } => {
+                let mut params = vec![ParamDescriptor {
+                    name: "preset",
+                    value: *preset_idx as f32,
+                    min: 0.0,
+                    max: (GRADIENT_PRESETS.len() - 1) as f32,
+                }];
+
+                // If it's the "Custom" preset (last one), allow editing colors.
+                if *preset_idx == GRADIENT_PRESETS.len() - 1 && stops.len() >= 2 {
+                    params.push(ParamDescriptor {
+                        name: "r1",
+                        value: stops[0].1[0] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
+                    params.push(ParamDescriptor {
+                        name: "g1",
+                        value: stops[0].1[1] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
+                    params.push(ParamDescriptor {
+                        name: "b1",
+                        value: stops[0].1[2] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
+                    params.push(ParamDescriptor {
+                        name: "r2",
+                        value: stops[1].1[0] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
+                    params.push(ParamDescriptor {
+                        name: "g2",
+                        value: stops[1].1[1] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
+                    params.push(ParamDescriptor {
+                        name: "b2",
+                        value: stops[1].1[2] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
+                }
+                params
+            }
+            ColorEffect::HueShift { degrees } => vec![ParamDescriptor {
+                name: "degrees",
+                value: *degrees,
+                min: 0.0,
+                max: 360.0,
+            }],
+            ColorEffect::Contrast { factor } => vec![ParamDescriptor {
+                name: "factor",
+                value: *factor,
+                min: 0.1,
+                max: 3.0,
+            }],
+            ColorEffect::Saturation { factor } => vec![ParamDescriptor {
+                name: "factor",
+                value: *factor,
+                min: 0.0,
+                max: 2.0,
+            }],
+            ColorEffect::ColorQuantization { levels } => vec![ParamDescriptor {
+                name: "levels",
+                value: *levels as f32,
+                min: 2.0,
+                max: 16.0,
+            }],
+        }
+    }
+
+    /// Rebuild this variant with new parameter values (clamped to valid ranges).
+    pub fn apply_params(&self, values: &[f32]) -> ColorEffect {
+        let get = |i: usize, fallback: f32| values.get(i).copied().unwrap_or(fallback);
+        match self {
+            ColorEffect::Invert => ColorEffect::Invert,
+            ColorEffect::GradientMap { preset_idx, stops } => {
+                let new_preset_idx = get(0, *preset_idx as f32) as usize;
+                if new_preset_idx != *preset_idx {
+                    ColorEffect::GradientMap {
+                        preset_idx: new_preset_idx,
+                        stops: GRADIENT_PRESETS[new_preset_idx].1.to_vec(),
+                    }
+                } else if new_preset_idx == GRADIENT_PRESETS.len() - 1 {
+                    let mut new_stops = stops.clone();
+                    if new_stops.len() >= 2 && values.len() >= 7 {
+                        new_stops[0].1 = [get(1, 0.0) as u8, get(2, 0.0) as u8, get(3, 0.0) as u8];
+                        new_stops[1].1 = [get(4, 0.0) as u8, get(5, 0.0) as u8, get(6, 0.0) as u8];
+                    }
+                    ColorEffect::GradientMap {
+                        preset_idx: new_preset_idx,
+                        stops: new_stops,
+                    }
+                } else {
+                    ColorEffect::GradientMap {
+                        preset_idx: *preset_idx,
+                        stops: stops.clone(),
+                    }
+                }
+            }
+            ColorEffect::HueShift { degrees } => ColorEffect::HueShift {
+                degrees: get(0, *degrees),
+            },
+            ColorEffect::Contrast { factor } => ColorEffect::Contrast {
+                factor: get(0, *factor),
+            },
+            ColorEffect::Saturation { factor } => ColorEffect::Saturation {
+                factor: get(0, *factor),
+            },
+            ColorEffect::ColorQuantization { levels } => ColorEffect::ColorQuantization {
+                levels: get(0, *levels as f32) as u8,
+            },
+        }
+    }
+
+    /// Returns the variant name (e.g. `"HueShift"`, `"Invert"`) for UI titles.
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            ColorEffect::Invert => "Invert",
+            ColorEffect::GradientMap { .. } => "GradientMap",
+            ColorEffect::HueShift { .. } => "HueShift",
+            ColorEffect::Contrast { .. } => "Contrast",
+            ColorEffect::Saturation { .. } => "Saturation",
+            ColorEffect::ColorQuantization { .. } => "ColorQuantization",
+        }
+    }
+}
+
+impl fmt::Display for ColorEffect {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ColorEffect::Invert => write!(f, "Invert"),
+            ColorEffect::GradientMap { preset_idx, .. } => {
+                let name = GRADIENT_PRESETS
+                    .get(*preset_idx)
+                    .map(|(n, _)| *n)
+                    .unwrap_or("Unknown");
+                write!(f, "Gradient {name}")
+            }
+            ColorEffect::HueShift { degrees } => write!(f, "HueShift {degrees:.0}°"),
+            ColorEffect::Contrast { factor } => write!(f, "Contrast ×{factor:.2}"),
+            ColorEffect::Saturation { factor } => write!(f, "Saturation ×{factor:.2}"),
+            ColorEffect::ColorQuantization { levels } => write!(f, "Quantize {levels}"),
         }
     }
 }

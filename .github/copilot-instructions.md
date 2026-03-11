@@ -5,8 +5,8 @@ You are an expert Rust developer and AI coding assistant working on "SpixelaTUIr
 ## 1. Core Architecture & State Management
 * **Strict Decoupling:** Never perform image processing math inside the `ratatui` UI drawing functions. The UI loop must be as lightweight as possible to maintain 60 FPS.
 * **Message Passing:** Communication between the Main Thread (UI) and the Engine Thread (Worker) must be handled via `std::sync::mpsc` channels. 
-    * UI sends `EngineCommand` enums (e.g., `UpdatePipeline(Pipeline)`, `TriggerRandomization`).
-    * Engine sends back processed `DynamicImage` buffers for the UI to render.
+    * UI sends `WorkerCommand` enums (e.g., `Process { image, pipeline, response_tx }`, `Export { ... }`, `Quit`).
+    * Engine sends back `WorkerResponse` enums (`ProcessedFrame(DynamicImage)`, `Exported(PathBuf)`, `Error(String)`).
 * **State Structuring:** Maintain a single source of truth in the UI thread for widget states (sliders, menus), but keep the heavy `DynamicImage` assets (source, proxy, preview buffer, animation frames) managed efficiently, minimizing clones.
 
 ## 2. Image Processing & Performance
@@ -30,13 +30,20 @@ You are an expert Rust developer and AI coding assistant working on "SpixelaTUIr
 
 ## 6. Project Structure Adherence
 Respect the established directory structure:
-* `src/ui/`: Strictly for Ratatui widgets, layouts, and input handling.
+* `src/app/`: Application state, event loop, keyboard handlers, and pipeline utilities. Decomposed into focused sub-modules:
+    * `state.rs`: Central `AppState` struct, image loading, undo/redo, worker dispatch, and preview management.
+    * `handlers.rs`: All keyboard input handlers for every `InputMode` (normal, edit effect, file browser, export dialog, etc.).
+    * `file_browser.rs`: `FileBrowserState`, `FileBrowserEntry`, `FileBrowserPurpose` — filesystem navigation modal.
+    * `dialogs.rs`: `ExportDialogState`, `SavePipelineDialogState`, `InputMode`, `FocusedPanel` enums and types.
+    * `pipeline_utils.rs`: `AVAILABLE_EFFECTS` catalogue, `randomize_pipeline()`, `format_param_value()`.
+    * `mod.rs`: Re-exports all public items, contains the `run()` event loop, constants (`PROXY_RESOLUTIONS`, hints), and tests.
+* `src/ui/`: Strictly for Ratatui widgets, layouts, and rendering. No input handling or state mutation.
 * `src/engine/`: Worker thread logic, multi-threading setup, and export sequencing.
-* `src/effects/`: Pure mathematical implementations of the image glitches/filters.
+* `src/effects/`: Pure mathematical implementations of the image glitches/filters. Each sub-effect type (`ColorEffect`, `GlitchEffect`, `CrtEffect`, `CompositeEffect`) owns its own `param_descriptors()`, `apply_params()`, `variant_name()`, and `Display` impl — the `Effect` enum in `mod.rs` only delegates.
 * `src/config/`: Serde parsing for loading/saving custom `Pipeline` configurations.
 
 ## 7. README Maintenance
-* **Keep README up to date.** Whenever you add, remove, or rename a keyboard shortcut in `src/app.rs`, update the **Keyboard Shortcuts** table in `README.md` in the same commit/change.
-* **Key binding source of truth:** `handle_normal()` in `src/app.rs` is the canonical source of all global key bindings. Cross-check the README table against it whenever key handling changes.
+* **Keep README up to date.** Whenever you add, remove, or rename a keyboard shortcut in `src/app/handlers.rs`, update the **Keyboard Shortcuts** table in `README.md` in the same commit/change.
+* **Key binding source of truth:** `handle_normal()` in `src/app/handlers.rs` is the canonical source of all global key bindings. Cross-check the README table against it whenever key handling changes.
 * **Effects table:** If a new `Effect` variant is added to the pipeline (in `src/effects/`), add a corresponding row to the **Effects** table in `README.md`.
 * **Architecture section:** If new threads, channels, or major data-flow paths are introduced, update the Architecture diagram in `README.md`.

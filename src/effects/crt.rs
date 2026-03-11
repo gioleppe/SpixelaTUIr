@@ -1,5 +1,9 @@
+use std::fmt;
+
 use image::Rgba;
 use serde::{Deserialize, Serialize};
+
+use super::ParamDescriptor;
 
 /// CRT-style post-processing effects: scanlines, curvature, phosphor glow, noise, RGB shift, vignette.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +93,141 @@ impl CrtEffect {
             }
             // Full-image ops fall back gracefully in per-pixel mode.
             CrtEffect::Curvature { .. } | CrtEffect::PhosphorGlow { .. } => pixel,
+        }
+    }
+
+    /// Return descriptors for all editable numeric parameters.
+    pub fn param_descriptors(&self) -> Vec<ParamDescriptor> {
+        match self {
+            CrtEffect::Scanlines { spacing, opacity } => vec![
+                ParamDescriptor {
+                    name: "spacing",
+                    value: *spacing as f32,
+                    min: 1.0,
+                    max: 20.0,
+                },
+                ParamDescriptor {
+                    name: "opacity",
+                    value: *opacity,
+                    min: 0.0,
+                    max: 1.0,
+                },
+            ],
+            CrtEffect::Curvature { strength } => vec![ParamDescriptor {
+                name: "strength",
+                value: *strength,
+                min: 0.0,
+                max: 1.0,
+            }],
+            CrtEffect::PhosphorGlow { radius, intensity } => vec![
+                ParamDescriptor {
+                    name: "radius",
+                    value: *radius as f32,
+                    min: 1.0,
+                    max: 20.0,
+                },
+                ParamDescriptor {
+                    name: "intensity",
+                    value: *intensity,
+                    min: 0.0,
+                    max: 1.0,
+                },
+            ],
+            CrtEffect::Noise {
+                intensity,
+                monochromatic,
+            } => vec![
+                ParamDescriptor {
+                    name: "intensity",
+                    value: *intensity,
+                    min: 0.0,
+                    max: 1.0,
+                },
+                ParamDescriptor {
+                    name: "monochromatic",
+                    value: if *monochromatic { 1.0 } else { 0.0 },
+                    min: 0.0,
+                    max: 1.0,
+                },
+            ],
+            CrtEffect::Vignette { radius, softness } => vec![
+                ParamDescriptor {
+                    name: "radius",
+                    value: *radius,
+                    min: 0.0,
+                    max: 2.0,
+                },
+                ParamDescriptor {
+                    name: "softness",
+                    value: *softness,
+                    min: 0.0,
+                    max: 2.0,
+                },
+            ],
+        }
+    }
+
+    /// Rebuild this variant with new parameter values (clamped to valid ranges).
+    pub fn apply_params(&self, values: &[f32]) -> CrtEffect {
+        let get = |i: usize, fallback: f32| values.get(i).copied().unwrap_or(fallback);
+        match self {
+            CrtEffect::Scanlines { spacing, opacity } => CrtEffect::Scanlines {
+                spacing: get(0, *spacing as f32) as u32,
+                opacity: get(1, *opacity),
+            },
+            CrtEffect::Curvature { strength } => CrtEffect::Curvature {
+                strength: get(0, *strength),
+            },
+            CrtEffect::PhosphorGlow { radius, intensity } => CrtEffect::PhosphorGlow {
+                radius: get(0, *radius as f32) as u32,
+                intensity: get(1, *intensity),
+            },
+            CrtEffect::Noise {
+                intensity,
+                monochromatic,
+            } => CrtEffect::Noise {
+                intensity: get(0, *intensity),
+                monochromatic: get(1, if *monochromatic { 1.0 } else { 0.0 }) >= 0.5,
+            },
+            CrtEffect::Vignette { radius, softness } => CrtEffect::Vignette {
+                radius: get(0, *radius),
+                softness: get(1, *softness),
+            },
+        }
+    }
+
+    /// Returns the variant name (e.g. `"Scanlines"`, `"Noise"`) for UI titles.
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            CrtEffect::Scanlines { .. } => "Scanlines",
+            CrtEffect::Curvature { .. } => "Curvature",
+            CrtEffect::PhosphorGlow { .. } => "PhosphorGlow",
+            CrtEffect::Noise { .. } => "Noise",
+            CrtEffect::Vignette { .. } => "Vignette",
+        }
+    }
+}
+
+impl fmt::Display for CrtEffect {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CrtEffect::Scanlines { spacing, opacity } => {
+                write!(f, "Scanlines {spacing}px {opacity:.0}%")
+            }
+            CrtEffect::Curvature { strength } => write!(f, "Curvature {strength:.2}"),
+            CrtEffect::PhosphorGlow { radius, intensity } => {
+                write!(f, "PhosphorGlow r={radius} i={intensity:.2}")
+            }
+            CrtEffect::Noise {
+                intensity,
+                monochromatic,
+            } => {
+                let kind = if *monochromatic { "mono" } else { "rgb" };
+                write!(f, "Noise {kind} {intensity:.2}")
+            }
+            CrtEffect::Vignette { radius, softness } => {
+                write!(f, "Vignette r={radius:.2} s={softness:.2}")
+            }
         }
     }
 }

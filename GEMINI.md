@@ -13,16 +13,23 @@
 
 ## Architecture & Module Structure
 - `src/main.rs`: Application entry point, terminal initialization, and panic hooks.
-- `src/app.rs`: Central `AppState` management, event loop, and keyboard interaction logic.
+- `src/app/`: Application state, event loop, and keyboard handlers — decomposed into focused sub-modules:
+    - `state.rs`: Central `AppState` struct, image loading, undo/redo, worker dispatch, preview management.
+    - `handlers.rs`: All keyboard input handlers for every `InputMode` (normal, edit effect, file browser, export dialog, etc.).
+    - `file_browser.rs`: `FileBrowserState`, entry types, and directory navigation logic.
+    - `dialogs.rs`: `ExportDialogState`, `SavePipelineDialogState`, `InputMode`, `FocusedPanel` enums.
+    - `pipeline_utils.rs`: `AVAILABLE_EFFECTS` catalogue, `randomize_pipeline()`, `format_param_value()`.
+    - `mod.rs`: Re-exports all public items, contains the `run()` event loop, constants, and tests.
 - `src/engine/`: 
     - `worker.rs`: Dedicated thread for image processing to avoid UI blocking.
     - `export.rs`: Logic for exporting processed frames to disk.
-- `src/effects/`: Modular effect implementations categorized into:
-    - `color`: Pixel-level operations (Hue, Saturation, Contrast, Inversion, Quantization).
-    - `glitch`: Spatial manipulations (Pixelate, Row Jitter, Block Shift, Pixel Sort).
-    - `crt`: Retro-display simulations (Scanlines, Noise, Vignette).
-    - `composite`: Image layout operations (Crop, Blend).
-- `src/ui/`: Ratatui-based rendering components (Canvas, Effects Panel, Modals, Widgets).
+- `src/effects/`: Modular effect implementations. Each sub-effect type owns its own `param_descriptors()`, `apply_params()`, `variant_name()`, and `Display` impl — the `Effect` enum in `mod.rs` delegates. Categorized into:
+    - `color.rs`: Pixel-level operations (Hue, Saturation, Contrast, Inversion, Quantization, GradientMap).
+    - `glitch.rs`: Spatial manipulations (Pixelate, Row Jitter, Block Shift, Pixel Sort).
+    - `crt.rs`: Retro-display simulations (Scanlines, Noise, Vignette, Curvature, PhosphorGlow).
+    - `composite.rs`: Image layout operations (Crop, Blend).
+    - `mod.rs`: `Effect` enum (thin delegation layer), `Pipeline`, `EnabledEffect`, `ParamDescriptor`, and `apply_per_pixel` helper.
+- `src/ui/`: Ratatui-based rendering components (Canvas, Effects Panel, Modals, Widgets). No input handling or state mutation.
 - `src/config/`: Pipeline serialization logic.
 
 ## Building and Running
@@ -52,12 +59,14 @@ Refer to [`.github/copilot-instructions.md`](.github/copilot-instructions.md) fo
 
 ### Coding Style
 - **Efficiency:** Tight inner loops in `src/effects/mod.rs` (`apply_per_pixel`) are designed for auto-vectorization by the compiler.
-- **State Management:** `AppState` holds the entire UI and application state. Avoid deep nesting of state where possible.
+- **State Management:** `AppState` (in `src/app/state.rs`) holds the entire UI and application state. Dialog and file-browser state are encapsulated in dedicated types (`ExportDialogState`, `SavePipelineDialogState`, `FileBrowserState`) within the `app/` module.
+- **Effect Ownership:** Each sub-effect type owns its parameter metadata (`param_descriptors()`), parameter mutation (`apply_params()`), display label (`Display` impl), and variant name (`variant_name()`). The `Effect` enum in `mod.rs` is a thin delegation layer.
 - **UI:** The UI is modularized. When adding new widgets, place them in `src/ui/` and register them in `src/ui/mod.rs`.
 
 ### Adding New Effects
-1. Define the effect struct in the appropriate `src/effects/` submodule (e.g., `glitch.rs`).
-2. Implement necessary logic in `Effect::apply_image` or `apply_pixel`.
-3. Add the effect to the `Effect` enum in `src/effects/mod.rs`.
-4. Register the effect in `AVAILABLE_EFFECTS` within `src/app.rs` to make it appear in the "Add Effect" menu.
-5. Update `randomize_pipeline` in `src/app.rs` if the effect has parameters.
+1. Define the effect variant in the appropriate `src/effects/` submodule (e.g., `glitch.rs`).
+2. Implement the processing logic (`apply_image` or `apply_pixel`/`apply_pixel_with_coords`).
+3. Implement `param_descriptors()`, `apply_params()`, `variant_name()`, and `Display` on the sub-effect type in the same file.
+4. Add the variant to the `Effect` enum in `src/effects/mod.rs` (delegation is automatic via the existing match arms).
+5. Register the effect in `AVAILABLE_EFFECTS` within `src/app/pipeline_utils.rs` to make it appear in the "Add Effect" menu.
+6. Update `randomize_pipeline` in `src/app/pipeline_utils.rs` if the effect has parameters.
