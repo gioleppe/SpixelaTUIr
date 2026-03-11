@@ -6,8 +6,8 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use crate::effects::{
-    Effect, Pipeline, color::ColorEffect, composite::CompositeEffect, crt::CrtEffect,
-    glitch::GlitchEffect,
+    Effect, EnabledEffect, Pipeline, color::ColorEffect, composite::CompositeEffect,
+    crt::CrtEffect, glitch::GlitchEffect,
 };
 use crate::engine::export::{EXPORT_FORMATS, ExportFormat};
 use crate::engine::worker::{WorkerCommand, WorkerResponse};
@@ -626,6 +626,22 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
             state.input_mode = InputMode::AddEffect;
             state.add_effect_cursor = 0;
         }
+        // Toggle the selected effect on/off without removing it (Space).
+        KeyCode::Char(' ') if state.focused_panel == FocusedPanel::EffectsList => {
+            if !state.pipeline.effects.is_empty() {
+                let ee = &mut state.pipeline.effects[state.selected_effect];
+                ee.enabled = !ee.enabled;
+                let enabled = ee.enabled;
+                state.pipeline_dirty = true;
+                state.status_message = if enabled {
+                    "Effect enabled. Re-processing…".to_string()
+                } else {
+                    "Effect disabled. Re-processing…".to_string()
+                };
+                state.image_protocol = None;
+                state.dispatch_process();
+            }
+        }
         // Delete selected effect.
         KeyCode::Delete | KeyCode::Char('d')
             if state.focused_panel == FocusedPanel::EffectsList =>
@@ -654,7 +670,9 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
             if state.focused_panel == FocusedPanel::EffectsList
                 && !state.pipeline.effects.is_empty() =>
         {
-            let descriptors = state.pipeline.effects[state.selected_effect].param_descriptors();
+            let descriptors = state.pipeline.effects[state.selected_effect]
+                .effect
+                .param_descriptors();
             if descriptors.is_empty() {
                 state.status_message = "This effect has no editable parameters.".to_string();
             } else {
@@ -859,7 +877,7 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
         KeyCode::Enter => {
             let effect = AVAILABLE_EFFECTS[state.add_effect_cursor].1();
             state.push_undo();
-            state.pipeline.effects.push(effect);
+            state.pipeline.effects.push(EnabledEffect::new(effect));
             state.input_mode = InputMode::Normal;
             state.selected_effect = state.pipeline.effects.len() - 1;
             state.pipeline_dirty = true;
@@ -961,6 +979,7 @@ fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
         0
     } else {
         state.pipeline.effects[state.selected_effect]
+            .effect
             .param_descriptors()
             .len()
     };
@@ -997,16 +1016,20 @@ fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
         }
         KeyCode::Enter => {
             if !state.pipeline.effects.is_empty() {
-                let descriptors = state.pipeline.effects[state.selected_effect].param_descriptors();
+                let descriptors = state.pipeline.effects[state.selected_effect]
+                    .effect
+                    .param_descriptors();
                 let values: Vec<f32> = state
                     .edit_params
                     .iter()
                     .zip(descriptors.iter())
                     .map(|(s, d)| s.parse::<f32>().unwrap_or(d.value).clamp(d.min, d.max))
                     .collect();
-                let updated = state.pipeline.effects[state.selected_effect].apply_params(&values);
+                let updated = state.pipeline.effects[state.selected_effect]
+                    .effect
+                    .apply_params(&values);
                 state.push_undo();
-                state.pipeline.effects[state.selected_effect] = updated;
+                state.pipeline.effects[state.selected_effect].effect = updated;
                 state.pipeline_dirty = true;
                 state.status_message = "Effect updated. Re-processing…".to_string();
                 state.image_protocol = None;
@@ -1218,11 +1241,11 @@ fn randomize_pipeline(pipeline: &mut Pipeline) {
     pipeline.effects.clear();
     for _ in 0..count {
         let idx = (next() * AVAILABLE_EFFECTS.len() as f32) as usize % AVAILABLE_EFFECTS.len();
-        pipeline.effects.push(AVAILABLE_EFFECTS[idx].1());
+        pipeline.effects.push(EnabledEffect::new(AVAILABLE_EFFECTS[idx].1()));
     }
 
-    for effect in &mut pipeline.effects {
-        match effect {
+    for ee in &mut pipeline.effects {
+        match &mut ee.effect {
             Effect::Color(e) => match e {
                 ColorEffect::HueShift { degrees } => *degrees = next() * 360.0,
                 ColorEffect::Contrast { factor } => *factor = 0.5 + next() * 2.5,
@@ -1305,9 +1328,9 @@ mod tests {
         let mut state = AppState::new(worker_tx, resp_rx, resp_tx, picker);
         state.pipeline = Pipeline {
             effects: vec![
-                Effect::Color(ColorEffect::Invert),
-                Effect::Glitch(GlitchEffect::Pixelate { block_size: 8 }),
-                Effect::Color(ColorEffect::HueShift { degrees: 30.0 }),
+                EnabledEffect::new(Effect::Color(ColorEffect::Invert)),
+                EnabledEffect::new(Effect::Glitch(GlitchEffect::Pixelate { block_size: 8 })),
+                EnabledEffect::new(Effect::Color(ColorEffect::HueShift { degrees: 30.0 })),
             ],
         };
         state.focused_panel = FocusedPanel::EffectsList;
@@ -1320,9 +1343,9 @@ mod tests {
         let mut state = make_state_with_effects();
         handle_normal(&mut state, KeyCode::Char('K'), KeyModifiers::NONE);
         assert_eq!(state.selected_effect, 0);
-        assert!(matches!(state.pipeline.effects[0], Effect::Glitch(_)));
+        assert!(matches!(state.pipeline.effects[0].effect, Effect::Glitch(_)));
         assert!(matches!(
-            state.pipeline.effects[1],
+            state.pipeline.effects[1].effect,
             Effect::Color(ColorEffect::Invert)
         ));
         assert!(state.status_message.contains("up"));
@@ -1333,9 +1356,9 @@ mod tests {
         let mut state = make_state_with_effects();
         handle_normal(&mut state, KeyCode::Up, KeyModifiers::SHIFT);
         assert_eq!(state.selected_effect, 0);
-        assert!(matches!(state.pipeline.effects[0], Effect::Glitch(_)));
+        assert!(matches!(state.pipeline.effects[0].effect, Effect::Glitch(_)));
         assert!(matches!(
-            state.pipeline.effects[1],
+            state.pipeline.effects[1].effect,
             Effect::Color(ColorEffect::Invert)
         ));
         assert!(state.status_message.contains("up"));
@@ -1346,8 +1369,8 @@ mod tests {
         let mut state = make_state_with_effects();
         handle_normal(&mut state, KeyCode::Char('J'), KeyModifiers::NONE);
         assert_eq!(state.selected_effect, 2);
-        assert!(matches!(state.pipeline.effects[1], Effect::Color(_)));
-        assert!(matches!(state.pipeline.effects[2], Effect::Glitch(_)));
+        assert!(matches!(state.pipeline.effects[1].effect, Effect::Color(_)));
+        assert!(matches!(state.pipeline.effects[2].effect, Effect::Glitch(_)));
         assert!(state.status_message.contains("down"));
     }
 
@@ -1356,8 +1379,8 @@ mod tests {
         let mut state = make_state_with_effects();
         handle_normal(&mut state, KeyCode::Down, KeyModifiers::SHIFT);
         assert_eq!(state.selected_effect, 2);
-        assert!(matches!(state.pipeline.effects[1], Effect::Color(_)));
-        assert!(matches!(state.pipeline.effects[2], Effect::Glitch(_)));
+        assert!(matches!(state.pipeline.effects[1].effect, Effect::Color(_)));
+        assert!(matches!(state.pipeline.effects[2].effect, Effect::Glitch(_)));
         assert!(state.status_message.contains("down"));
     }
 
@@ -1389,7 +1412,7 @@ mod tests {
         assert_eq!(state.selected_effect, 0);
         // First effect must remain the original Invert, not the Pixelate.
         assert!(matches!(
-            state.pipeline.effects[0],
+            state.pipeline.effects[0].effect,
             Effect::Color(ColorEffect::Invert)
         ));
     }
@@ -1462,7 +1485,7 @@ mod tests {
         let picker = ratatui_image::picker::Picker::halfblocks();
         let mut state = AppState::new(worker_tx, resp_rx, resp_tx, picker);
         state.pipeline = Pipeline {
-            effects: vec![Effect::Color(ColorEffect::Invert)],
+            effects: vec![EnabledEffect::new(Effect::Color(ColorEffect::Invert))],
         };
         state.input_mode = InputMode::SavePipelineDialog;
         state.save_pipeline_dialog.directory = tmp_dir.to_string_lossy().into_owned();
@@ -1508,8 +1531,8 @@ mod tests {
         let tmp = std::env::temp_dir().join("spixelatuir_test_pipeline.json");
         let pipeline = Pipeline {
             effects: vec![
-                Effect::Color(ColorEffect::Invert),
-                Effect::Glitch(GlitchEffect::Pixelate { block_size: 4 }),
+                EnabledEffect::new(Effect::Color(ColorEffect::Invert)),
+                EnabledEffect::new(Effect::Glitch(GlitchEffect::Pixelate { block_size: 4 })),
             ],
         };
 
@@ -1519,13 +1542,14 @@ mod tests {
 
         assert_eq!(loaded.effects.len(), 2);
         assert!(matches!(
-            loaded.effects[0],
+            loaded.effects[0].effect,
             Effect::Color(ColorEffect::Invert)
         ));
         assert!(matches!(
-            loaded.effects[1],
+            loaded.effects[1].effect,
             Effect::Glitch(GlitchEffect::Pixelate { block_size: 4 })
         ));
+        assert!(loaded.effects[0].enabled, "loaded effects should be enabled by default");
 
         let _ = std::fs::remove_file(&tmp);
     }
