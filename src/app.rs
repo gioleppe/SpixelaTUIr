@@ -274,6 +274,11 @@ pub struct AppState {
     pub redo_stack: std::collections::VecDeque<Pipeline>,
     /// Whether to show the live luminance/RGB histogram overlay on the canvas.
     pub show_histogram: bool,
+    /// Whether the canvas is in side-by-side before/after split view.
+    pub split_view: bool,
+    /// ratatui-image stateful protocol for displaying the original (pre-effects) proxy.
+    /// Only populated when `split_view` is active and an image is loaded.
+    pub original_image_protocol: Option<StatefulProtocol>,
 }
 
 impl AppState {
@@ -328,6 +333,8 @@ impl AppState {
             undo_stack: std::collections::VecDeque::new(),
             redo_stack: std::collections::VecDeque::new(),
             show_histogram: false,
+            split_view: false,
+            original_image_protocol: None,
         }
     }
 
@@ -339,6 +346,7 @@ impl AppState {
                 let proxy = img.thumbnail(size, size);
                 self.image_path = Some(path.clone());
                 self.source_asset = Some(img);
+                self.original_image_protocol = Some(self.picker.new_resize_protocol(proxy.clone()));
                 self.proxy_asset = Some(proxy);
                 self.preview_buffer = None;
                 self.image_protocol = None;
@@ -372,6 +380,8 @@ impl AppState {
             let size = PROXY_RESOLUTIONS[self.proxy_resolution_index];
             let proxy = source.thumbnail(size, size);
             self.source_asset = Some(source);
+            self.original_image_protocol =
+                Some(self.picker.new_resize_protocol(proxy.clone()));
             self.proxy_asset = Some(proxy);
             self.preview_buffer = None;
             self.image_protocol = None;
@@ -810,6 +820,15 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
                 "Histogram overlay enabled.".to_string()
             } else {
                 "Histogram overlay disabled.".to_string()
+            };
+        }
+        // Toggle side-by-side before/after split view.
+        KeyCode::Char('v') => {
+            state.split_view = !state.split_view;
+            state.status_message = if state.split_view {
+                "Split view enabled – left: original, right: processed.".to_string()
+            } else {
+                "Split view disabled.".to_string()
             };
         }
         _ => {}
@@ -1562,6 +1581,7 @@ mod tests {
             Effect::Glitch(GlitchEffect::Pixelate { block_size: 4 })
         ));
         assert!(loaded.effects[0].enabled, "loaded effects should be enabled by default");
+        assert!(loaded.effects[1].enabled, "all loaded effects should be enabled by default");
 
         let _ = std::fs::remove_file(&tmp);
     }
