@@ -386,6 +386,15 @@ fn randomize_pipeline(pipeline: &mut Pipeline) {
         ((rng >> 33) as f32) / (u32::MAX as f32)
     };
 
+    // Populate the pipeline with 2-5 random effects so randomization is
+    // visible even when starting from an empty pipeline.
+    let count = 2 + (next() * 4.0) as usize;
+    pipeline.effects.clear();
+    for _ in 0..count {
+        let idx = (next() * AVAILABLE_EFFECTS.len() as f32) as usize % AVAILABLE_EFFECTS.len();
+        pipeline.effects.push(AVAILABLE_EFFECTS[idx].1());
+    }
+
     for effect in &mut pipeline.effects {
         match effect {
             Effect::Color(e) => match e {
@@ -422,5 +431,44 @@ fn randomize_pipeline(pipeline: &mut Pipeline) {
             },
             Effect::Composite(_) => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn randomize_pipeline_populates_empty_pipeline() {
+        let mut pipeline = Pipeline::default();
+        assert!(pipeline.effects.is_empty(), "pipeline should start empty");
+
+        randomize_pipeline(&mut pipeline);
+
+        let len = pipeline.effects.len();
+        assert!(
+            (2..=5).contains(&len),
+            "randomize should add 2–5 effects, got {len}"
+        );
+    }
+
+    #[test]
+    fn randomize_pipeline_replaces_existing_effects() {
+        let mut pipeline = Pipeline::default();
+        randomize_pipeline(&mut pipeline);
+        let first_len = pipeline.effects.len();
+
+        // A second call must also produce a valid count (pipeline is non-empty now).
+        randomize_pipeline(&mut pipeline);
+        let second_len = pipeline.effects.len();
+
+        assert!(
+            (2..=5).contains(&first_len),
+            "first randomize should give 2–5 effects, got {first_len}"
+        );
+        assert!(
+            (2..=5).contains(&second_len),
+            "second randomize should give 2–5 effects, got {second_len}"
+        );
     }
 }
