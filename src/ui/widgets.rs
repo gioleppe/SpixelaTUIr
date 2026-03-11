@@ -34,7 +34,7 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         }
         InputMode::SavePipelineInput => "Type path  Enter: save  Esc: cancel",
         InputMode::Normal => {
-            "q: Quit  o: Open  e: Export  Ctrl+S: Save pipeline  Ctrl+L: Load pipeline  Tab: Switch panel  [Effects] a: Add  d: Del  Enter: Edit  K/J: Move up/down  r: Random"
+            "q: Quit  o: Open  e: Export  Ctrl+S: Save pipeline  Ctrl+L: Load pipeline  Tab: Switch panel  [/]: Preview res  [Effects] a: Add  d: Del  Enter: Edit  K/J: Move up/down  r: Random"
         }
     };
     let block = Block::default().title("Controls").borders(Borders::ALL);
