@@ -168,6 +168,8 @@ pub enum InputMode {
     HelpModal,
     /// Waiting for the user to confirm clearing the pipeline (Ctrl+D).
     ConfirmClearPipeline,
+    /// Waiting for the user to confirm quitting with unsaved changes.
+    ConfirmQuit,
 }
 
 /// State for the export dialog modal.
@@ -266,8 +268,6 @@ pub struct AppState {
     pub dragging_effect: bool,
     /// Set whenever the pipeline is modified; cleared when the pipeline is saved.
     pub pipeline_dirty: bool,
-    /// True after the first quit attempt when there are unsaved changes (double-press to confirm).
-    pub quit_requested: bool,
     /// Ring-buffer of past pipeline states for undo (most-recent-first).
     pub undo_stack: std::collections::VecDeque<Pipeline>,
     /// Stack of pipeline states that were undone, for redo.
@@ -329,7 +329,6 @@ impl AppState {
             proxy_resolution_index: 1,
             dragging_effect: false,
             pipeline_dirty: false,
-            quit_requested: false,
             undo_stack: std::collections::VecDeque::new(),
             redo_stack: std::collections::VecDeque::new(),
             show_histogram: false,
@@ -571,22 +570,17 @@ fn handle_key(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
         InputMode::SavePipelineDialog => handle_save_pipeline_dialog(state, code),
         InputMode::HelpModal => handle_help_modal(state, code),
         InputMode::ConfirmClearPipeline => handle_confirm_clear_pipeline(state, code),
+        InputMode::ConfirmQuit => handle_confirm_quit(state, code),
     }
 }
 
 fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
     // Any keypress ends the drag highlight by default; move_effect_* will re-enable it.
     state.dragging_effect = false;
-    // Any non-quit keypress resets the pending-quit confirmation.
-    if !matches!(code, KeyCode::Char('q') | KeyCode::Esc) {
-        state.quit_requested = false;
-    }
     match code {
         KeyCode::Char('q') | KeyCode::Esc => {
-            if state.pipeline_dirty && !state.quit_requested {
-                state.quit_requested = true;
-                state.status_message =
-                    "Unsaved changes – press q again to quit, or Ctrl+S to save.".to_string();
+            if state.pipeline_dirty {
+                state.input_mode = InputMode::ConfirmQuit;
             } else {
                 state.should_quit = true;
             }
@@ -973,7 +967,6 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
                                     state.pipeline = pipeline;
                                     state.clamp_selection();
                                     state.pipeline_dirty = false;
-                                    state.quit_requested = false;
                                     state.undo_stack.clear();
                                     state.redo_stack.clear();
                                     state.image_protocol = None;
@@ -1176,7 +1169,6 @@ fn handle_save_pipeline_dialog(state: &mut AppState, code: KeyCode) {
             match crate::config::parser::save_pipeline(&state.pipeline, &output_path) {
                 Ok(()) => {
                     state.pipeline_dirty = false;
-                    state.quit_requested = false;
                     state.status_message = format!("Pipeline saved → {}", output_path.display());
                 }
                 Err(e) => {
@@ -1243,6 +1235,25 @@ fn handle_confirm_clear_pipeline(state: &mut AppState, code: KeyCode) {
         KeyCode::Esc => {
             state.input_mode = InputMode::Normal;
             state.status_message = "Clear cancelled.".to_string();
+        }
+        _ => {}
+    }
+}
+/// Handle the quit-confirmation modal (shown when quitting with unsaved changes).
+fn handle_confirm_quit(state: &mut AppState, code: KeyCode) {
+    match code {
+        // 'y' or Enter: discard changes and quit.
+        KeyCode::Char('y') | KeyCode::Enter => {
+            state.should_quit = true;
+        }
+        // 'n' or Esc: go back to normal mode.
+        KeyCode::Char('n') | KeyCode::Esc => {
+            state.input_mode = InputMode::Normal;
+            state.status_message = "Quit cancelled.".to_string();
+        }
+        // 's': save pipeline and quit.
+        KeyCode::Char('s') => {
+            state.input_mode = InputMode::SavePipelineDialog;
         }
         _ => {}
     }
