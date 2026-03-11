@@ -42,6 +42,7 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
             "j/k: navigate fields  Enter: save as JSON  Esc: cancel"
         }
         InputMode::HelpModal => "h / Esc: close help",
+        InputMode::ConfirmClearPipeline => "Enter: confirm clear  Esc: cancel",
         InputMode::Normal => {
             "q: Quit  o: Open  e: Export  Ctrl+S: Save  Ctrl+L: Load  r: Random  Tab: Switch focus  [/]: Preview  h: Help"
         }
@@ -273,6 +274,7 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
   e             Export image (dialog)\n\
   Ctrl+S        Save pipeline (JSON dialog)\n\
   Ctrl+L        Load pipeline (file browser)\n\
+  Ctrl+D        Clear all effects (with confirm)\n\
   r             Randomise all effect parameters\n\
   [             Decrease preview resolution\n\
   ]             Increase preview resolution\n\
