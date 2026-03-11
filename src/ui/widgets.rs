@@ -42,7 +42,7 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         InputMode::HelpModal => "h / Esc: close help",
         InputMode::ConfirmClearPipeline => "Enter: confirm clear  Esc: cancel",
         InputMode::Normal => {
-            "q: Quit  o: Open  e: Export  Ctrl+S: Save  Ctrl+L: Load  Ctrl+Z/Y: Undo/Redo  Ctrl+D: Clear  r: Random  [/]: Preview  h: Help"
+            "q: Quit  o: Open  e: Export  Ctrl+S: Save  Ctrl+L: Load  Ctrl+Z/Y: Undo/Redo  Ctrl+D: Clear  r: Random  [/]: Preview  v: Split  H: Histogram  h: Help"
         }
     };
     let block = Block::default().title("Controls").borders(Borders::ALL);
@@ -287,6 +287,7 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
   a             Add a new effect\n\
   d / Delete    Delete selected effect\n\
   Enter         Edit effect parameters\n\
+  Space         Toggle selected effect on/off\n\
   K / Shift+↑   Move effect up in pipeline\n\
   J / Shift+↓   Move effect down in pipeline\n\
 \n\

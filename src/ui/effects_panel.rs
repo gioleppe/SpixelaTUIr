@@ -47,9 +47,10 @@ pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
         .effects
         .iter()
         .enumerate()
-        .map(|(i, e)| {
+        .map(|(i, ee)| {
             let selected = i == state.selected_effect && is_focused;
-            let label = effect_label(e);
+            let label = effect_label(&ee.effect);
+            let enabled = ee.enabled;
             let style = if selected && state.dragging_effect {
                 // Distinct "dragging" highlight: cyan background.
                 Style::default()
@@ -61,6 +62,10 @@ pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
                     .fg(Color::Black)
                     .bg(Color::Yellow)
                     .add_modifier(Modifier::BOLD)
+            } else if !enabled {
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM)
             } else {
                 Style::default().fg(Color::White)
             };
@@ -70,8 +75,10 @@ pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
             } else {
                 ""
             };
+            let toggle_indicator = if enabled { " " } else { "✗" };
             ListItem::new(Line::from(vec![
                 Span::styled(prefix, style),
+                Span::styled(toggle_indicator, style),
                 Span::styled(label, style),
                 Span::styled(suffix, style),
             ]))
@@ -148,7 +155,7 @@ pub fn render_edit_effect_modal(frame: &mut Frame, state: &AppState) {
         return;
     }
 
-    let effect = &state.pipeline.effects[state.selected_effect];
+    let effect = &state.pipeline.effects[state.selected_effect].effect;
     let descriptors = effect.param_descriptors();
     if descriptors.is_empty() {
         return;

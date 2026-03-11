@@ -306,17 +306,42 @@ impl Effect {
     }
 }
 
-/// An ordered sequence of [`Effect`]s applied to the image.
+/// A single pipeline step with an optional enable/disable flag.
+///
+/// When `enabled` is `false` the wrapped [`Effect`] is skipped during
+/// [`Pipeline::apply_image`] without being removed from the pipeline,
+/// allowing quick A/B comparisons.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnabledEffect {
+    /// Whether this effect participates in the pipeline.
+    pub enabled: bool,
+    /// The wrapped image-manipulation effect.
+    pub effect: Effect,
+}
+
+impl EnabledEffect {
+    /// Create a new enabled effect wrapping `effect`.
+    pub fn new(effect: Effect) -> Self {
+        Self {
+            enabled: true,
+            effect,
+        }
+    }
+}
+
+/// An ordered sequence of [`EnabledEffect`]s applied to the image.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Pipeline {
-    pub effects: Vec<Effect>,
+    pub effects: Vec<EnabledEffect>,
 }
 
 impl Pipeline {
-    /// Apply all effects in the pipeline to a full image buffer.
+    /// Apply all **enabled** effects in the pipeline to a full image buffer.
     pub fn apply_image(&self, mut img: DynamicImage) -> DynamicImage {
-        for effect in &self.effects {
-            img = effect.apply_image(img);
+        for ee in &self.effects {
+            if ee.enabled {
+                img = ee.effect.apply_image(img);
+            }
         }
         img
     }
