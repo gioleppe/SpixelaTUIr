@@ -18,4 +18,5 @@ pub fn render(frame: &mut Frame, state: &mut AppState) {
     // Overlays (rendered on top of everything).
     widgets::render_path_input(frame, state);
     effects_panel::render_add_effect_menu(frame, state);
+    effects_panel::render_edit_effect_modal(frame, state);
 }
