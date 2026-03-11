@@ -22,7 +22,7 @@ pub fn render_canvas(frame: &mut Frame, area: Rect, state: &mut AppState) {
         // In split view, render the halves directly into the provided area
         // to avoid double borders which can cause flickering with some Sixel terminals.
         render_split_canvas(frame, area, state);
-        
+
         // Histogram overlay (top-right corner of canvas, processed side).
         if state.show_histogram {
             let halves = Layout::default()

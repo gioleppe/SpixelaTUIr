@@ -323,11 +323,7 @@ pub fn render_quit_confirm_modal(frame: &mut Frame, state: &AppState) {
     let outer_block = Block::default()
         .title("  ⚠  Unsaved Changes  ")
         .borders(Borders::ALL)
-        .border_style(
-            Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD),
-        );
+        .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
     frame.render_widget(outer_block, popup_area);
 
     let inner = Rect::new(
@@ -348,8 +344,11 @@ pub fn render_quit_confirm_modal(frame: &mut Frame, state: &AppState) {
         ])
         .split(inner);
 
-    let warning = Paragraph::new("  You have unsaved pipeline changes.")
-        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+    let warning = Paragraph::new("  You have unsaved pipeline changes.").style(
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    );
     frame.render_widget(warning, rows[1]);
 
     let hints = Paragraph::new("  [y] Quit  [n] Cancel  [s] Save & stay")

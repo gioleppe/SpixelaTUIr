@@ -41,8 +41,7 @@ use ratatui_image::picker::Picker;
 use crate::engine::worker::{WorkerCommand, WorkerResponse};
 
 /// Keyboard hint shown in the controls bar and inside the file-browser footer.
-pub const FILE_BROWSER_HINT: &str =
-    "↑↓/jk: navigate  Enter: open  Backspace/-: up  Esc: cancel";
+pub const FILE_BROWSER_HINT: &str = "↑↓/jk: navigate  Enter: open  Backspace/-: up  Esc: cancel";
 
 /// Keyboard hint shown when the file browser is open to load a pipeline.
 pub const PIPELINE_BROWSER_HINT: &str =
@@ -226,10 +225,7 @@ mod tests {
         let mut state = make_state_with_effects();
         handle_normal(&mut state, KeyCode::Char('J'), KeyModifiers::NONE);
         assert_eq!(state.selected_effect, 2);
-        assert!(matches!(
-            state.pipeline.effects[1].effect,
-            Effect::Color(_)
-        ));
+        assert!(matches!(state.pipeline.effects[1].effect, Effect::Color(_)));
         assert!(matches!(
             state.pipeline.effects[2].effect,
             Effect::Glitch(_)
@@ -242,10 +238,7 @@ mod tests {
         let mut state = make_state_with_effects();
         handle_normal(&mut state, KeyCode::Down, KeyModifiers::SHIFT);
         assert_eq!(state.selected_effect, 2);
-        assert!(matches!(
-            state.pipeline.effects[1].effect,
-            Effect::Color(_)
-        ));
+        assert!(matches!(state.pipeline.effects[1].effect, Effect::Color(_)));
         assert!(matches!(
             state.pipeline.effects[2].effect,
             Effect::Glitch(_)
@@ -338,8 +331,7 @@ mod tests {
         let mut state = make_state_with_effects();
         state.input_mode = InputMode::SavePipelineDialog;
         // Point the dialog at the temp dir so we don't pollute the project root.
-        state.save_pipeline_dialog.directory =
-            std::env::temp_dir().to_string_lossy().into_owned();
+        state.save_pipeline_dialog.directory = std::env::temp_dir().to_string_lossy().into_owned();
         // Leave filename empty — effective_filename() will fall back to "pipeline".
         handle_save_pipeline_dialog(&mut state, KeyCode::Enter);
         assert_eq!(state.input_mode, InputMode::Normal);
@@ -408,8 +400,7 @@ mod tests {
 
         crate::config::parser::save_pipeline(&pipeline, &tmp).expect("save should succeed");
 
-        let loaded =
-            crate::config::parser::load_pipeline(&tmp).expect("load should succeed");
+        let loaded = crate::config::parser::load_pipeline(&tmp).expect("load should succeed");
 
         assert_eq!(loaded.effects.len(), 2);
         assert!(matches!(

@@ -46,7 +46,11 @@ pub fn serialize_pipeline(pipeline: &Pipeline) -> Result<String> {
 /// extension supplied by the caller.  Parent directories are **not** created
 /// automatically.
 pub fn save_pipeline(pipeline: &Pipeline, path: &Path) -> Result<()> {
-    log::info!("Saving pipeline ({} effects) to {}", pipeline.effects.len(), path.display());
+    log::info!(
+        "Saving pipeline ({} effects) to {}",
+        pipeline.effects.len(),
+        path.display()
+    );
     let json = serialize_pipeline(pipeline)?;
     std::fs::write(path, json)
         .with_context(|| format!("writing pipeline to {}", path.display()))?;

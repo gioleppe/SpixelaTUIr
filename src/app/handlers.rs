@@ -1,15 +1,13 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 
-use crate::effects::{
-    Effect, EnabledEffect, color, color::ColorEffect,
-};
+use crate::effects::{Effect, EnabledEffect, color, color::ColorEffect};
 use crate::engine::export::EXPORT_FORMATS;
 
+use super::PROXY_RESOLUTIONS;
 use super::dialogs::{FocusedPanel, InputMode};
 use super::file_browser::{FileBrowserEntry, FileBrowserPurpose, FileBrowserState};
-use super::pipeline_utils::{format_param_value, randomize_pipeline, AVAILABLE_EFFECTS};
+use super::pipeline_utils::{AVAILABLE_EFFECTS, format_param_value, randomize_pipeline};
 use super::state::AppState;
-use super::PROXY_RESOLUTIONS;
 
 /// Top-level key dispatch — routes to the appropriate mode-specific handler.
 pub fn handle_key(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
@@ -113,11 +111,12 @@ pub fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifier
             if state.focused_panel == FocusedPanel::EffectsList =>
         {
             if !state.pipeline.effects.is_empty() {
-                let idx = state.selected_effect;
-                state.mutate_pipeline(|p| {
-                    p.effects.remove(idx);
-                });
+                state.push_undo();
+                state.pipeline.effects.remove(state.selected_effect);
                 state.clamp_selection();
+                state.pipeline_dirty = true;
+                state.image_protocol = None;
+                state.dispatch_process();
                 state.status_message = "Effect removed. Re-processing…".to_string();
             }
         }
@@ -244,8 +243,7 @@ pub fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifier
         // Load a pipeline from a JSON or YAML file via the file browser (Ctrl+L).
         KeyCode::Char('l') if modifiers.contains(KeyModifiers::CONTROL) => {
             let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
-            state.file_browser =
-                Some(FileBrowserState::new(cwd, FileBrowserPurpose::LoadPipeline));
+            state.file_browser = Some(FileBrowserState::new(cwd, FileBrowserPurpose::LoadPipeline));
             state.input_mode = InputMode::FileBrowser;
         }
         // Clear all effects with a confirmation prompt (Ctrl+D).
@@ -458,8 +456,7 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
                                     );
                                 }
                                 Err(e) => {
-                                    state.status_message =
-                                        format!("Error loading pipeline: {e}");
+                                    state.status_message = format!("Error loading pipeline: {e}");
                                 }
                             }
                         }
@@ -525,8 +522,9 @@ fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
                 if let Some(d) = descriptors.get(field_idx) {
                     // For "preset" fields, we allow arrow-key cycling.
                     if d.name == "preset" {
-                        let current =
-                            state.edit_params[field_idx].parse::<f32>().unwrap_or(d.value);
+                        let current = state.edit_params[field_idx]
+                            .parse::<f32>()
+                            .unwrap_or(d.value);
                         let n = color::GRADIENT_PRESETS.len() as f32;
                         let next = if matches!(code, KeyCode::Left) {
                             (current + n - 1.0) % n
@@ -719,8 +717,7 @@ pub fn handle_save_pipeline_dialog(state: &mut AppState, code: KeyCode) {
             match crate::config::parser::save_pipeline(&state.pipeline, &output_path) {
                 Ok(()) => {
                     state.pipeline_dirty = false;
-                    state.status_message =
-                        format!("Pipeline saved → {}", output_path.display());
+                    state.status_message = format!("Pipeline saved → {}", output_path.display());
                 }
                 Err(e) => {
                     state.status_message = format!("Error saving pipeline: {e}");

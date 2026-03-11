@@ -100,18 +100,49 @@ impl CrtEffect {
     pub fn param_descriptors(&self) -> Vec<ParamDescriptor> {
         match self {
             CrtEffect::Scanlines { spacing, opacity } => vec![
-                ParamDescriptor { name: "spacing", value: *spacing as f32, min: 1.0, max: 20.0 },
-                ParamDescriptor { name: "opacity", value: *opacity, min: 0.0, max: 1.0 },
+                ParamDescriptor {
+                    name: "spacing",
+                    value: *spacing as f32,
+                    min: 1.0,
+                    max: 20.0,
+                },
+                ParamDescriptor {
+                    name: "opacity",
+                    value: *opacity,
+                    min: 0.0,
+                    max: 1.0,
+                },
             ],
             CrtEffect::Curvature { strength } => vec![ParamDescriptor {
-                name: "strength", value: *strength, min: 0.0, max: 1.0,
+                name: "strength",
+                value: *strength,
+                min: 0.0,
+                max: 1.0,
             }],
             CrtEffect::PhosphorGlow { radius, intensity } => vec![
-                ParamDescriptor { name: "radius", value: *radius as f32, min: 1.0, max: 20.0 },
-                ParamDescriptor { name: "intensity", value: *intensity, min: 0.0, max: 1.0 },
+                ParamDescriptor {
+                    name: "radius",
+                    value: *radius as f32,
+                    min: 1.0,
+                    max: 20.0,
+                },
+                ParamDescriptor {
+                    name: "intensity",
+                    value: *intensity,
+                    min: 0.0,
+                    max: 1.0,
+                },
             ],
-            CrtEffect::Noise { intensity, monochromatic } => vec![
-                ParamDescriptor { name: "intensity", value: *intensity, min: 0.0, max: 1.0 },
+            CrtEffect::Noise {
+                intensity,
+                monochromatic,
+            } => vec![
+                ParamDescriptor {
+                    name: "intensity",
+                    value: *intensity,
+                    min: 0.0,
+                    max: 1.0,
+                },
                 ParamDescriptor {
                     name: "monochromatic",
                     value: if *monochromatic { 1.0 } else { 0.0 },
@@ -120,8 +151,18 @@ impl CrtEffect {
                 },
             ],
             CrtEffect::Vignette { radius, softness } => vec![
-                ParamDescriptor { name: "radius", value: *radius, min: 0.0, max: 2.0 },
-                ParamDescriptor { name: "softness", value: *softness, min: 0.0, max: 2.0 },
+                ParamDescriptor {
+                    name: "radius",
+                    value: *radius,
+                    min: 0.0,
+                    max: 2.0,
+                },
+                ParamDescriptor {
+                    name: "softness",
+                    value: *softness,
+                    min: 0.0,
+                    max: 2.0,
+                },
             ],
         }
     }
@@ -141,7 +182,10 @@ impl CrtEffect {
                 radius: get(0, *radius as f32) as u32,
                 intensity: get(1, *intensity),
             },
-            CrtEffect::Noise { intensity, monochromatic } => CrtEffect::Noise {
+            CrtEffect::Noise {
+                intensity,
+                monochromatic,
+            } => CrtEffect::Noise {
                 intensity: get(0, *intensity),
                 monochromatic: get(1, if *monochromatic { 1.0 } else { 0.0 }) >= 0.5,
             },

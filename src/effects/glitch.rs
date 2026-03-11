@@ -33,17 +33,36 @@ impl GlitchEffect {
     pub fn param_descriptors(&self) -> Vec<ParamDescriptor> {
         match self {
             GlitchEffect::Pixelate { block_size } => vec![ParamDescriptor {
-                name: "block_size", value: *block_size as f32, min: 1.0, max: 64.0,
+                name: "block_size",
+                value: *block_size as f32,
+                min: 1.0,
+                max: 64.0,
             }],
             GlitchEffect::RowJitter { magnitude } => vec![ParamDescriptor {
-                name: "magnitude", value: *magnitude, min: 0.0, max: 1.0,
+                name: "magnitude",
+                value: *magnitude,
+                min: 0.0,
+                max: 1.0,
             }],
             GlitchEffect::BlockShift { shift_x, shift_y } => vec![
-                ParamDescriptor { name: "shift_x", value: *shift_x as f32, min: -200.0, max: 200.0 },
-                ParamDescriptor { name: "shift_y", value: *shift_y as f32, min: -200.0, max: 200.0 },
+                ParamDescriptor {
+                    name: "shift_x",
+                    value: *shift_x as f32,
+                    min: -200.0,
+                    max: 200.0,
+                },
+                ParamDescriptor {
+                    name: "shift_y",
+                    value: *shift_y as f32,
+                    min: -200.0,
+                    max: 200.0,
+                },
             ],
             GlitchEffect::PixelSort { threshold } => vec![ParamDescriptor {
-                name: "threshold", value: *threshold, min: 0.0, max: 1.0,
+                name: "threshold",
+                value: *threshold,
+                min: 0.0,
+                max: 1.0,
             }],
         }
     }

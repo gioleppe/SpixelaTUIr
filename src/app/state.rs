@@ -8,11 +8,9 @@ use crate::effects::Pipeline;
 use crate::engine::export::ExportFormat;
 use crate::engine::worker::{WorkerCommand, WorkerResponse};
 
-use super::dialogs::{
-    ExportDialogState, FocusedPanel, InputMode, SavePipelineDialogState,
-};
-use super::file_browser::FileBrowserState;
 use super::PROXY_RESOLUTIONS;
+use super::dialogs::{ExportDialogState, FocusedPanel, InputMode, SavePipelineDialogState};
+use super::file_browser::FileBrowserState;
 
 /// Central application state.
 pub struct AppState {
@@ -139,8 +137,7 @@ impl AppState {
                 let proxy = img.thumbnail(size, size);
                 self.image_path = Some(path.clone());
                 self.source_asset = Some(img);
-                self.original_image_protocol =
-                    Some(self.picker.new_resize_protocol(proxy.clone()));
+                self.original_image_protocol = Some(self.picker.new_resize_protocol(proxy.clone()));
                 self.proxy_asset = Some(proxy);
                 self.preview_buffer = None;
                 self.image_protocol = None;
@@ -182,8 +179,7 @@ impl AppState {
             log::debug!("Reloading proxy at {size}px");
             let proxy = source.thumbnail(size, size);
             self.source_asset = Some(source);
-            self.original_image_protocol =
-                Some(self.picker.new_resize_protocol(proxy.clone()));
+            self.original_image_protocol = Some(self.picker.new_resize_protocol(proxy.clone()));
             self.proxy_asset = Some(proxy);
             self.preview_buffer = None;
             self.image_protocol = None;
@@ -254,12 +250,17 @@ impl AppState {
         self.redo_stack.clear();
     }
 
-    /// Mutate the pipeline after pushing an undo snapshot, re-dispatch processing,
-    /// and mark the pipeline as dirty.
+    /// Mutate the pipeline with automatic undo, dirty-tracking, and re-processing.
     ///
-    /// This is a convenience helper that centralises the common post-mutation
-    /// pattern used by many keyboard handlers: push undo → apply change → mark
-    /// dirty → clear protocol → re-dispatch.
+    /// Performs the following sequence automatically:
+    /// 1. Pushes the current pipeline onto the **undo stack** (clears redo).
+    /// 2. Applies the caller-supplied closure `f` to the pipeline.
+    /// 3. Sets `pipeline_dirty = true`.
+    /// 4. Clears the cached `image_protocol` (forces a Sixel re-encode).
+    /// 5. Dispatches the updated pipeline to the worker thread for processing.
+    ///
+    /// Use this helper for simple pipeline mutations where no additional
+    /// state adjustments (e.g. `clamp_selection`) are needed after the change.
     pub fn mutate_pipeline(&mut self, f: impl FnOnce(&mut Pipeline)) {
         self.push_undo();
         f(&mut self.pipeline);

@@ -60,7 +60,9 @@ mod snapshot_tests {
     use std::sync::mpsc;
 
     use crate::app::AppState;
-    use crate::effects::{Effect, EnabledEffect, Pipeline, color::ColorEffect, glitch::GlitchEffect};
+    use crate::effects::{
+        Effect, EnabledEffect, Pipeline, color::ColorEffect, glitch::GlitchEffect,
+    };
 
     fn make_state() -> AppState {
         let (worker_tx, _worker_rx) = mpsc::channel();

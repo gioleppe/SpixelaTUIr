@@ -50,13 +50,41 @@ impl CompositeEffect {
     pub fn param_descriptors(&self) -> Vec<ParamDescriptor> {
         match self {
             CompositeEffect::ImageBlend { opacity } => vec![ParamDescriptor {
-                name: "opacity", value: *opacity, min: 0.0, max: 1.0,
+                name: "opacity",
+                value: *opacity,
+                min: 0.0,
+                max: 1.0,
             }],
-            CompositeEffect::CropRect { x, y, width, height } => vec![
-                ParamDescriptor { name: "x", value: *x as f32, min: 0.0, max: 4096.0 },
-                ParamDescriptor { name: "y", value: *y as f32, min: 0.0, max: 4096.0 },
-                ParamDescriptor { name: "width", value: *width as f32, min: 1.0, max: 4096.0 },
-                ParamDescriptor { name: "height", value: *height as f32, min: 1.0, max: 4096.0 },
+            CompositeEffect::CropRect {
+                x,
+                y,
+                width,
+                height,
+            } => vec![
+                ParamDescriptor {
+                    name: "x",
+                    value: *x as f32,
+                    min: 0.0,
+                    max: 4096.0,
+                },
+                ParamDescriptor {
+                    name: "y",
+                    value: *y as f32,
+                    min: 0.0,
+                    max: 4096.0,
+                },
+                ParamDescriptor {
+                    name: "width",
+                    value: *width as f32,
+                    min: 1.0,
+                    max: 4096.0,
+                },
+                ParamDescriptor {
+                    name: "height",
+                    value: *height as f32,
+                    min: 1.0,
+                    max: 4096.0,
+                },
             ],
         }
     }
@@ -68,7 +96,12 @@ impl CompositeEffect {
             CompositeEffect::ImageBlend { opacity } => CompositeEffect::ImageBlend {
                 opacity: get(0, *opacity),
             },
-            CompositeEffect::CropRect { x, y, width, height } => CompositeEffect::CropRect {
+            CompositeEffect::CropRect {
+                x,
+                y,
+                width,
+                height,
+            } => CompositeEffect::CropRect {
                 x: get(0, *x as f32) as u32,
                 y: get(1, *y as f32) as u32,
                 width: get(2, *width as f32) as u32,

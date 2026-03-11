@@ -102,5 +102,3 @@ pub enum FocusedPanel {
     Canvas,
     EffectsList,
 }
-
-

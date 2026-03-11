@@ -89,7 +89,7 @@ impl ColorEffect {
                 let luma = 0.2126 * (pixel[0] as f32 / 255.0)
                     + 0.7152 * (pixel[1] as f32 / 255.0)
                     + 0.0722 * (pixel[2] as f32 / 255.0);
-                
+
                 if stops.len() == 1 || luma <= stops[0].0 {
                     let c = stops[0].1;
                     return Rgba([c[0], c[1], c[2], pixel[3]]);
@@ -98,7 +98,7 @@ impl ColorEffect {
                     let c = stops.last().unwrap().1;
                     return Rgba([c[0], c[1], c[2], pixel[3]]);
                 }
-                
+
                 let mut lower = &stops[0];
                 let mut upper = &stops[stops.len() - 1];
                 for i in 0..stops.len() - 1 {
@@ -108,14 +108,18 @@ impl ColorEffect {
                         break;
                     }
                 }
-                
+
                 let range = upper.0 - lower.0;
-                let t = if range > 0.0 { (luma - lower.0) / range } else { 0.0 };
-                
+                let t = if range > 0.0 {
+                    (luma - lower.0) / range
+                } else {
+                    0.0
+                };
+
                 let r = (lower.1[0] as f32 * (1.0 - t) + upper.1[0] as f32 * t) as u8;
                 let g = (lower.1[1] as f32 * (1.0 - t) + upper.1[1] as f32 * t) as u8;
                 let b = (lower.1[2] as f32 * (1.0 - t) + upper.1[2] as f32 * t) as u8;
-                
+
                 Rgba([r, g, b, pixel[3]])
             }
             ColorEffect::HueShift { degrees } => {
@@ -181,26 +185,68 @@ impl ColorEffect {
 
                 // If it's the "Custom" preset (last one), allow editing colors.
                 if *preset_idx == GRADIENT_PRESETS.len() - 1 && stops.len() >= 2 {
-                    params.push(ParamDescriptor { name: "r1", value: stops[0].1[0] as f32, min: 0.0, max: 255.0 });
-                    params.push(ParamDescriptor { name: "g1", value: stops[0].1[1] as f32, min: 0.0, max: 255.0 });
-                    params.push(ParamDescriptor { name: "b1", value: stops[0].1[2] as f32, min: 0.0, max: 255.0 });
-                    params.push(ParamDescriptor { name: "r2", value: stops[1].1[0] as f32, min: 0.0, max: 255.0 });
-                    params.push(ParamDescriptor { name: "g2", value: stops[1].1[1] as f32, min: 0.0, max: 255.0 });
-                    params.push(ParamDescriptor { name: "b2", value: stops[1].1[2] as f32, min: 0.0, max: 255.0 });
+                    params.push(ParamDescriptor {
+                        name: "r1",
+                        value: stops[0].1[0] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
+                    params.push(ParamDescriptor {
+                        name: "g1",
+                        value: stops[0].1[1] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
+                    params.push(ParamDescriptor {
+                        name: "b1",
+                        value: stops[0].1[2] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
+                    params.push(ParamDescriptor {
+                        name: "r2",
+                        value: stops[1].1[0] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
+                    params.push(ParamDescriptor {
+                        name: "g2",
+                        value: stops[1].1[1] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
+                    params.push(ParamDescriptor {
+                        name: "b2",
+                        value: stops[1].1[2] as f32,
+                        min: 0.0,
+                        max: 255.0,
+                    });
                 }
                 params
             }
             ColorEffect::HueShift { degrees } => vec![ParamDescriptor {
-                name: "degrees", value: *degrees, min: 0.0, max: 360.0,
+                name: "degrees",
+                value: *degrees,
+                min: 0.0,
+                max: 360.0,
             }],
             ColorEffect::Contrast { factor } => vec![ParamDescriptor {
-                name: "factor", value: *factor, min: 0.1, max: 3.0,
+                name: "factor",
+                value: *factor,
+                min: 0.1,
+                max: 3.0,
             }],
             ColorEffect::Saturation { factor } => vec![ParamDescriptor {
-                name: "factor", value: *factor, min: 0.0, max: 2.0,
+                name: "factor",
+                value: *factor,
+                min: 0.0,
+                max: 2.0,
             }],
             ColorEffect::ColorQuantization { levels } => vec![ParamDescriptor {
-                name: "levels", value: *levels as f32, min: 2.0, max: 16.0,
+                name: "levels",
+                value: *levels as f32,
+                min: 2.0,
+                max: 16.0,
             }],
         }
     }
@@ -223,14 +269,26 @@ impl ColorEffect {
                         new_stops[0].1 = [get(1, 0.0) as u8, get(2, 0.0) as u8, get(3, 0.0) as u8];
                         new_stops[1].1 = [get(4, 0.0) as u8, get(5, 0.0) as u8, get(6, 0.0) as u8];
                     }
-                    ColorEffect::GradientMap { preset_idx: new_preset_idx, stops: new_stops }
+                    ColorEffect::GradientMap {
+                        preset_idx: new_preset_idx,
+                        stops: new_stops,
+                    }
                 } else {
-                    ColorEffect::GradientMap { preset_idx: *preset_idx, stops: stops.clone() }
+                    ColorEffect::GradientMap {
+                        preset_idx: *preset_idx,
+                        stops: stops.clone(),
+                    }
                 }
             }
-            ColorEffect::HueShift { degrees } => ColorEffect::HueShift { degrees: get(0, *degrees) },
-            ColorEffect::Contrast { factor } => ColorEffect::Contrast { factor: get(0, *factor) },
-            ColorEffect::Saturation { factor } => ColorEffect::Saturation { factor: get(0, *factor) },
+            ColorEffect::HueShift { degrees } => ColorEffect::HueShift {
+                degrees: get(0, *degrees),
+            },
+            ColorEffect::Contrast { factor } => ColorEffect::Contrast {
+                factor: get(0, *factor),
+            },
+            ColorEffect::Saturation { factor } => ColorEffect::Saturation {
+                factor: get(0, *factor),
+            },
             ColorEffect::ColorQuantization { levels } => ColorEffect::ColorQuantization {
                 levels: get(0, *levels as f32) as u8,
             },
