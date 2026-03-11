@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
@@ -130,6 +130,112 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
 
     let list = List::new(items);
     frame.render_stateful_widget(list, inner, &mut list_state);
+}
+
+/// Render the floating "edit effect parameters" modal overlay.
+pub fn render_edit_effect_modal(frame: &mut Frame, state: &AppState) {
+    let field_idx = match state.input_mode {
+        InputMode::EditEffect { field_idx } => field_idx,
+        _ => return,
+    };
+
+    if state.pipeline.effects.is_empty() {
+        return;
+    }
+
+    let effect = &state.pipeline.effects[state.selected_effect];
+    let descriptors = effect.param_descriptors();
+    if descriptors.is_empty() {
+        return;
+    }
+
+    let total = frame.area();
+    // Width: 2 border cols + 2 indent + 14 name col + 2 spacing + "[ value_ ]" ≈ 44 chars.
+    let popup_w = 44u16.min(total.width);
+    // Height: one row per param + footer row + 2 border rows.
+    let popup_h = (descriptors.len() as u16 + 3).min(total.height);
+    let x = (total.width.saturating_sub(popup_w)) / 2;
+    let y = (total.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let title = format!("Edit Effect: {}", effect_variant_name(effect));
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Magenta));
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    // Split inner into [param rows, footer].
+    let chunks = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).split(inner);
+
+    let items: Vec<ListItem> = descriptors
+        .iter()
+        .enumerate()
+        .map(|(i, d)| {
+            let focused = i == field_idx;
+            let value_str = state.edit_params.get(i).cloned().unwrap_or_default();
+            let style = if focused {
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let value_display = if focused {
+                format!("[ {value_str}_ ]")
+            } else {
+                format!("  {value_str}  ")
+            };
+            ListItem::new(Line::from(vec![
+                Span::styled(format!("  {:<14}", d.name), style),
+                Span::styled(value_display, style),
+            ]))
+        })
+        .collect();
+
+    let list = List::new(items);
+    frame.render_widget(list, chunks[0]);
+
+    let footer = Paragraph::new("  Enter: apply   Esc: cancel")
+        .style(Style::default().fg(Color::DarkGray));
+    frame.render_widget(footer, chunks[1]);
+}
+
+/// Returns the human-readable variant name of an effect for use in the modal title.
+///
+/// Each variant maps to a `&'static str` matching its Rust identifier; e.g.
+/// `Effect::Color(ColorEffect::HueShift { .. })` returns `"HueShift"`.
+fn effect_variant_name(e: &Effect) -> &'static str {
+    match e {
+        Effect::Color(c) => match c {
+            ColorEffect::Invert => "Invert",
+            ColorEffect::HueShift { .. } => "HueShift",
+            ColorEffect::Contrast { .. } => "Contrast",
+            ColorEffect::Saturation { .. } => "Saturation",
+            ColorEffect::ColorQuantization { .. } => "ColorQuantization",
+        },
+        Effect::Glitch(g) => match g {
+            GlitchEffect::Pixelate { .. } => "Pixelate",
+            GlitchEffect::RowJitter { .. } => "RowJitter",
+            GlitchEffect::BlockShift { .. } => "BlockShift",
+            GlitchEffect::PixelSort { .. } => "PixelSort",
+        },
+        Effect::Crt(c) => match c {
+            CrtEffect::Scanlines { .. } => "Scanlines",
+            CrtEffect::Curvature { .. } => "Curvature",
+            CrtEffect::PhosphorGlow { .. } => "PhosphorGlow",
+            CrtEffect::Noise { .. } => "Noise",
+            CrtEffect::Vignette { .. } => "Vignette",
+        },
+        Effect::Composite(c) => match c {
+            CompositeEffect::ImageBlend { .. } => "ImageBlend",
+            CompositeEffect::CropRect { .. } => "CropRect",
+        },
+    }
 }
 
 /// Short human-readable label for an effect.

@@ -30,6 +30,8 @@ pub enum InputMode {
     PathInput,
     /// User is browsing the add-effect menu.
     AddEffect,
+    /// User is editing parameters of the selected pipeline effect.
+    EditEffect { field_idx: usize },
 }
 
 /// Central application state
@@ -68,6 +70,8 @@ pub struct AppState {
     pub add_effect_cursor: usize,
     /// Buffer for the file-path typed by the user when in PathInput mode.
     pub path_input: String,
+    /// Per-field string buffers used while editing effect parameters.
+    pub edit_params: Vec<String>,
 }
 
 impl AppState {
@@ -95,6 +99,7 @@ impl AppState {
             selected_effect: 0,
             add_effect_cursor: 0,
             path_input: String::new(),
+            edit_params: Vec::new(),
         }
     }
 
@@ -245,6 +250,7 @@ fn handle_key(state: &mut AppState, code: KeyCode) {
         InputMode::Normal => handle_normal(state, code),
         InputMode::PathInput => handle_path_input(state, code),
         InputMode::AddEffect => handle_add_effect(state, code),
+        InputMode::EditEffect { .. } => handle_edit_effect(state, code),
     }
 }
 
@@ -304,6 +310,24 @@ fn handle_normal(state: &mut AppState, code: KeyCode) {
             state.status_message = "Randomised pipeline. Re-processing…".to_string();
             state.image_protocol = None;
             state.dispatch_process();
+        }
+        // Open the edit-parameters modal (effects panel focused, effect selected).
+        KeyCode::Enter
+            if state.focused_panel == FocusedPanel::EffectsList
+                && !state.pipeline.effects.is_empty() =>
+        {
+            let descriptors = state.pipeline.effects[state.selected_effect].param_descriptors();
+            if descriptors.is_empty() {
+                state.status_message = "This effect has no editable parameters.".to_string();
+            } else {
+                state.edit_params = descriptors
+                    .iter()
+                    .map(|d| format_param_value(d.value))
+                    .collect();
+                state.input_mode = InputMode::EditEffect { field_idx: 0 };
+                state.status_message =
+                    "Edit parameters (↑↓: field, Enter: apply, Esc: cancel)".to_string();
+            }
         }
         // Export current preview to PNG.
         KeyCode::Char('e') => {
@@ -366,6 +390,82 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
             state.dispatch_process();
         }
         _ => {}
+    }
+}
+
+fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
+    let field_idx = match state.input_mode {
+        InputMode::EditEffect { field_idx } => field_idx,
+        _ => return,
+    };
+
+    let num_fields = if state.pipeline.effects.is_empty() {
+        0
+    } else {
+        state.pipeline.effects[state.selected_effect]
+            .param_descriptors()
+            .len()
+    };
+
+    match code {
+        KeyCode::Esc => {
+            state.input_mode = InputMode::Normal;
+            state.edit_params.clear();
+            state.status_message = "Edit cancelled.".to_string();
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            if field_idx > 0 {
+                state.input_mode = InputMode::EditEffect { field_idx: field_idx - 1 };
+            }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if field_idx + 1 < num_fields {
+                state.input_mode = InputMode::EditEffect { field_idx: field_idx + 1 };
+            }
+        }
+        KeyCode::Backspace => {
+            if let Some(buf) = state.edit_params.get_mut(field_idx) {
+                buf.pop();
+            }
+        }
+        KeyCode::Char(c) if c.is_ascii_digit() || c == '.' || c == '-' => {
+            if let Some(buf) = state.edit_params.get_mut(field_idx) {
+                buf.push(c);
+            }
+        }
+        KeyCode::Enter => {
+            if !state.pipeline.effects.is_empty() {
+                let descriptors =
+                    state.pipeline.effects[state.selected_effect].param_descriptors();
+                let values: Vec<f32> = state
+                    .edit_params
+                    .iter()
+                    .zip(descriptors.iter())
+                    .map(|(s, d)| s.parse::<f32>().unwrap_or(d.value).clamp(d.min, d.max))
+                    .collect();
+                let updated = state.pipeline.effects[state.selected_effect].apply_params(&values);
+                state.pipeline.effects[state.selected_effect] = updated;
+                state.status_message = "Effect updated. Re-processing…".to_string();
+                state.image_protocol = None;
+                state.dispatch_process();
+            }
+            state.input_mode = InputMode::Normal;
+            state.edit_params.clear();
+        }
+        _ => {}
+    }
+}
+
+/// Format a float parameter value for display in the edit buffer.
+///
+/// Integers (where `fract() == 0`) are displayed without a decimal point
+/// (e.g. `8` instead of `8`), while fractional values use Rust's default
+/// shortest-round-trip representation (e.g. `0.05`, `1.5`).
+fn format_param_value(value: f32) -> String {
+    if value.fract() == 0.0 {
+        format!("{}", value as i64)
+    } else {
+        format!("{value}")
     }
 }
 
