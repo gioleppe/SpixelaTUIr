@@ -6,8 +6,8 @@ A high-performance, terminal-based image glitching and processing tool written i
 
 - **Live preview canvas** — renders processed images directly in the terminal using the Sixel graphics protocol (with ANSI half-block fallback for terminals that don't support Sixel)
 - **Interactive effects pipeline** — build a chain of effects that are applied in real-time to a downscaled proxy of your image
-- **Multi-threaded** — image processing runs on a dedicated worker thread, keeping the UI responsive at 60 FPS; per-pixel loops are auto-vectorised by LLVM via SIMD
-- **PNG export** — save the current processed preview to disk with safe auto-incrementing filenames
+- **Multi-threaded** — image processing runs on a dedicated worker thread, keeping the UI responsive at 60 FPS; per-pixel loops are auto-vectorised by the compiler
+PNG, JPEG, GIF, BMP
 - **Pipeline randomisation** — instantly randomise all effect parameters with a single keypress
 - **Pipeline save / load** — export your favourite pipeline to a JSON file and re-import it in any future session
 
