@@ -10,7 +10,13 @@ use crate::engine::export::EXPORT_FORMATS;
 
 /// Render the status bar at the top of the screen.
 pub fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
-    let status = format!("SpixelaTUIr | {}", state.status_message);
+    let res_label = if state.image_path.is_some() {
+        let size = crate::app::PROXY_RESOLUTIONS[state.proxy_resolution_index];
+        format!(" [{size}px]")
+    } else {
+        String::new()
+    };
+    let status = format!("SpixelaTUIr | {}{}", state.status_message, res_label);
     let paragraph =
         Paragraph::new(status).style(Style::default().fg(Color::White).bg(Color::DarkGray));
     frame.render_widget(paragraph, area);
