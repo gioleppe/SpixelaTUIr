@@ -1,4 +1,4 @@
-use image::Rgba;
+use image::{DynamicImage, Rgba};
 use serde::{Deserialize, Serialize};
 
 /// Compositing effects: image blend and crop/rect.
@@ -16,11 +16,29 @@ pub enum CompositeEffect {
 }
 
 impl CompositeEffect {
-    /// Apply per-pixel compositing transformation.
+    /// Apply per-pixel compositing transformation (passthrough stub).
     pub fn apply_pixel(&self, pixel: Rgba<u8>) -> Rgba<u8> {
+        pixel
+    }
+
+    /// Apply this effect to a full image buffer.
+    pub fn apply_image(&self, img: DynamicImage) -> DynamicImage {
         match self {
-            CompositeEffect::ImageBlend { .. } => pixel,
-            CompositeEffect::CropRect { .. } => pixel,
+            CompositeEffect::CropRect { x, y, width, height } => {
+                // Clamp to the image bounds to prevent panics.
+                let img_w = img.width();
+                let img_h = img.height();
+                let cx = (*x).min(img_w);
+                let cy = (*y).min(img_h);
+                let cw = (*width).min(img_w.saturating_sub(cx));
+                let ch = (*height).min(img_h.saturating_sub(cy));
+                if cw == 0 || ch == 0 {
+                    return img;
+                }
+                img.crop_imm(cx, cy, cw, ch)
+            }
+            // ImageBlend without a secondary asset is a no-op.
+            CompositeEffect::ImageBlend { .. } => img,
         }
     }
 }
