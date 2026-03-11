@@ -1,4 +1,4 @@
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, Sender};
 
 use crate::effects::Pipeline;
 
@@ -8,25 +8,46 @@ pub enum WorkerCommand {
     Process {
         image_path: std::path::PathBuf,
         pipeline: Pipeline,
+        /// Channel on which to deliver the processed frame.
+        response_tx: Sender<WorkerResponse>,
     },
-    /// Export the current processed image to a file.
-    Export { output_path: std::path::PathBuf },
+    /// Export the given image to a file.
+    Export {
+        image: image::DynamicImage,
+        output_path: std::path::PathBuf,
+        response_tx: Sender<WorkerResponse>,
+    },
     /// Shut down the worker thread.
     Quit,
+}
+
+/// Responses sent from the worker thread back to the UI thread.
+pub enum WorkerResponse {
+    /// A processed frame ready for display.
+    ProcessedFrame(image::DynamicImage),
+    /// An image was successfully exported to the given path.
+    Exported(std::path::PathBuf),
+    /// A human-readable error description.
+    Error(String),
 }
 
 /// Worker thread entry point. Receives commands and dispatches work.
 pub fn run(rx: Receiver<WorkerCommand>) {
     while let Ok(cmd) = rx.recv() {
         match cmd {
-            WorkerCommand::Process { image_path, pipeline } => {
-                if let Err(e) = process_image(image_path, pipeline) {
-                    eprintln!("Worker processing error: {e}");
+            WorkerCommand::Process { image_path, pipeline, response_tx } => {
+                if let Err(e) = process_image(image_path, pipeline, response_tx.clone()) {
+                    let _ = response_tx.send(WorkerResponse::Error(e.to_string()));
                 }
             }
-            WorkerCommand::Export { output_path } => {
-                if let Err(e) = crate::engine::export::export_image(output_path) {
-                    eprintln!("Worker export error: {e}");
+            WorkerCommand::Export { image, output_path, response_tx } => {
+                match crate::engine::export::export_image(&image, output_path.clone()) {
+                    Ok(()) => {
+                        let _ = response_tx.send(WorkerResponse::Exported(output_path));
+                    }
+                    Err(e) => {
+                        let _ = response_tx.send(WorkerResponse::Error(e.to_string()));
+                    }
                 }
             }
             WorkerCommand::Quit => break,
@@ -37,23 +58,13 @@ pub fn run(rx: Receiver<WorkerCommand>) {
 fn process_image(
     image_path: std::path::PathBuf,
     pipeline: Pipeline,
+    response_tx: Sender<WorkerResponse>,
 ) -> anyhow::Result<()> {
-    use rayon::prelude::*;
-
     let img = image::open(&image_path)?;
-    let pixels: Vec<image::Rgba<u8>> = img
-        .to_rgba8()
-        .pixels()
-        .copied()
-        .collect();
 
-    // Apply each effect in the pipeline in parallel, producing the processed frame.
-    // In a full implementation this result would be sent back to the UI thread
-    // (e.g. via a response channel) for rendering via ratatui-image.
-    let _processed: Vec<image::Rgba<u8>> = pixels
-        .par_iter()
-        .map(|p| pipeline.apply_pixel(*p))
-        .collect();
+    // Apply the full pipeline (each effect may operate on the whole image).
+    let result = pipeline.apply_image(img);
 
+    let _ = response_tx.send(WorkerResponse::ProcessedFrame(result));
     Ok(())
 }
