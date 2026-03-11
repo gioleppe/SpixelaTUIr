@@ -1,0 +1,55 @@
+{
+  "effects": [
+    {
+      "enabled": true,
+      "effect": {
+        "Color": {
+          "Saturation": {
+            "factor": 0.77690494
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Color": {
+          "ColorQuantization": {
+            "levels": 4
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Crt": {
+          "Scanlines": {
+            "spacing": 2,
+            "opacity": 0.3
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Color": {
+          "ColorQuantization": {
+            "levels": 3
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Glitch": {
+          "RowJitter": {
+            "magnitude": 0.003
+          }
+        }
+      }
+    }
+  ]
+}

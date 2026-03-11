@@ -1,6 +1,9 @@
 # SpixelaTUIr
 
-A high-performance, terminal-based image glitching and processing tool written in Rust.
+![SpixelaTUIr demo](./samples/sample_images/pc_on_fire_out.png)
+
+
+A terminal-based image glitching and processing tool written in Rust.
 
 ## Features
 
