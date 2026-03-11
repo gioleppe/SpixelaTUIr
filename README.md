@@ -1,9 +1,21 @@
 # SpixelaTUIr
 
-![SpixelaTUIr demo](./samples/sample_images/pc_on_fire_out.png)
+![SpixelaTUIr](./readme_assets/pc_on_fire_out.png)
 
 
 A terminal-based image glitching and processing tool written in Rust.
+
+## What is this thing?
+
+SpixelaTUIr is a terminal-based image glitching and processing application designed for creative tinkering and fast visual experimentation. Built in Rust, it leverages the Sixel graphics protocol to render high-fidelity, live previews of image manipulations entirely inside your terminal emulator.
+
+With SpixelaTUIr, you can intuitively construct and compose complex, multi-layered visual effect pipelines. Combine color manipulation, stylistic retro CRT overlays, and pixel-level structural glitches like pixel sorting, row jittering, and block shifting. It lets you interactively tweak effect parameters, instantly randomize pipelines for unexpected inspiration, and seamlessly visualize your changes in real-time. 
+
+
+![SpixelaTUIr Example](./readme_assets/spixelatuir_example.png)
+
+
+Once you've crafted the perfect aesthetic, you can export the full-resolution glitch art to your filesystem or save your custom effect pipeline as a preset to apply to other images.
 
 ## Features
 
