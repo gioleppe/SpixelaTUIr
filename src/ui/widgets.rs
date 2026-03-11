@@ -5,7 +5,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{AppState, InputMode, FILE_BROWSER_HINT};
+use crate::app::{AppState, InputMode, FILE_BROWSER_HINT, PIPELINE_BROWSER_HINT};
 use crate::engine::export::EXPORT_FORMATS;
 
 /// Render the status bar at the top of the screen.
@@ -21,13 +21,20 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
     let help = match state.input_mode {
         InputMode::PathInput => "Type path  Enter: load  Esc: cancel",
         InputMode::AddEffect => "j/k: navigate  Enter: add  Esc: cancel",
-        InputMode::FileBrowser => FILE_BROWSER_HINT,
+        InputMode::FileBrowser => {
+            use crate::app::FileBrowserPurpose;
+            match state.file_browser.as_ref().map(|fb| &fb.purpose) {
+                Some(FileBrowserPurpose::LoadPipeline) => PIPELINE_BROWSER_HINT,
+                _ => FILE_BROWSER_HINT,
+            }
+        }
         InputMode::EditEffect { .. } => "j/k: next field  Type value  Enter: apply  Esc: cancel",
         InputMode::ExportDialog => {
             "j/k: navigate fields  ←/→/Space: cycle format  Enter: export  Esc: cancel"
         }
+        InputMode::SavePipelineInput => "Type path  Enter: save  Esc: cancel",
         InputMode::Normal => {
-            "q: Quit  o: Open  e: Export  Tab: Switch panel  [Effects] a: Add  d: Del  Enter: Edit  K/J: Move up/down  r: Random"
+            "q: Quit  o: Open  e: Export  Ctrl+S: Save pipeline  Ctrl+L: Load pipeline  Tab: Switch panel  [Effects] a: Add  d: Del  Enter: Edit  K/J: Move up/down  r: Random"
         }
     };
     let block = Block::default().title("Controls").borders(Borders::ALL);
@@ -157,4 +164,31 @@ pub fn render_export_dialog(frame: &mut Frame, state: &AppState) {
         Paragraph::new(preview).style(Style::default().fg(Color::DarkGray)),
         rows[4],
     );
+}
+
+/// Render the floating save-pipeline input overlay when the user presses Ctrl+S.
+pub fn render_save_pipeline_input(frame: &mut Frame, state: &AppState) {
+    if state.input_mode != InputMode::SavePipelineInput {
+        return;
+    }
+
+    let total = frame.area();
+
+    // Centre a 70-wide, 3-tall popup.
+    let popup_width = total.width.min(70);
+    let x = (total.width.saturating_sub(popup_width)) / 2;
+    let y = total.height / 2 - 1;
+    let popup_area = Rect::new(x, y, popup_width, 3);
+
+    frame.render_widget(Clear, popup_area);
+
+    let display_text = format!("{}_", state.path_input);
+    let block = Block::default()
+        .title(" Save Pipeline (Enter to save, Esc to cancel) ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Green));
+    let paragraph = Paragraph::new(display_text)
+        .block(block)
+        .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD));
+    frame.render_widget(paragraph, popup_area);
 }
