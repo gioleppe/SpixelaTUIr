@@ -162,8 +162,10 @@ pub enum InputMode {
     EditEffect { field_idx: usize },
     /// User is configuring an export via the export dialog.
     ExportDialog,
-    /// User is typing a destination path to save the current pipeline.
-    SavePipelineInput,
+    /// User is configuring a pipeline save via the save-pipeline dialog.
+    SavePipelineDialog,
+    /// User is viewing the full keyboard-shortcut help overlay.
+    HelpModal,
 }
 
 /// State for the export dialog modal.
@@ -184,6 +186,28 @@ impl ExportDialogState {
     pub fn effective_filename(&self) -> &str {
         if self.filename.is_empty() {
             "output"
+        } else {
+            &self.filename
+        }
+    }
+}
+
+/// State for the save-pipeline dialog modal (mirrors [`ExportDialogState`] but enforces JSON).
+#[derive(Debug, Clone)]
+pub struct SavePipelineDialogState {
+    /// Output directory (editable).
+    pub directory: String,
+    /// Base filename without extension (editable). The `.json` extension is appended automatically.
+    pub filename: String,
+    /// Which field has focus: 0 = Directory, 1 = Filename.
+    pub focused_field: usize,
+}
+
+impl SavePipelineDialogState {
+    /// Return the effective filename, falling back to `"pipeline"` when the field is blank.
+    pub fn effective_filename(&self) -> &str {
+        if self.filename.is_empty() {
+            "pipeline"
         } else {
             &self.filename
         }
@@ -232,6 +256,8 @@ pub struct AppState {
     pub edit_params: Vec<String>,
     /// State for the export dialog when in ExportDialog mode.
     pub export_dialog: ExportDialogState,
+    /// State for the save-pipeline dialog when in SavePipelineDialog mode.
+    pub save_pipeline_dialog: SavePipelineDialogState,
     /// Index into `PROXY_RESOLUTIONS` – controls live-preview quality.
     pub proxy_resolution_index: usize,
 }
@@ -270,6 +296,14 @@ impl AppState {
                     .into_owned(),
                 filename: String::new(),
                 format_index: 0,
+                focused_field: 1,
+            },
+            save_pipeline_dialog: SavePipelineDialogState {
+                directory: std::env::current_dir()
+                    .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                    .to_string_lossy()
+                    .into_owned(),
+                filename: String::new(),
                 focused_field: 1,
             },
             // Default to index 1 (512 px) — preserves prior behaviour.
@@ -491,7 +525,8 @@ fn handle_key(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
         InputMode::FileBrowser => handle_file_browser(state, code),
         InputMode::EditEffect { .. } => handle_edit_effect(state, code),
         InputMode::ExportDialog => handle_export_dialog(state, code),
-        InputMode::SavePipelineInput => handle_save_pipeline_input(state, code),
+        InputMode::SavePipelineDialog => handle_save_pipeline_dialog(state, code),
+        InputMode::HelpModal => handle_help_modal(state, code),
     }
 }
 
@@ -619,15 +654,21 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
                 state.reload_proxy();
             }
         }
-        // Save the current pipeline to a JSON file (Ctrl+S).
+        // Save the current pipeline via the save-pipeline dialog (Ctrl+S).
         KeyCode::Char('s') if modifiers.contains(KeyModifiers::CONTROL) => {
             if state.pipeline.effects.is_empty() {
                 state.status_message = "Pipeline is empty – nothing to save.".to_string();
             } else {
-                state.path_input.clear();
-                state.input_mode = InputMode::SavePipelineInput;
-                state.status_message =
-                    "Enter path to save pipeline (e.g. my_pipeline.json)".to_string();
+                // Pre-populate with a sensible default filename.
+                let default_filename = state
+                    .image_path
+                    .as_ref()
+                    .and_then(|p| p.file_stem())
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "pipeline".to_string());
+                state.save_pipeline_dialog.filename = default_filename;
+                state.save_pipeline_dialog.focused_field = 1;
+                state.input_mode = InputMode::SavePipelineDialog;
             }
         }
         // Load a pipeline from a JSON or YAML file via the file browser (Ctrl+L).
@@ -635,6 +676,10 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
             let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
             state.file_browser = Some(FileBrowserState::new(cwd, FileBrowserPurpose::LoadPipeline));
             state.input_mode = InputMode::FileBrowser;
+        }
+        // Open the full keyboard-shortcut help overlay.
+        KeyCode::Char('h') => {
+            state.input_mode = InputMode::HelpModal;
         }
         _ => {}
     }
@@ -936,37 +981,70 @@ fn handle_export_dialog(state: &mut AppState, code: KeyCode) {
     }
 }
 
-/// Handle keyboard input when the user is typing a path to save the current pipeline.
-fn handle_save_pipeline_input(state: &mut AppState, code: KeyCode) {
+/// Handle keyboard input when the user is configuring a pipeline save via the dialog.
+fn handle_save_pipeline_dialog(state: &mut AppState, code: KeyCode) {
+    const FIELD_DIRECTORY: usize = 0;
+    const FIELD_FILENAME: usize = 1;
+    const FIELD_COUNT: usize = 2;
+
     match code {
         KeyCode::Esc => {
             state.input_mode = InputMode::Normal;
-            state.path_input.clear();
             state.status_message = "Save cancelled.".to_string();
         }
         KeyCode::Enter => {
-            let raw = state.path_input.trim().to_string();
-            state.path_input.clear();
-            state.input_mode = InputMode::Normal;
-            if raw.is_empty() {
-                state.status_message = "Save cancelled.".to_string();
-                return;
-            }
-            let path = std::path::PathBuf::from(&raw);
-            match crate::config::parser::save_pipeline(&state.pipeline, &path) {
+            let dir = std::path::PathBuf::from(&state.save_pipeline_dialog.directory);
+            let filename = state.save_pipeline_dialog.effective_filename().to_string();
+            // Enforce the .json extension regardless of what the user typed.
+            let output_path = dir.join(format!("{filename}.json"));
+            match crate::config::parser::save_pipeline(&state.pipeline, &output_path) {
                 Ok(()) => {
-                    state.status_message = format!("Pipeline saved → {}", path.display());
+                    state.status_message =
+                        format!("Pipeline saved → {}", output_path.display());
                 }
                 Err(e) => {
                     state.status_message = format!("Error saving pipeline: {e}");
                 }
             }
+            state.input_mode = InputMode::Normal;
         }
-        KeyCode::Backspace => {
-            state.path_input.pop();
+        KeyCode::Up | KeyCode::Char('k') => {
+            if state.save_pipeline_dialog.focused_field > 0 {
+                state.save_pipeline_dialog.focused_field -= 1;
+            }
         }
-        KeyCode::Char(c) => {
-            state.path_input.push(c);
+        KeyCode::Down | KeyCode::Char('j') => {
+            if state.save_pipeline_dialog.focused_field < FIELD_COUNT - 1 {
+                state.save_pipeline_dialog.focused_field += 1;
+            }
+        }
+        KeyCode::Backspace => match state.save_pipeline_dialog.focused_field {
+            FIELD_DIRECTORY => {
+                state.save_pipeline_dialog.directory.pop();
+            }
+            FIELD_FILENAME => {
+                state.save_pipeline_dialog.filename.pop();
+            }
+            _ => {}
+        },
+        KeyCode::Char(c) => match state.save_pipeline_dialog.focused_field {
+            FIELD_DIRECTORY => {
+                state.save_pipeline_dialog.directory.push(c);
+            }
+            FIELD_FILENAME => {
+                state.save_pipeline_dialog.filename.push(c);
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+}
+
+/// Handle keyboard input when the full help overlay is shown.
+fn handle_help_modal(state: &mut AppState, code: KeyCode) {
+    match code {
+        KeyCode::Esc | KeyCode::Char('h') | KeyCode::Char('q') => {
+            state.input_mode = InputMode::Normal;
         }
         _ => {}
     }
@@ -1195,32 +1273,84 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_s_with_effects_enters_save_mode() {
+    fn ctrl_s_with_effects_enters_save_dialog() {
         let mut state = make_state_with_effects();
         handle_normal(&mut state, KeyCode::Char('s'), KeyModifiers::CONTROL);
-        assert_eq!(state.input_mode, InputMode::SavePipelineInput);
-        assert!(state.path_input.is_empty());
+        assert_eq!(state.input_mode, InputMode::SavePipelineDialog);
+        // Dialog should be pre-populated with a non-empty default filename.
+        assert!(
+            !state.save_pipeline_dialog.filename.is_empty(),
+            "default filename should be populated"
+        );
     }
 
     #[test]
-    fn save_pipeline_input_esc_cancels() {
+    fn save_pipeline_dialog_esc_cancels() {
         let mut state = make_state_with_effects();
-        state.input_mode = InputMode::SavePipelineInput;
-        state.path_input = "something".to_string();
-        handle_save_pipeline_input(&mut state, KeyCode::Esc);
+        state.input_mode = InputMode::SavePipelineDialog;
+        state.save_pipeline_dialog.filename = "something".to_string();
+        handle_save_pipeline_dialog(&mut state, KeyCode::Esc);
         assert_eq!(state.input_mode, InputMode::Normal);
-        assert!(state.path_input.is_empty());
-        assert!(state.status_message.contains("cancel") || state.status_message.contains("Cancel"));
+        assert!(
+            state.status_message.contains("cancel") || state.status_message.contains("Cancel"),
+            "status should mention cancellation: {}",
+            state.status_message
+        );
     }
 
     #[test]
-    fn save_pipeline_input_empty_enter_cancels_gracefully() {
+    fn save_pipeline_dialog_enter_returns_to_normal() {
         let mut state = make_state_with_effects();
-        state.input_mode = InputMode::SavePipelineInput;
-        // path_input is already empty
-        handle_save_pipeline_input(&mut state, KeyCode::Enter);
+        state.input_mode = InputMode::SavePipelineDialog;
+        // Point the dialog at the temp dir so we don't pollute the project root.
+        state.save_pipeline_dialog.directory =
+            std::env::temp_dir().to_string_lossy().into_owned();
+        // Leave filename empty — effective_filename() will fall back to "pipeline".
+        handle_save_pipeline_dialog(&mut state, KeyCode::Enter);
         assert_eq!(state.input_mode, InputMode::Normal);
-        assert!(state.path_input.is_empty());
+        // Clean up any file that was created.
+        let _ = std::fs::remove_file(std::env::temp_dir().join("pipeline.json"));
+    }
+
+    #[test]
+    fn save_pipeline_dialog_enforces_json_extension() {
+        let tmp_dir = std::env::temp_dir();
+        let (worker_tx, _worker_rx) = std::sync::mpsc::channel();
+        let (resp_tx, resp_rx) = std::sync::mpsc::channel();
+        let picker = ratatui_image::picker::Picker::halfblocks();
+        let mut state = AppState::new(worker_tx, resp_rx, resp_tx, picker);
+        state.pipeline = Pipeline {
+            effects: vec![Effect::Color(ColorEffect::Invert)],
+        };
+        state.input_mode = InputMode::SavePipelineDialog;
+        state.save_pipeline_dialog.directory = tmp_dir.to_string_lossy().into_owned();
+        state.save_pipeline_dialog.filename = "test_enforce_ext".to_string();
+        handle_save_pipeline_dialog(&mut state, KeyCode::Enter);
+        // Resulting path must carry the .json extension.
+        let expected = tmp_dir.join("test_enforce_ext.json");
+        assert!(
+            expected.exists(),
+            "saved file should have .json extension at {}",
+            expected.display()
+        );
+        let _ = std::fs::remove_file(&expected);
+    }
+
+    #[test]
+    fn help_modal_opens_and_closes() {
+        let mut state = make_state_empty();
+        handle_normal(&mut state, KeyCode::Char('h'), KeyModifiers::NONE);
+        assert_eq!(state.input_mode, InputMode::HelpModal, "h should open HelpModal");
+        handle_help_modal(&mut state, KeyCode::Esc);
+        assert_eq!(state.input_mode, InputMode::Normal, "Esc should close HelpModal");
+    }
+
+    #[test]
+    fn help_modal_closed_by_h() {
+        let mut state = make_state_empty();
+        state.input_mode = InputMode::HelpModal;
+        handle_help_modal(&mut state, KeyCode::Char('h'));
+        assert_eq!(state.input_mode, InputMode::Normal);
     }
 
     #[test]
