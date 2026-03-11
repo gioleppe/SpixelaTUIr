@@ -10,6 +10,8 @@ A high-performance, terminal-based image glitching and processing tool written i
 PNG, JPEG, GIF, BMP
 - **Pipeline randomisation** — instantly randomise all effect parameters with a single keypress
 - **Pipeline save / load** — export your favourite pipeline to a JSON file and re-import it in any future session
+- **Undo / redo** — up to 20 levels of pipeline undo (`Ctrl+Z`) and redo (`Ctrl+Y`)
+- **Unsaved-changes guard** — a confirmation prompt prevents accidentally quitting with an unsaved pipeline
 
 ## Effects
 
@@ -40,8 +42,8 @@ PNG, JPEG, GIF, BMP
 | `a` | Add an effect from the preset menu (requires Effects panel focus) |
 | `d` / `Delete` | Delete the selected effect and re-process (requires Effects panel focus) |
 | `Enter` | Edit parameters of the selected effect (requires Effects panel focus) |
-| `K` / `Shift+↑` | Move selected effect one position up in the pipeline |
-| `J` / `Shift+↓` | Move selected effect one position down in the pipeline |
+| `K` / `Shift+↑` | Move selected effect one position up in the pipeline (cyan highlight while dragging) |
+| `J` / `Shift+↓` | Move selected effect one position down in the pipeline (cyan highlight while dragging) |
 | `r` | Randomise all effect parameter values |
 | `e` | Export the current preview as an image (dialog with directory/filename/format) |
 | `[` | Decrease preview resolution tier (1024 → 768 → 512 → 256 px) |
@@ -49,6 +51,8 @@ PNG, JPEG, GIF, BMP
 | `Ctrl+S` | Save the current pipeline via a dialog (always writes JSON) |
 | `Ctrl+L` | Load / import a pipeline from a JSON or YAML file (file browser) |
 | `Ctrl+D` | Clear all effects at once (shows a confirmation prompt) |
+| `Ctrl+Z` | Undo the last pipeline change (up to 20 levels) |
+| `Ctrl+Y` | Redo the last undone pipeline change |
 | `h` | Open the full keyboard-shortcut help overlay |
 | `q` / `Esc` | Quit (prompts to confirm if there are unsaved pipeline changes; press `q` again to force-quit) |
 

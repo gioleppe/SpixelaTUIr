@@ -44,7 +44,7 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         InputMode::HelpModal => "h / Esc: close help",
         InputMode::ConfirmClearPipeline => "Enter: confirm clear  Esc: cancel",
         InputMode::Normal => {
-            "q: Quit  o: Open  e: Export  Ctrl+S: Save  Ctrl+L: Load  r: Random  Tab: Switch focus  [/]: Preview  h: Help"
+            "q: Quit  o: Open  e: Export  Ctrl+S: Save  Ctrl+L: Load  Ctrl+Z/Y: Undo/Redo  Ctrl+D: Clear  r: Random  [/]: Preview  h: Help"
         }
     };
     let block = Block::default().title("Controls").borders(Borders::ALL);
@@ -275,6 +275,8 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
   Ctrl+S        Save pipeline (JSON dialog)\n\
   Ctrl+L        Load pipeline (file browser)\n\
   Ctrl+D        Clear all effects (with confirm)\n\
+  Ctrl+Z        Undo last pipeline change\n\
+  Ctrl+Y        Redo last undone change\n\
   r             Randomise all effect parameters\n\
   [             Decrease preview resolution\n\
   ]             Increase preview resolution\n\
