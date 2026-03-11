@@ -1,6 +1,7 @@
 use std::sync::mpsc::{Receiver, Sender};
 
 use crate::effects::Pipeline;
+use crate::engine::export::ExportFormat;
 
 /// Commands sent from the UI thread to the worker thread.
 pub enum WorkerCommand {
@@ -15,6 +16,7 @@ pub enum WorkerCommand {
     Export {
         image: image::DynamicImage,
         output_path: std::path::PathBuf,
+        format: ExportFormat,
         response_tx: Sender<WorkerResponse>,
     },
     /// Shut down the worker thread.
@@ -40,10 +42,10 @@ pub fn run(rx: Receiver<WorkerCommand>) {
                     let _ = response_tx.send(WorkerResponse::Error(e.to_string()));
                 }
             }
-            WorkerCommand::Export { image, output_path, response_tx } => {
-                match crate::engine::export::export_image(&image, output_path.clone()) {
-                    Ok(()) => {
-                        let _ = response_tx.send(WorkerResponse::Exported(output_path));
+            WorkerCommand::Export { image, output_path, format, response_tx } => {
+                match crate::engine::export::export_image(&image, output_path, &format) {
+                    Ok(saved_path) => {
+                        let _ = response_tx.send(WorkerResponse::Exported(saved_path));
                     }
                     Err(e) => {
                         let _ = response_tx.send(WorkerResponse::Error(e.to_string()));
