@@ -106,7 +106,7 @@ fn row_jitter(img: DynamicImage, magnitude: f32) -> DynamicImage {
         .enumerate()
         .map(|(y, row)| {
             let hash = (y as u32).wrapping_mul(2654435761) ^ (y as u32).wrapping_mul(2246822519);
-            let n = ((hash as f32).sin() * 43758.5453).fract();
+            let n = ((hash as f32).sin() * 43_758.547).fract();
             let shift = ((n * 2.0 - 1.0) * max_shift as f32) as i32;
             (0..w)
                 .map(|x| {

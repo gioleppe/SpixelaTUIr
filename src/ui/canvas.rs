@@ -1,8 +1,8 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 use ratatui_image::{Resize, StatefulImage};
 

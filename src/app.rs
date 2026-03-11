@@ -1,15 +1,15 @@
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use ratatui::{backend::Backend, Terminal};
+use ratatui::{Terminal, backend::Backend};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use std::sync::mpsc;
 use std::time::Duration;
 
 use crate::effects::{
-    color::ColorEffect, composite::CompositeEffect, crt::CrtEffect, glitch::GlitchEffect, Effect,
-    Pipeline,
+    Effect, Pipeline, color::ColorEffect, composite::CompositeEffect, crt::CrtEffect,
+    glitch::GlitchEffect,
 };
-use crate::engine::export::{ExportFormat, EXPORT_FORMATS};
+use crate::engine::export::{EXPORT_FORMATS, ExportFormat};
 use crate::engine::worker::{WorkerCommand, WorkerResponse};
 
 /// Which panel currently has keyboard focus.
@@ -92,10 +92,10 @@ impl FileBrowserState {
                         .extension()
                         .and_then(|e| e.to_str())
                         .map(|e| e.to_lowercase());
-                    if let Some(e) = ext {
-                        if self.accepted_extensions().contains(&e.as_str()) {
-                            files.push(path);
-                        }
+                    if let Some(e) = ext
+                        && self.accepted_extensions().contains(&e.as_str())
+                    {
+                        files.push(path);
                     }
                 }
             }
@@ -429,7 +429,8 @@ pub const PIPELINE_BROWSER_HINT: &str =
     "↑↓/jk: navigate  Enter: load  Backspace/-: up  Esc: cancel";
 
 /// All effects available to add, with display names.
-pub const AVAILABLE_EFFECTS: &[(&str, fn() -> Effect)] = &[
+pub type EffectEntry = (&'static str, fn() -> Effect);
+pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
     ("Invert", || Effect::Color(ColorEffect::Invert)),
     ("HueShift +30°", || {
         Effect::Color(ColorEffect::HueShift { degrees: 30.0 })
@@ -529,12 +530,11 @@ where
             crate::ui::render(frame, &mut state);
         })?;
 
-        if event::poll(Duration::from_millis(16))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    handle_key(&mut state, key.code, key.modifiers);
-                }
-            }
+        if event::poll(Duration::from_millis(16))?
+            && let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            handle_key(&mut state, key.code, key.modifiers);
         }
 
         if state.should_quit {
@@ -730,7 +730,11 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
                 state.status_message = format!(
                     "Undo – {} effect{} in pipeline.",
                     state.pipeline.effects.len(),
-                    if state.pipeline.effects.len() == 1 { "" } else { "s" }
+                    if state.pipeline.effects.len() == 1 {
+                        ""
+                    } else {
+                        "s"
+                    }
                 );
             } else {
                 state.status_message = "Nothing to undo.".to_string();
@@ -748,7 +752,11 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
                 state.status_message = format!(
                     "Redo – {} effect{} in pipeline.",
                     state.pipeline.effects.len(),
-                    if state.pipeline.effects.len() == 1 { "" } else { "s" }
+                    if state.pipeline.effects.len() == 1 {
+                        ""
+                    } else {
+                        "s"
+                    }
                 );
             } else {
                 state.status_message = "Nothing to redo.".to_string();
@@ -1115,8 +1123,7 @@ fn handle_save_pipeline_dialog(state: &mut AppState, code: KeyCode) {
                 Ok(()) => {
                     state.pipeline_dirty = false;
                     state.quit_requested = false;
-                    state.status_message =
-                        format!("Pipeline saved → {}", output_path.display());
+                    state.status_message = format!("Pipeline saved → {}", output_path.display());
                 }
                 Err(e) => {
                     state.status_message = format!("Error saving pipeline: {e}");
@@ -1439,8 +1446,7 @@ mod tests {
         let mut state = make_state_with_effects();
         state.input_mode = InputMode::SavePipelineDialog;
         // Point the dialog at the temp dir so we don't pollute the project root.
-        state.save_pipeline_dialog.directory =
-            std::env::temp_dir().to_string_lossy().into_owned();
+        state.save_pipeline_dialog.directory = std::env::temp_dir().to_string_lossy().into_owned();
         // Leave filename empty — effective_filename() will fall back to "pipeline".
         handle_save_pipeline_dialog(&mut state, KeyCode::Enter);
         assert_eq!(state.input_mode, InputMode::Normal);
@@ -1476,9 +1482,17 @@ mod tests {
     fn help_modal_opens_and_closes() {
         let mut state = make_state_empty();
         handle_normal(&mut state, KeyCode::Char('h'), KeyModifiers::NONE);
-        assert_eq!(state.input_mode, InputMode::HelpModal, "h should open HelpModal");
+        assert_eq!(
+            state.input_mode,
+            InputMode::HelpModal,
+            "h should open HelpModal"
+        );
         handle_help_modal(&mut state, KeyCode::Esc);
-        assert_eq!(state.input_mode, InputMode::Normal, "Esc should close HelpModal");
+        assert_eq!(
+            state.input_mode,
+            InputMode::Normal,
+            "Esc should close HelpModal"
+        );
     }
 
     #[test]

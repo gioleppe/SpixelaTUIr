@@ -31,7 +31,7 @@ impl CrtEffect {
                 if spacing == &0 {
                     return pixel;
                 }
-                if y % spacing == 0 {
+                if y.is_multiple_of(*spacing) {
                     let darken =
                         |c: u8| -> u8 { ((c as f32) * (1.0 - opacity.clamp(0.0, 1.0))) as u8 };
                     Rgba([
@@ -66,7 +66,7 @@ impl CrtEffect {
             } => {
                 // Deterministic noise seeded by pixel position.
                 let seed = (x.wrapping_mul(2654435761) ^ y.wrapping_mul(2246822519)) as f32;
-                let n = (seed.sin() * 43758.5453).fract(); // 0..1
+                let n = (seed.sin() * 43_758.547).fract(); // 0..1
                 let delta = ((n * 2.0 - 1.0) * intensity * 255.0) as i16;
                 let add = |c: u8, d: i16| -> u8 { (c as i16 + d).clamp(0, 255) as u8 };
                 if *monochromatic {
@@ -75,7 +75,7 @@ impl CrtEffect {
                 } else {
                     let seed_r = seed;
                     let seed_g = (seed * 1.618).fract();
-                    let seed_b = (seed * 2.718).fract();
+                    let seed_b = (seed * std::f32::consts::E).fract();
                     let dr = (((seed_r * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);
                     let dg = (((seed_g * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);
                     let db = (((seed_b * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);

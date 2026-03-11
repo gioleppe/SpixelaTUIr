@@ -1,9 +1,9 @@
 use anyhow::Result;
 use crossterm::{
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 
 mod app;
@@ -40,12 +40,12 @@ fn main() -> Result<()> {
 
 #[cfg(test)]
 mod snapshot_tests {
-    use ratatui::{backend::TestBackend, Terminal};
+    use ratatui::{Terminal, backend::TestBackend};
     use ratatui_image::picker::Picker;
     use std::sync::mpsc;
 
     use crate::app::AppState;
-    use crate::effects::{color::ColorEffect, glitch::GlitchEffect, Effect, Pipeline};
+    use crate::effects::{Effect, Pipeline, color::ColorEffect, glitch::GlitchEffect};
 
     fn make_state() -> AppState {
         let (worker_tx, _worker_rx) = mpsc::channel();

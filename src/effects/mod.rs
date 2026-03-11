@@ -43,9 +43,7 @@ impl Effect {
             // CRT effects that need coordinates.
             Effect::Crt(e) => {
                 let (w, h) = (img.width(), img.height());
-                apply_per_pixel(img, move |p, x, y| {
-                    e.apply_pixel_with_coords(p, x, y, w, h)
-                })
+                apply_per_pixel(img, move |p, x, y| e.apply_pixel_with_coords(p, x, y, w, h))
             }
             // Glitch effects need full-image context.
             Effect::Glitch(e) => e.apply_image(img),

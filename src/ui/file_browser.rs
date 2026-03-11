@@ -1,13 +1,13 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
-    Frame,
 };
 
 use crate::app::{
-    AppState, FileBrowserEntry, FileBrowserPurpose, InputMode, FILE_BROWSER_HINT,
+    AppState, FILE_BROWSER_HINT, FileBrowserEntry, FileBrowserPurpose, InputMode,
     PIPELINE_BROWSER_HINT,
 };
 

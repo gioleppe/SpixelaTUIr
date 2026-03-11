@@ -1,14 +1,14 @@
 use ratatui::{
+    Frame,
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
-    Frame,
 };
 
-use crate::app::{AppState, FocusedPanel, InputMode, AVAILABLE_EFFECTS};
+use crate::app::{AVAILABLE_EFFECTS, AppState, FocusedPanel, InputMode};
 use crate::effects::{
-    color::ColorEffect, composite::CompositeEffect, crt::CrtEffect, glitch::GlitchEffect, Effect,
+    Effect, color::ColorEffect, composite::CompositeEffect, crt::CrtEffect, glitch::GlitchEffect,
 };
 
 /// Render the side-panel showing the active pipeline effects.

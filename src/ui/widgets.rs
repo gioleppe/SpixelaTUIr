@@ -1,11 +1,11 @@
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     widgets::{Block, Borders, Clear, Paragraph},
-    Frame,
 };
 
-use crate::app::{AppState, InputMode, FILE_BROWSER_HINT, PIPELINE_BROWSER_HINT};
+use crate::app::{AppState, FILE_BROWSER_HINT, InputMode, PIPELINE_BROWSER_HINT};
 use crate::engine::export::EXPORT_FORMATS;
 
 /// Render the status bar at the top of the screen.
@@ -38,9 +38,7 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         InputMode::ExportDialog => {
             "j/k: navigate fields  ←/→/Space: cycle format  Enter: export  Esc: cancel"
         }
-        InputMode::SavePipelineDialog => {
-            "j/k: navigate fields  Enter: save as JSON  Esc: cancel"
-        }
+        InputMode::SavePipelineDialog => "j/k: navigate fields  Enter: save as JSON  Esc: cancel",
         InputMode::HelpModal => "h / Esc: close help",
         InputMode::ConfirmClearPipeline => "Enter: confirm clear  Esc: cancel",
         InputMode::Normal => {
