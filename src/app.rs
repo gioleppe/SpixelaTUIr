@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use ratatui::{Terminal, backend::Backend};
-use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
+use ratatui::{Terminal, backend::Backend, layout::Rect};
+use ratatui_image::{Resize, ResizeEncodeRender, picker::Picker, protocol::StatefulProtocol};
 use std::sync::mpsc;
 use std::time::Duration;
 
@@ -279,6 +279,12 @@ pub struct AppState {
     /// ratatui-image stateful protocol for displaying the original (pre-effects) proxy.
     /// Only populated when `split_view` is active and an image is loaded.
     pub original_image_protocol: Option<StatefulProtocol>,
+    /// The screen area that `image_protocol` was last rendered into.
+    ///
+    /// Stored so that `set_preview` can immediately pre-encode the replacement
+    /// protocol with the same area, preventing the Sixel clear+redraw blink that
+    /// would otherwise occur on the first render after the protocol is replaced.
+    pub image_protocol_last_area: Option<Rect>,
 }
 
 impl AppState {
@@ -335,6 +341,7 @@ impl AppState {
             show_histogram: false,
             split_view: false,
             original_image_protocol: None,
+            image_protocol_last_area: None,
         }
     }
 
@@ -391,8 +398,24 @@ impl AppState {
     }
 
     /// Update the displayed image from a processed frame.
+    ///
+    /// Creates a new `StatefulProtocol` for the incoming image. If the render
+    /// area from the previous frame is known, the protocol is immediately
+    /// pre-encoded for that area so that `needs_resize` returns `None` on the
+    /// very next render pass — avoiding the Sixel clear+redraw blink that would
+    /// otherwise occur because a fresh protocol starts with `hash = 0`.
     pub fn set_preview(&mut self, img: image::DynamicImage) {
-        self.image_protocol = Some(self.picker.new_resize_protocol(img.clone()));
+        let mut new_protocol = self.picker.new_resize_protocol(img.clone());
+        // Pre-encode the protocol for the last known render area so the
+        // next `render_stateful_widget` call sees no change and skips
+        // the expensive re-encode (and associated terminal blink).
+        let resize = Resize::Fit(None);
+        if let Some(screen_area) = self.image_protocol_last_area
+            && let Some(target) = new_protocol.needs_resize(&resize, screen_area)
+        {
+            new_protocol.resize_encode(&resize, target);
+        }
+        self.image_protocol = Some(new_protocol);
         self.preview_buffer = Some(img);
     }
 
