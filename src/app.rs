@@ -583,6 +583,7 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
                 state.proxy_resolution_index += 1;
                 state.reload_proxy();
             }
+        }
         // Save the current pipeline to a JSON file (Ctrl+S).
         KeyCode::Char('s') if modifiers.contains(KeyModifiers::CONTROL) => {
             if state.pipeline.effects.is_empty() {
