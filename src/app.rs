@@ -268,6 +268,10 @@ pub struct AppState {
     pub pipeline_dirty: bool,
     /// True after the first quit attempt when there are unsaved changes (double-press to confirm).
     pub quit_requested: bool,
+    /// Ring-buffer of past pipeline states for undo (most-recent-first).
+    pub undo_stack: std::collections::VecDeque<Pipeline>,
+    /// Stack of pipeline states that were undone, for redo.
+    pub redo_stack: std::collections::VecDeque<Pipeline>,
 }
 
 impl AppState {
@@ -319,6 +323,8 @@ impl AppState {
             dragging_effect: false,
             pipeline_dirty: false,
             quit_requested: false,
+            undo_stack: std::collections::VecDeque::new(),
+            redo_stack: std::collections::VecDeque::new(),
         }
     }
 
@@ -396,6 +402,19 @@ impl AppState {
                 response_tx: self.worker_resp_tx.clone(),
             });
         }
+    }
+
+    /// Push the current pipeline onto the undo stack before a mutation, clearing redo.
+    ///
+    /// The stack is capped at 20 entries; the oldest entry is dropped when the
+    /// capacity is exceeded.
+    pub fn push_undo(&mut self) {
+        const MAX_UNDO: usize = 20;
+        self.undo_stack.push_front(self.pipeline.clone());
+        if self.undo_stack.len() > MAX_UNDO {
+            self.undo_stack.pop_back();
+        }
+        self.redo_stack.clear();
     }
 }
 
@@ -612,6 +631,7 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
             if state.focused_panel == FocusedPanel::EffectsList =>
         {
             if !state.pipeline.effects.is_empty() {
+                state.push_undo();
                 state.pipeline.effects.remove(state.selected_effect);
                 state.clamp_selection();
                 state.pipeline_dirty = true;
@@ -622,6 +642,7 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
         }
         // Randomize effect parameters.
         KeyCode::Char('r') => {
+            state.push_undo();
             randomize_pipeline(&mut state.pipeline);
             state.pipeline_dirty = true;
             state.status_message = "Randomised pipeline. Re-processing…".to_string();
@@ -697,6 +718,42 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
                 state.input_mode = InputMode::SavePipelineDialog;
             }
         }
+        // Undo last pipeline edit (Ctrl+Z).
+        KeyCode::Char('z') if modifiers.contains(KeyModifiers::CONTROL) => {
+            if let Some(previous) = state.undo_stack.pop_front() {
+                let current = std::mem::replace(&mut state.pipeline, previous);
+                state.redo_stack.push_front(current);
+                state.clamp_selection();
+                state.pipeline_dirty = true;
+                state.image_protocol = None;
+                state.dispatch_process();
+                state.status_message = format!(
+                    "Undo – {} effect{} in pipeline.",
+                    state.pipeline.effects.len(),
+                    if state.pipeline.effects.len() == 1 { "" } else { "s" }
+                );
+            } else {
+                state.status_message = "Nothing to undo.".to_string();
+            }
+        }
+        // Redo last undone pipeline edit (Ctrl+Y).
+        KeyCode::Char('y') if modifiers.contains(KeyModifiers::CONTROL) => {
+            if let Some(next) = state.redo_stack.pop_front() {
+                let current = std::mem::replace(&mut state.pipeline, next);
+                state.undo_stack.push_front(current);
+                state.clamp_selection();
+                state.pipeline_dirty = true;
+                state.image_protocol = None;
+                state.dispatch_process();
+                state.status_message = format!(
+                    "Redo – {} effect{} in pipeline.",
+                    state.pipeline.effects.len(),
+                    if state.pipeline.effects.len() == 1 { "" } else { "s" }
+                );
+            } else {
+                state.status_message = "Nothing to redo.".to_string();
+            }
+        }
         // Load a pipeline from a JSON or YAML file via the file browser (Ctrl+L).
         KeyCode::Char('l') if modifiers.contains(KeyModifiers::CONTROL) => {
             let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
@@ -725,6 +782,7 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
 fn move_effect_up(state: &mut AppState) {
     let idx = state.selected_effect;
     if idx > 0 {
+        state.push_undo();
         state.pipeline.effects.swap(idx, idx - 1);
         state.selected_effect -= 1;
         state.dragging_effect = true;
@@ -740,6 +798,7 @@ fn move_effect_down(state: &mut AppState) {
     let idx = state.selected_effect;
     let last = state.pipeline.effects.len().saturating_sub(1);
     if idx < last {
+        state.push_undo();
         state.pipeline.effects.swap(idx, idx + 1);
         state.selected_effect += 1;
         state.dragging_effect = true;
@@ -791,6 +850,7 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
         }
         KeyCode::Enter => {
             let effect = AVAILABLE_EFFECTS[state.add_effect_cursor].1();
+            state.push_undo();
             state.pipeline.effects.push(effect);
             state.input_mode = InputMode::Normal;
             state.selected_effect = state.pipeline.effects.len() - 1;
@@ -857,6 +917,8 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
                                     state.clamp_selection();
                                     state.pipeline_dirty = false;
                                     state.quit_requested = false;
+                                    state.undo_stack.clear();
+                                    state.redo_stack.clear();
                                     state.image_protocol = None;
                                     state.dispatch_process();
                                     state.status_message = format!(
@@ -935,6 +997,7 @@ fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
                     .map(|(s, d)| s.parse::<f32>().unwrap_or(d.value).clamp(d.min, d.max))
                     .collect();
                 let updated = state.pipeline.effects[state.selected_effect].apply_params(&values);
+                state.push_undo();
                 state.pipeline.effects[state.selected_effect] = updated;
                 state.pipeline_dirty = true;
                 state.status_message = "Effect updated. Re-processing…".to_string();
@@ -1107,6 +1170,7 @@ fn handle_help_modal(state: &mut AppState, code: KeyCode) {
 fn handle_confirm_clear_pipeline(state: &mut AppState, code: KeyCode) {
     match code {
         KeyCode::Enter => {
+            state.push_undo();
             state.pipeline.effects.clear();
             state.selected_effect = 0;
             state.pipeline_dirty = true;
