@@ -34,48 +34,55 @@ impl GlitchEffect {
 // ── Pixelate ─────────────────────────────────────────────────────────────────
 
 fn pixelate(img: DynamicImage, block_size: u32) -> DynamicImage {
+    use rayon::prelude::*;
+
     if block_size <= 1 {
         return img;
     }
-    let (w, h) = img.dimensions();
-    let rgba = img.to_rgba8();
-    let mut out = ImageBuffer::new(w, h);
+    let rgba = img.into_rgba8();
+    let (w, h) = rgba.dimensions();
+    let w_usize = w as usize;
+    let h_usize = h as usize;
+    let bsize = block_size as usize;
+    let row_stride = w_usize * 4;
+    let strip_stride = bsize * row_stride;
+    let raw = rgba.into_raw();
+    let mut out_raw = vec![0u8; raw.len()];
 
-    let bw = block_size;
-    let bh = block_size;
-    let mut by = 0u32;
-    while by < h {
-        let block_h = bh.min(h - by);
-        let mut bx = 0u32;
-        while bx < w {
-            let block_w = bw.min(w - bx);
-            // Average colour within this block.
-            let (mut sr, mut sg, mut sb, mut sa, mut cnt) = (0u64, 0u64, 0u64, 0u64, 0u64);
-            for dy in 0..block_h {
-                for dx in 0..block_w {
-                    let p = rgba.get_pixel(bx + dx, by + dy);
-                    sr += p[0] as u64;
-                    sg += p[1] as u64;
-                    sb += p[2] as u64;
-                    sa += p[3] as u64;
-                    cnt += 1;
+    // Each horizontal strip of `block_size` rows is fully independent, so
+    // rayon can process all strips in parallel without any shared mutable state.
+    out_raw.par_chunks_mut(strip_stride).enumerate().for_each(|(strip_idx, strip)| {
+        let by = strip_idx * bsize;
+        let actual_bh = bsize.min(h_usize - by);
+
+        for bx in (0..w_usize).step_by(bsize) {
+            let actual_bw = bsize.min(w_usize - bx);
+            let cnt = (actual_bh * actual_bw) as u64;
+
+            // Compute average colour across the block.
+            let (mut sr, mut sg, mut sb, mut sa) = (0u64, 0u64, 0u64, 0u64);
+            for dy in 0..actual_bh {
+                for dx in 0..actual_bw {
+                    let idx = ((by + dy) * w_usize + (bx + dx)) * 4;
+                    sr += raw[idx] as u64;
+                    sg += raw[idx + 1] as u64;
+                    sb += raw[idx + 2] as u64;
+                    sa += raw[idx + 3] as u64;
                 }
             }
-            let avg = Rgba([
-                (sr / cnt) as u8,
-                (sg / cnt) as u8,
-                (sb / cnt) as u8,
-                (sa / cnt) as u8,
-            ]);
-            for dy in 0..block_h {
-                for dx in 0..block_w {
-                    out.put_pixel(bx + dx, by + dy, avg);
+            let avg = [(sr / cnt) as u8, (sg / cnt) as u8, (sb / cnt) as u8, (sa / cnt) as u8];
+
+            // Fill every pixel in the block with the average colour.
+            for dy in 0..actual_bh {
+                for dx in 0..actual_bw {
+                    let dst = dy * row_stride + (bx + dx) * 4;
+                    strip[dst..dst + 4].copy_from_slice(&avg);
                 }
             }
-            bx += bw;
         }
-        by += bh;
-    }
+    });
+
+    let out = image::ImageBuffer::from_raw(w, h, out_raw).expect("buffer size mismatch");
     DynamicImage::ImageRgba8(out)
 }
 
@@ -122,17 +129,27 @@ fn row_jitter(img: DynamicImage, magnitude: f32) -> DynamicImage {
 // ── Block Shift ───────────────────────────────────────────────────────────────
 
 fn block_shift(img: DynamicImage, shift_x: i32, shift_y: i32) -> DynamicImage {
-    let (w, h) = img.dimensions();
-    let rgba = img.to_rgba8();
-    let mut out = ImageBuffer::new(w, h);
+    use rayon::prelude::*;
 
-    for y in 0..h {
-        for x in 0..w {
-            let src_x = ((x as i32 + shift_x).rem_euclid(w as i32)) as u32;
-            let src_y = ((y as i32 + shift_y).rem_euclid(h as i32)) as u32;
-            out.put_pixel(x, y, *rgba.get_pixel(src_x, src_y));
+    let rgba = img.into_rgba8();
+    let (w, h) = rgba.dimensions();
+    let w_usize = w as usize;
+    let raw = rgba.into_raw();
+    let mut out_raw = vec![0u8; raw.len()];
+
+    // Each destination row is filled from a (possibly different) source row,
+    // and rows never overlap, so all rows can be processed in parallel.
+    out_raw.par_chunks_mut(w_usize * 4).enumerate().for_each(|(y, row)| {
+        let src_y = ((y as i32 + shift_y).rem_euclid(h as i32)) as usize;
+        for x in 0..w_usize {
+            let src_x = ((x as i32 + shift_x).rem_euclid(w as i32)) as usize;
+            let src_idx = (src_y * w_usize + src_x) * 4;
+            let dst_idx = x * 4;
+            row[dst_idx..dst_idx + 4].copy_from_slice(&raw[src_idx..src_idx + 4]);
         }
-    }
+    });
+
+    let out = image::ImageBuffer::from_raw(w, h, out_raw).expect("buffer size mismatch");
     DynamicImage::ImageRgba8(out)
 }
 
@@ -214,12 +231,31 @@ mod tests {
     }
 
     #[test]
-    fn pixelate_solid_image_unchanged() {
-        let color = Rgba([100u8, 150, 200, 255]);
-        let img = solid_image(40, 40, color);
-        let out = GlitchEffect::Pixelate { block_size: 8 }.apply_image(img);
+    fn block_shift_preserves_dimensions() {
+        let img = solid_image(60, 45, Rgba([200, 100, 50, 255]));
+        let out = GlitchEffect::BlockShift { shift_x: 10, shift_y: -5 }.apply_image(img);
+        assert_eq!(out.dimensions(), (60, 45));
+    }
+
+    #[test]
+    fn block_shift_solid_image_unchanged() {
+        let color = Rgba([200u8, 100, 50, 255]);
+        let img = solid_image(60, 45, color);
+        let out = GlitchEffect::BlockShift { shift_x: 10, shift_y: -5 }.apply_image(img);
         let rgba = out.to_rgba8();
-        // Every pixel should still be the same colour.
+        // Shifting a uniform image must not change any pixel.
+        for p in rgba.pixels() {
+            assert_eq!(*p, color);
+        }
+    }
+
+    #[test]
+    fn pixelate_block_size_one_is_identity() {
+        let color = Rgba([42u8, 84, 126, 255]);
+        let img = solid_image(20, 20, color);
+        let out = GlitchEffect::Pixelate { block_size: 1 }.apply_image(img);
+        // block_size == 1 is a no-op; every pixel is unchanged.
+        let rgba = out.to_rgba8();
         for p in rgba.pixels() {
             assert_eq!(*p, color);
         }

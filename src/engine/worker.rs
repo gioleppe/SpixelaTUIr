@@ -7,7 +7,8 @@ use crate::engine::export::ExportFormat;
 pub enum WorkerCommand {
     /// Process the given image through the supplied pipeline.
     Process {
-        image_path: std::path::PathBuf,
+        /// Pre-decoded proxy image – the worker never touches disk during normal editing.
+        image: image::DynamicImage,
         pipeline: Pipeline,
         /// Channel on which to deliver the processed frame.
         response_tx: Sender<WorkerResponse>,
@@ -35,12 +36,47 @@ pub enum WorkerResponse {
 
 /// Worker thread entry point. Receives commands and dispatches work.
 pub fn run(rx: Receiver<WorkerCommand>) {
-    while let Ok(cmd) = rx.recv() {
+    // `pending` holds a non-Process command that was discovered while draining
+    // stale Process jobs; it will be handled at the top of the next iteration.
+    let mut pending: Option<WorkerCommand> = None;
+
+    loop {
+        let cmd = if let Some(p) = pending.take() {
+            p
+        } else {
+            match rx.recv() {
+                Ok(cmd) => cmd,
+                Err(_) => break,
+            }
+        };
+
         match cmd {
-            WorkerCommand::Process { image_path, pipeline, response_tx } => {
-                if let Err(e) = process_image(image_path, pipeline, response_tx.clone()) {
-                    let _ = response_tx.send(WorkerResponse::Error(e.to_string()));
+            WorkerCommand::Process { image, pipeline, response_tx } => {
+                // Drain any additional Process commands queued since this one
+                // arrived so that only the most-recent user intent is executed.
+                let mut latest_image = image;
+                let mut latest_pipeline = pipeline;
+                let mut latest_resp_tx = response_tx;
+
+                loop {
+                    match rx.try_recv() {
+                        Ok(WorkerCommand::Process { image: img, pipeline: pipe, response_tx: tx }) => {
+                            latest_image = img;
+                            latest_pipeline = pipe;
+                            latest_resp_tx = tx;
+                        }
+                        Ok(other) => {
+                            // Non-Process command (Export, Quit) — defer it.
+                            pending = Some(other);
+                            break;
+                        }
+                        Err(_) => break,
+                    }
                 }
+
+                // Apply the full pipeline (each effect may operate on the whole image).
+                let result = latest_pipeline.apply_image(latest_image);
+                let _ = latest_resp_tx.send(WorkerResponse::ProcessedFrame(result));
             }
             WorkerCommand::Export { image, output_path, format, response_tx } => {
                 match crate::engine::export::export_image(&image, output_path, &format) {
@@ -55,18 +91,4 @@ pub fn run(rx: Receiver<WorkerCommand>) {
             WorkerCommand::Quit => break,
         }
     }
-}
-
-fn process_image(
-    image_path: std::path::PathBuf,
-    pipeline: Pipeline,
-    response_tx: Sender<WorkerResponse>,
-) -> anyhow::Result<()> {
-    let img = image::open(&image_path)?;
-
-    // Apply the full pipeline (each effect may operate on the whole image).
-    let result = pipeline.apply_image(img);
-
-    let _ = response_tx.send(WorkerResponse::ProcessedFrame(result));
-    Ok(())
 }
