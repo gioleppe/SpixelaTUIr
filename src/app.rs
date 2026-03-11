@@ -264,6 +264,10 @@ pub struct AppState {
     pub proxy_resolution_index: usize,
     /// True while the user is actively moving an effect with K / J (drag-to-reorder).
     pub dragging_effect: bool,
+    /// Set whenever the pipeline is modified; cleared when the pipeline is saved.
+    pub pipeline_dirty: bool,
+    /// True after the first quit attempt when there are unsaved changes (double-press to confirm).
+    pub quit_requested: bool,
 }
 
 impl AppState {
@@ -313,6 +317,8 @@ impl AppState {
             // Default to index 1 (512 px) — preserves prior behaviour.
             proxy_resolution_index: 1,
             dragging_effect: false,
+            pipeline_dirty: false,
+            quit_requested: false,
         }
     }
 
@@ -539,9 +545,19 @@ fn handle_key(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
 fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
     // Any keypress ends the drag highlight by default; move_effect_* will re-enable it.
     state.dragging_effect = false;
+    // Any non-quit keypress resets the pending-quit confirmation.
+    if !matches!(code, KeyCode::Char('q') | KeyCode::Esc) {
+        state.quit_requested = false;
+    }
     match code {
         KeyCode::Char('q') | KeyCode::Esc => {
-            state.should_quit = true;
+            if state.pipeline_dirty && !state.quit_requested {
+                state.quit_requested = true;
+                state.status_message =
+                    "Unsaved changes – press q again to quit, or Ctrl+S to save.".to_string();
+            } else {
+                state.should_quit = true;
+            }
         }
         KeyCode::Char('o') => {
             let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
@@ -598,6 +614,7 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
             if !state.pipeline.effects.is_empty() {
                 state.pipeline.effects.remove(state.selected_effect);
                 state.clamp_selection();
+                state.pipeline_dirty = true;
                 state.status_message = "Effect removed. Re-processing…".to_string();
                 state.image_protocol = None;
                 state.dispatch_process();
@@ -606,6 +623,7 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
         // Randomize effect parameters.
         KeyCode::Char('r') => {
             randomize_pipeline(&mut state.pipeline);
+            state.pipeline_dirty = true;
             state.status_message = "Randomised pipeline. Re-processing…".to_string();
             state.image_protocol = None;
             state.dispatch_process();
@@ -710,6 +728,7 @@ fn move_effect_up(state: &mut AppState) {
         state.pipeline.effects.swap(idx, idx - 1);
         state.selected_effect -= 1;
         state.dragging_effect = true;
+        state.pipeline_dirty = true;
         state.status_message = "Moved effect up. Re-processing…".to_string();
         state.image_protocol = None;
         state.dispatch_process();
@@ -724,6 +743,7 @@ fn move_effect_down(state: &mut AppState) {
         state.pipeline.effects.swap(idx, idx + 1);
         state.selected_effect += 1;
         state.dragging_effect = true;
+        state.pipeline_dirty = true;
         state.status_message = "Moved effect down. Re-processing…".to_string();
         state.image_protocol = None;
         state.dispatch_process();
@@ -774,6 +794,7 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
             state.pipeline.effects.push(effect);
             state.input_mode = InputMode::Normal;
             state.selected_effect = state.pipeline.effects.len() - 1;
+            state.pipeline_dirty = true;
             state.status_message = format!(
                 "Added '{}'. Re-processing…",
                 AVAILABLE_EFFECTS[state.add_effect_cursor].0
@@ -834,6 +855,8 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
                                         .unwrap_or_else(|| path.display().to_string());
                                     state.pipeline = pipeline;
                                     state.clamp_selection();
+                                    state.pipeline_dirty = false;
+                                    state.quit_requested = false;
                                     state.image_protocol = None;
                                     state.dispatch_process();
                                     state.status_message = format!(
@@ -913,6 +936,7 @@ fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
                     .collect();
                 let updated = state.pipeline.effects[state.selected_effect].apply_params(&values);
                 state.pipeline.effects[state.selected_effect] = updated;
+                state.pipeline_dirty = true;
                 state.status_message = "Effect updated. Re-processing…".to_string();
                 state.image_protocol = None;
                 state.dispatch_process();
@@ -1026,6 +1050,8 @@ fn handle_save_pipeline_dialog(state: &mut AppState, code: KeyCode) {
             let output_path = dir.join(format!("{filename}.json"));
             match crate::config::parser::save_pipeline(&state.pipeline, &output_path) {
                 Ok(()) => {
+                    state.pipeline_dirty = false;
+                    state.quit_requested = false;
                     state.status_message =
                         format!("Pipeline saved → {}", output_path.display());
                 }
@@ -1083,6 +1109,7 @@ fn handle_confirm_clear_pipeline(state: &mut AppState, code: KeyCode) {
         KeyCode::Enter => {
             state.pipeline.effects.clear();
             state.selected_effect = 0;
+            state.pipeline_dirty = true;
             state.image_protocol = None;
             state.dispatch_process();
             state.input_mode = InputMode::Normal;
