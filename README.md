@@ -50,7 +50,7 @@ PNG, JPEG, GIF, BMP
 | `Ctrl+L` | Load / import a pipeline from a JSON or YAML file (file browser) |
 | `Ctrl+D` | Clear all effects at once (shows a confirmation prompt) |
 | `h` | Open the full keyboard-shortcut help overlay |
-| `q` / `Esc` | Quit |
+| `q` / `Esc` | Quit (prompts to confirm if there are unsaved pipeline changes; press `q` again to force-quit) |
 
 ## Building
 
