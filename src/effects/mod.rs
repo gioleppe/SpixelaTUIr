@@ -4,7 +4,6 @@ pub mod crt;
 pub mod glitch;
 
 use image::{DynamicImage, GenericImageView, Rgba};
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use color::ColorEffect;
@@ -49,12 +48,12 @@ impl Effect {
     /// full spatial context (row jitter, pixel sort, scanlines with coordinates, …).
     pub fn apply_image(&self, img: DynamicImage) -> DynamicImage {
         match self {
-            // Per-pixel colour effects are embarrassingly parallel.
-            Effect::Color(e) => apply_per_pixel_parallel(img, |p, _, _| e.apply_pixel(p)),
+            // Per-pixel colour effects – the tight inner loop is auto-vectorised by LLVM.
+            Effect::Color(e) => apply_per_pixel(img, |p, _, _| e.apply_pixel(p)),
             // CRT effects that need coordinates.
             Effect::Crt(e) => {
                 let (w, h) = (img.width(), img.height());
-                apply_per_pixel_parallel(img, move |p, x, y| {
+                apply_per_pixel(img, move |p, x, y| {
                     e.apply_pixel_with_coords(p, x, y, w, h)
                 })
             }
@@ -345,18 +344,19 @@ impl Pipeline {
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 
-/// Apply a pixel-level function in parallel across all pixels, using rayon.
+/// Apply a pixel-level function sequentially across all pixels.
 ///
-/// Operates directly on the raw RGBA byte slice via `par_chunks_mut(4)` to
-/// avoid allocating a large intermediate `Vec<(u32, u32, Rgba<u8>)>` (which
-/// would triple the image data in memory simultaneously).
-pub fn apply_per_pixel_parallel<F>(img: DynamicImage, f: F) -> DynamicImage
+/// Operates directly on the raw RGBA byte slice via `chunks_mut(4)`,
+/// keeping allocations minimal and enabling LLVM to auto-vectorise the
+/// inner loop via SIMD when compiling with optimisations (`--release` or
+/// equivalent `-O2`/`-O3` flags).
+pub fn apply_per_pixel<F>(img: DynamicImage, f: F) -> DynamicImage
 where
-    F: Fn(Rgba<u8>, u32, u32) -> Rgba<u8> + Sync + Send,
+    F: Fn(Rgba<u8>, u32, u32) -> Rgba<u8>,
 {
     let (width, _height) = img.dimensions();
     let mut rgba = img.into_rgba8();
-    rgba.par_chunks_mut(4).enumerate().for_each(|(i, chunk)| {
+    rgba.chunks_mut(4).enumerate().for_each(|(i, chunk)| {
         let x = (i as u32) % width;
         let y = (i as u32) / width;
         let result = f(Rgba([chunk[0], chunk[1], chunk[2], chunk[3]]), x, y);
