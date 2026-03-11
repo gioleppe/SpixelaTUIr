@@ -6,7 +6,7 @@ A high-performance, terminal-based image glitching and processing tool written i
 
 - **Live preview canvas** — renders processed images directly in the terminal using the Sixel graphics protocol (with ANSI half-block fallback for terminals that don't support Sixel); the status bar always shows the active proxy resolution (e.g. `[512px]`)
 - **Interactive effects pipeline** — build a chain of effects that are applied in real-time to a downscaled proxy of your image; the Effects panel title always shows the current effect count (e.g. `Effects (3)`)
-- **Multi-threaded** — image processing runs on a dedicated worker thread, keeping the UI responsive at 60 FPS; per-pixel loops are auto-vectorised by the compiler
+- **Multi-threaded** — image processing runs on a dedicated worker thread, keeping the UI responsive. Re-rendering is only triggered when needed. Per-pixel loops are auto-vectorised by the compiler
 PNG, JPEG, GIF, BMP
 - **Pipeline randomisation** — instantly randomise all effect parameters with a single keypress
 - **Pipeline save / load** — export your favourite pipeline to a JSON file and re-import it in any future session

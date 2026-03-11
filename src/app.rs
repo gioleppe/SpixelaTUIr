@@ -560,6 +560,9 @@ where
     let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
     let mut state = AppState::new(worker_tx, worker_rx, worker_resp_tx, picker);
 
+    // Always draw the very first frame so the UI is visible on startup.
+    let mut ui_needs_redraw = true;
+
     loop {
         while let Ok(response) = state.worker_rx.try_recv() {
             match response {
@@ -582,17 +585,30 @@ where
                     state.status_message = format!("Engine error: {e}");
                 }
             }
+            // Any worker response means visible state changed.
+            ui_needs_redraw = true;
         }
 
-        terminal.draw(|frame| {
-            crate::ui::render(frame, &mut state);
-        })?;
+        if event::poll(Duration::from_millis(16))? {
+            match event::read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                    handle_key(&mut state, key.code, key.modifiers);
+                    ui_needs_redraw = true;
+                }
+                // Terminal was resized — ratatui-image needs to re-encode at the
+                // new dimensions, so force a full redraw.
+                Event::Resize(_, _) => {
+                    ui_needs_redraw = true;
+                }
+                _ => {}
+            }
+        }
 
-        if event::poll(Duration::from_millis(16))?
-            && let Event::Key(key) = event::read()?
-            && key.kind == KeyEventKind::Press
-        {
-            handle_key(&mut state, key.code, key.modifiers);
+        if ui_needs_redraw {
+            terminal.draw(|frame| {
+                crate::ui::render(frame, &mut state);
+            })?;
+            ui_needs_redraw = false;
         }
 
         if state.should_quit {

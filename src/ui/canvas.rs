@@ -57,6 +57,7 @@ pub fn render_canvas(frame: &mut Frame, area: Rect, state: &mut AppState) {
 /// Render the full canvas with a single processed preview.
 fn render_single_canvas(frame: &mut Frame, inner: Rect, state: &mut AppState) {
     if let Some(ref mut protocol) = state.image_protocol {
+        log::debug!("Rendering processed preview in single-view mode");
         let image_widget = StatefulImage::default().resize(Resize::Fit(None));
         frame.render_stateful_widget(image_widget, inner, protocol);
         // Record the render area so `set_preview` can pre-encode the next
