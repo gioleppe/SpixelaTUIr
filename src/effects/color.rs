@@ -1,6 +1,8 @@
 use image::Rgba;
 use serde::{Deserialize, Serialize};
 
+use super::ParamDescriptor;
+
 /// Color manipulation effects: hue shift, contrast, invert, saturation, quantization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ColorEffect {
@@ -160,6 +162,76 @@ impl ColorEffect {
                     pixel[3],
                 ])
             }
+        }
+    }
+
+    /// Return descriptors for all editable numeric parameters.
+    pub fn param_descriptors(&self) -> Vec<ParamDescriptor> {
+        match self {
+            ColorEffect::Invert => vec![],
+            ColorEffect::GradientMap { preset_idx, stops } => {
+                let mut params = vec![ParamDescriptor {
+                    name: "preset",
+                    value: *preset_idx as f32,
+                    min: 0.0,
+                    max: (GRADIENT_PRESETS.len() - 1) as f32,
+                }];
+
+                // If it's the "Custom" preset (last one), allow editing colors.
+                if *preset_idx == GRADIENT_PRESETS.len() - 1 && stops.len() >= 2 {
+                    params.push(ParamDescriptor { name: "r1", value: stops[0].1[0] as f32, min: 0.0, max: 255.0 });
+                    params.push(ParamDescriptor { name: "g1", value: stops[0].1[1] as f32, min: 0.0, max: 255.0 });
+                    params.push(ParamDescriptor { name: "b1", value: stops[0].1[2] as f32, min: 0.0, max: 255.0 });
+                    params.push(ParamDescriptor { name: "r2", value: stops[1].1[0] as f32, min: 0.0, max: 255.0 });
+                    params.push(ParamDescriptor { name: "g2", value: stops[1].1[1] as f32, min: 0.0, max: 255.0 });
+                    params.push(ParamDescriptor { name: "b2", value: stops[1].1[2] as f32, min: 0.0, max: 255.0 });
+                }
+                params
+            }
+            ColorEffect::HueShift { degrees } => vec![ParamDescriptor {
+                name: "degrees", value: *degrees, min: 0.0, max: 360.0,
+            }],
+            ColorEffect::Contrast { factor } => vec![ParamDescriptor {
+                name: "factor", value: *factor, min: 0.1, max: 3.0,
+            }],
+            ColorEffect::Saturation { factor } => vec![ParamDescriptor {
+                name: "factor", value: *factor, min: 0.0, max: 2.0,
+            }],
+            ColorEffect::ColorQuantization { levels } => vec![ParamDescriptor {
+                name: "levels", value: *levels as f32, min: 2.0, max: 16.0,
+            }],
+        }
+    }
+
+    /// Rebuild this variant with new parameter values (clamped to valid ranges).
+    pub fn apply_params(&self, values: &[f32]) -> ColorEffect {
+        let get = |i: usize, fallback: f32| values.get(i).copied().unwrap_or(fallback);
+        match self {
+            ColorEffect::Invert => ColorEffect::Invert,
+            ColorEffect::GradientMap { preset_idx, stops } => {
+                let new_preset_idx = get(0, *preset_idx as f32) as usize;
+                if new_preset_idx != *preset_idx {
+                    ColorEffect::GradientMap {
+                        preset_idx: new_preset_idx,
+                        stops: GRADIENT_PRESETS[new_preset_idx].1.to_vec(),
+                    }
+                } else if new_preset_idx == GRADIENT_PRESETS.len() - 1 {
+                    let mut new_stops = stops.clone();
+                    if new_stops.len() >= 2 && values.len() >= 7 {
+                        new_stops[0].1 = [get(1, 0.0) as u8, get(2, 0.0) as u8, get(3, 0.0) as u8];
+                        new_stops[1].1 = [get(4, 0.0) as u8, get(5, 0.0) as u8, get(6, 0.0) as u8];
+                    }
+                    ColorEffect::GradientMap { preset_idx: new_preset_idx, stops: new_stops }
+                } else {
+                    ColorEffect::GradientMap { preset_idx: *preset_idx, stops: stops.clone() }
+                }
+            }
+            ColorEffect::HueShift { degrees } => ColorEffect::HueShift { degrees: get(0, *degrees) },
+            ColorEffect::Contrast { factor } => ColorEffect::Contrast { factor: get(0, *factor) },
+            ColorEffect::Saturation { factor } => ColorEffect::Saturation { factor: get(0, *factor) },
+            ColorEffect::ColorQuantization { levels } => ColorEffect::ColorQuantization {
+                levels: get(0, *levels as f32) as u8,
+            },
         }
     }
 }

@@ -1,6 +1,8 @@
 use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
 use serde::{Deserialize, Serialize};
 
+use super::ParamDescriptor;
+
 /// Glitch-style pixel effects: pixelate, row jitter, block shift, pixel sort.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GlitchEffect {
@@ -22,6 +24,45 @@ impl GlitchEffect {
             GlitchEffect::RowJitter { magnitude } => row_jitter(img, *magnitude),
             GlitchEffect::BlockShift { shift_x, shift_y } => block_shift(img, *shift_x, *shift_y),
             GlitchEffect::PixelSort { threshold } => pixel_sort(img, *threshold),
+        }
+    }
+
+    /// Return descriptors for all editable numeric parameters.
+    pub fn param_descriptors(&self) -> Vec<ParamDescriptor> {
+        match self {
+            GlitchEffect::Pixelate { block_size } => vec![ParamDescriptor {
+                name: "block_size", value: *block_size as f32, min: 1.0, max: 64.0,
+            }],
+            GlitchEffect::RowJitter { magnitude } => vec![ParamDescriptor {
+                name: "magnitude", value: *magnitude, min: 0.0, max: 1.0,
+            }],
+            GlitchEffect::BlockShift { shift_x, shift_y } => vec![
+                ParamDescriptor { name: "shift_x", value: *shift_x as f32, min: -200.0, max: 200.0 },
+                ParamDescriptor { name: "shift_y", value: *shift_y as f32, min: -200.0, max: 200.0 },
+            ],
+            GlitchEffect::PixelSort { threshold } => vec![ParamDescriptor {
+                name: "threshold", value: *threshold, min: 0.0, max: 1.0,
+            }],
+        }
+    }
+
+    /// Rebuild this variant with new parameter values (clamped to valid ranges).
+    pub fn apply_params(&self, values: &[f32]) -> GlitchEffect {
+        let get = |i: usize, fallback: f32| values.get(i).copied().unwrap_or(fallback);
+        match self {
+            GlitchEffect::Pixelate { block_size } => GlitchEffect::Pixelate {
+                block_size: get(0, *block_size as f32) as u32,
+            },
+            GlitchEffect::RowJitter { magnitude } => GlitchEffect::RowJitter {
+                magnitude: get(0, *magnitude),
+            },
+            GlitchEffect::BlockShift { shift_x, shift_y } => GlitchEffect::BlockShift {
+                shift_x: get(0, *shift_x as f32) as i32,
+                shift_y: get(1, *shift_y as f32) as i32,
+            },
+            GlitchEffect::PixelSort { threshold } => GlitchEffect::PixelSort {
+                threshold: get(0, *threshold),
+            },
         }
     }
 }
