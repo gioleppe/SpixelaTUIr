@@ -21,11 +21,7 @@ pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
     };
 
     let effect_count = state.pipeline.effects.len();
-    let title = if is_focused {
-        format!("Effects ({effect_count}) [Tab]")
-    } else {
-        format!("Effects ({effect_count}) [Tab to focus]")
-    };
+    let title = format!("Effects ({effect_count})");
 
     let block = Block::default()
         .title(title.as_str())
