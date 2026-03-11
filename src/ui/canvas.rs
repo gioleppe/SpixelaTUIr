@@ -59,6 +59,9 @@ fn render_single_canvas(frame: &mut Frame, inner: Rect, state: &mut AppState) {
     if let Some(ref mut protocol) = state.image_protocol {
         let image_widget = StatefulImage::default().resize(Resize::Fit(None));
         frame.render_stateful_widget(image_widget, inner, protocol);
+        // Record the render area so `set_preview` can pre-encode the next
+        // protocol replacement without triggering a Sixel blink.
+        state.image_protocol_last_area = Some(inner);
     } else {
         let msg = if state.image_path.is_some() {
             "Processing… please wait."
@@ -111,6 +114,9 @@ fn render_split_canvas(frame: &mut Frame, inner: Rect, state: &mut AppState) {
     if let Some(ref mut protocol) = state.image_protocol {
         let image_widget = StatefulImage::default().resize(Resize::Fit(None));
         frame.render_stateful_widget(image_widget, after_inner, protocol);
+        // Record the render area so `set_preview` can pre-encode the next
+        // protocol replacement without triggering a Sixel blink.
+        state.image_protocol_last_area = Some(after_inner);
     } else {
         let msg = if state.image_path.is_some() {
             "Processing… please wait."
