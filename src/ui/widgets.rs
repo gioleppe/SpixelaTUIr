@@ -21,8 +21,9 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         InputMode::PathInput => "Type path  Enter: load  Esc: cancel",
         InputMode::AddEffect => "j/k: navigate  Enter: add  Esc: cancel",
         InputMode::FileBrowser => FILE_BROWSER_HINT,
+        InputMode::EditEffect { .. } => "j/k: next field  Type value  Enter: apply  Esc: cancel",
         InputMode::Normal => {
-            "q: Quit  o: Open  e: Export  Tab: Switch panel  [Effects] a: Add  d: Del  r: Random"
+            "q: Quit  o: Open  e: Export  Tab: Switch panel  [Effects] a: Add  d: Del  Enter: Edit  K/J: Move up/down  r: Random"
         }
     };
     let block = Block::default().title("Controls").borders(Borders::ALL);

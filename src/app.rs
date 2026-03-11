@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{backend::Backend, Terminal};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use std::sync::mpsc;
@@ -137,6 +137,8 @@ pub enum InputMode {
     AddEffect,
     /// User is browsing the filesystem via the interactive file browser modal.
     FileBrowser,
+    /// User is editing parameters of the selected pipeline effect.
+    EditEffect { field_idx: usize },
 }
 
 /// Central application state
@@ -177,6 +179,8 @@ pub struct AppState {
     pub path_input: String,
     /// State for the interactive file-browser modal (Some when modal is open).
     pub file_browser: Option<FileBrowserState>,
+    /// Per-field string buffers used while editing effect parameters.
+    pub edit_params: Vec<String>,
 }
 
 impl AppState {
@@ -205,6 +209,7 @@ impl AppState {
             add_effect_cursor: 0,
             path_input: String::new(),
             file_browser: None,
+            edit_params: Vec::new(),
         }
     }
 
@@ -339,7 +344,7 @@ where
         if event::poll(Duration::from_millis(16))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    handle_key(&mut state, key.code);
+                    handle_key(&mut state, key.code, key.modifiers);
                 }
             }
         }
@@ -354,16 +359,17 @@ where
     Ok(())
 }
 
-fn handle_key(state: &mut AppState, code: KeyCode) {
+fn handle_key(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
     match state.input_mode {
-        InputMode::Normal => handle_normal(state, code),
+        InputMode::Normal => handle_normal(state, code, modifiers),
         InputMode::PathInput => handle_path_input(state, code),
         InputMode::AddEffect => handle_add_effect(state, code),
         InputMode::FileBrowser => handle_file_browser(state, code),
+        InputMode::EditEffect { .. } => handle_edit_effect(state, code),
     }
 }
 
-fn handle_normal(state: &mut AppState, code: KeyCode) {
+fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
     match code {
         KeyCode::Char('q') | KeyCode::Esc => {
             state.should_quit = true;
@@ -378,6 +384,26 @@ fn handle_normal(state: &mut AppState, code: KeyCode) {
                 FocusedPanel::Canvas => FocusedPanel::EffectsList,
                 FocusedPanel::EffectsList => FocusedPanel::Canvas,
             };
+        }
+        // Move selected effect one position up (Shift+Up or K).
+        KeyCode::Up
+            if state.focused_panel == FocusedPanel::EffectsList
+                && modifiers.contains(KeyModifiers::SHIFT) =>
+        {
+            move_effect_up(state);
+        }
+        KeyCode::Char('K') if state.focused_panel == FocusedPanel::EffectsList => {
+            move_effect_up(state);
+        }
+        // Move selected effect one position down (Shift+Down or J).
+        KeyCode::Down
+            if state.focused_panel == FocusedPanel::EffectsList
+                && modifiers.contains(KeyModifiers::SHIFT) =>
+        {
+            move_effect_down(state);
+        }
+        KeyCode::Char('J') if state.focused_panel == FocusedPanel::EffectsList => {
+            move_effect_down(state);
         }
         // Effects-list navigation (when effects panel is focused).
         KeyCode::Up | KeyCode::Char('k')
@@ -419,6 +445,24 @@ fn handle_normal(state: &mut AppState, code: KeyCode) {
             state.image_protocol = None;
             state.dispatch_process();
         }
+        // Open the edit-parameters modal (effects panel focused, effect selected).
+        KeyCode::Enter
+            if state.focused_panel == FocusedPanel::EffectsList
+                && !state.pipeline.effects.is_empty() =>
+        {
+            let descriptors = state.pipeline.effects[state.selected_effect].param_descriptors();
+            if descriptors.is_empty() {
+                state.status_message = "This effect has no editable parameters.".to_string();
+            } else {
+                state.edit_params = descriptors
+                    .iter()
+                    .map(|d| format_param_value(d.value))
+                    .collect();
+                state.input_mode = InputMode::EditEffect { field_idx: 0 };
+                state.status_message =
+                    "Edit parameters (↑↓: field, Enter: apply, Esc: cancel)".to_string();
+            }
+        }
         // Export current preview to PNG.
         KeyCode::Char('e') => {
             if state.preview_buffer.is_some() {
@@ -429,6 +473,31 @@ fn handle_normal(state: &mut AppState, code: KeyCode) {
             }
         }
         _ => {}
+    }
+}
+
+/// Move the selected effect one position up in the pipeline.
+fn move_effect_up(state: &mut AppState) {
+    let idx = state.selected_effect;
+    if idx > 0 {
+        state.pipeline.effects.swap(idx, idx - 1);
+        state.selected_effect -= 1;
+        state.status_message = "Moved effect up. Re-processing…".to_string();
+        state.image_protocol = None;
+        state.dispatch_process();
+    }
+}
+
+/// Move the selected effect one position down in the pipeline.
+fn move_effect_down(state: &mut AppState) {
+    let idx = state.selected_effect;
+    let last = state.pipeline.effects.len().saturating_sub(1);
+    if idx < last {
+        state.pipeline.effects.swap(idx, idx + 1);
+        state.selected_effect += 1;
+        state.status_message = "Moved effect down. Re-processing…".to_string();
+        state.image_protocol = None;
+        state.dispatch_process();
     }
 }
 
@@ -529,6 +598,82 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
     }
 }
 
+fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
+    let field_idx = match state.input_mode {
+        InputMode::EditEffect { field_idx } => field_idx,
+        _ => return,
+    };
+
+    let num_fields = if state.pipeline.effects.is_empty() {
+        0
+    } else {
+        state.pipeline.effects[state.selected_effect]
+            .param_descriptors()
+            .len()
+    };
+
+    match code {
+        KeyCode::Esc => {
+            state.input_mode = InputMode::Normal;
+            state.edit_params.clear();
+            state.status_message = "Edit cancelled.".to_string();
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            if field_idx > 0 {
+                state.input_mode = InputMode::EditEffect { field_idx: field_idx - 1 };
+            }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if field_idx + 1 < num_fields {
+                state.input_mode = InputMode::EditEffect { field_idx: field_idx + 1 };
+            }
+        }
+        KeyCode::Backspace => {
+            if let Some(buf) = state.edit_params.get_mut(field_idx) {
+                buf.pop();
+            }
+        }
+        KeyCode::Char(c) if c.is_ascii_digit() || c == '.' || c == '-' => {
+            if let Some(buf) = state.edit_params.get_mut(field_idx) {
+                buf.push(c);
+            }
+        }
+        KeyCode::Enter => {
+            if !state.pipeline.effects.is_empty() {
+                let descriptors =
+                    state.pipeline.effects[state.selected_effect].param_descriptors();
+                let values: Vec<f32> = state
+                    .edit_params
+                    .iter()
+                    .zip(descriptors.iter())
+                    .map(|(s, d)| s.parse::<f32>().unwrap_or(d.value).clamp(d.min, d.max))
+                    .collect();
+                let updated = state.pipeline.effects[state.selected_effect].apply_params(&values);
+                state.pipeline.effects[state.selected_effect] = updated;
+                state.status_message = "Effect updated. Re-processing…".to_string();
+                state.image_protocol = None;
+                state.dispatch_process();
+            }
+            state.input_mode = InputMode::Normal;
+            state.edit_params.clear();
+        }
+        _ => {}
+    }
+}
+
+/// Format a float parameter value for display in the edit buffer.
+///
+/// Integers (where `fract() == 0`) are displayed without a decimal point
+/// (e.g. `8` instead of `8`), while fractional values use Rust's default
+/// shortest-round-trip representation (e.g. `0.05`, `1.5`).
+fn format_param_value(value: f32) -> String {
+    if value.fract() == 0.0 {
+        format!("{}", value as i64)
+    } else {
+        format!("{value}")
+    }
+}
+
 /// Randomize the numeric parameters of every effect in the pipeline.
 fn randomize_pipeline(pipeline: &mut Pipeline) {
     use std::collections::hash_map::DefaultHasher;
@@ -545,6 +690,15 @@ fn randomize_pipeline(pipeline: &mut Pipeline) {
         rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         ((rng >> 33) as f32) / (u32::MAX as f32)
     };
+
+    // Populate the pipeline with 2-5 random effects so randomization is
+    // visible even when starting from an empty pipeline.
+    let count = 2 + (next() * 4.0) as usize;
+    pipeline.effects.clear();
+    for _ in 0..count {
+        let idx = (next() * AVAILABLE_EFFECTS.len() as f32) as usize % AVAILABLE_EFFECTS.len();
+        pipeline.effects.push(AVAILABLE_EFFECTS[idx].1());
+    }
 
     for effect in &mut pipeline.effects {
         match effect {
@@ -582,5 +736,131 @@ fn randomize_pipeline(pipeline: &mut Pipeline) {
             },
             Effect::Composite(_) => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn randomize_pipeline_populates_empty_pipeline() {
+        let mut pipeline = Pipeline::default();
+        assert!(pipeline.effects.is_empty(), "pipeline should start empty");
+
+        randomize_pipeline(&mut pipeline);
+
+        let len = pipeline.effects.len();
+        assert!(
+            (2..=5).contains(&len),
+            "randomize should add 2–5 effects, got {len}"
+        );
+    }
+
+    #[test]
+    fn randomize_pipeline_replaces_existing_effects() {
+        let mut pipeline = Pipeline::default();
+        randomize_pipeline(&mut pipeline);
+        let first_len = pipeline.effects.len();
+
+        // A second call must also produce a valid count (pipeline is non-empty now).
+        randomize_pipeline(&mut pipeline);
+        let second_len = pipeline.effects.len();
+
+        assert!(
+            (2..=5).contains(&first_len),
+            "first randomize should give 2–5 effects, got {first_len}"
+        );
+        assert!(
+            (2..=5).contains(&second_len),
+            "second randomize should give 2–5 effects, got {second_len}"
+        );
+    }
+
+    fn make_state_with_effects() -> AppState {
+        let (worker_tx, _worker_rx) = std::sync::mpsc::channel();
+        let (resp_tx, resp_rx) = std::sync::mpsc::channel();
+        let picker = ratatui_image::picker::Picker::halfblocks();
+        let mut state = AppState::new(worker_tx, resp_rx, resp_tx, picker);
+        state.pipeline = Pipeline {
+            effects: vec![
+                Effect::Color(ColorEffect::Invert),
+                Effect::Glitch(GlitchEffect::Pixelate { block_size: 8 }),
+                Effect::Color(ColorEffect::HueShift { degrees: 30.0 }),
+            ],
+        };
+        state.focused_panel = FocusedPanel::EffectsList;
+        state.selected_effect = 1;
+        state
+    }
+
+    #[test]
+    fn move_effect_up_with_k() {
+        let mut state = make_state_with_effects();
+        handle_normal(&mut state, KeyCode::Char('K'), KeyModifiers::NONE);
+        assert_eq!(state.selected_effect, 0);
+        assert!(matches!(state.pipeline.effects[0], Effect::Glitch(_)));
+        assert!(matches!(state.pipeline.effects[1], Effect::Color(ColorEffect::Invert)));
+        assert!(state.status_message.contains("up"));
+    }
+
+    #[test]
+    fn move_effect_up_with_shift_up() {
+        let mut state = make_state_with_effects();
+        handle_normal(&mut state, KeyCode::Up, KeyModifiers::SHIFT);
+        assert_eq!(state.selected_effect, 0);
+        assert!(matches!(state.pipeline.effects[0], Effect::Glitch(_)));
+        assert!(matches!(state.pipeline.effects[1], Effect::Color(ColorEffect::Invert)));
+        assert!(state.status_message.contains("up"));
+    }
+
+    #[test]
+    fn move_effect_down_with_j() {
+        let mut state = make_state_with_effects();
+        handle_normal(&mut state, KeyCode::Char('J'), KeyModifiers::NONE);
+        assert_eq!(state.selected_effect, 2);
+        assert!(matches!(state.pipeline.effects[1], Effect::Color(_)));
+        assert!(matches!(state.pipeline.effects[2], Effect::Glitch(_)));
+        assert!(state.status_message.contains("down"));
+    }
+
+    #[test]
+    fn move_effect_down_with_shift_down() {
+        let mut state = make_state_with_effects();
+        handle_normal(&mut state, KeyCode::Down, KeyModifiers::SHIFT);
+        assert_eq!(state.selected_effect, 2);
+        assert!(matches!(state.pipeline.effects[1], Effect::Color(_)));
+        assert!(matches!(state.pipeline.effects[2], Effect::Glitch(_)));
+        assert!(state.status_message.contains("down"));
+    }
+
+    #[test]
+    fn move_effect_up_noop_at_first() {
+        let mut state = make_state_with_effects();
+        state.selected_effect = 0;
+        let effects_before = state.pipeline.effects.clone();
+        handle_normal(&mut state, KeyCode::Char('K'), KeyModifiers::NONE);
+        assert_eq!(state.selected_effect, 0);
+        assert_eq!(state.pipeline.effects.len(), effects_before.len());
+    }
+
+    #[test]
+    fn move_effect_down_noop_at_last() {
+        let mut state = make_state_with_effects();
+        state.selected_effect = 2;
+        let effects_before = state.pipeline.effects.clone();
+        handle_normal(&mut state, KeyCode::Char('J'), KeyModifiers::NONE);
+        assert_eq!(state.selected_effect, 2);
+        assert_eq!(state.pipeline.effects.len(), effects_before.len());
+    }
+
+    #[test]
+    fn plain_up_does_not_swap() {
+        let mut state = make_state_with_effects();
+        // Plain Up (no SHIFT) should only move cursor, not reorder effects.
+        handle_normal(&mut state, KeyCode::Up, KeyModifiers::NONE);
+        assert_eq!(state.selected_effect, 0);
+        // First effect must remain the original Invert, not the Pixelate.
+        assert!(matches!(state.pipeline.effects[0], Effect::Color(ColorEffect::Invert)));
     }
 }
