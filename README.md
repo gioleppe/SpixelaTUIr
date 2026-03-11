@@ -1,2 +1,87 @@
 # SpixelaTUIr
-TUI based rust image glitcher
+
+A high-performance, terminal-based image glitching and processing tool written in Rust.
+
+## Features
+
+- **Live preview canvas** — renders processed images directly in the terminal using the Sixel graphics protocol (with ANSI half-block fallback for terminals that don't support Sixel)
+- **Interactive effects pipeline** — build a chain of effects that are applied in real-time to a downscaled proxy of your image
+- **Multi-threaded** — image processing runs on a dedicated worker thread using [rayon](https://github.com/rayon-rs/rayon) for data-parallel pixel ops, keeping the UI responsive at 60 FPS
+- **PNG export** — save the current processed preview to disk with safe auto-incrementing filenames
+- **Pipeline randomisation** — instantly randomise all effect parameters with a single keypress
+
+## Effects
+
+| Category | Effect | Description |
+|----------|--------|-------------|
+| **Color** | `HueShift` | Rotate the colour spectrum by N degrees (HSL) |
+| | `Saturation` | Scale colour intensity (HSL) |
+| | `Contrast` | Expand or compress the tonal range |
+| | `Invert` | Mathematical RGB inversion |
+| | `ColorQuantization` | Posterize to N palette levels |
+| **Glitch** | `Pixelate` | Block-average downsampling then nearest-neighbour upscale |
+| | `RowJitter` | Deterministic horizontal row displacement |
+| | `PixelSort` | Sort above-threshold pixels by luminance within each row |
+| | `BlockShift` | Translate the entire image by (x, y) with wrapping |
+| **CRT** | `Scanlines` | Semi-transparent dark horizontal lines |
+| | `Noise` | Per-pixel RGB or monochromatic noise |
+| | `Vignette` | Smooth-step radial edge darkening |
+| **Composite** | `CropRect` | Crop to a given rectangle |
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `o` | Open an image (floating path input) |
+| `Tab` | Toggle keyboard focus between Canvas and Effects panel |
+| `a` | Add an effect from the preset menu (requires Effects panel focus) |
+| `d` | Delete the selected effect and re-process |
+| `r` | Randomise all effect parameter values |
+| `e` | Export the current preview as a PNG |
+| `q` / `Esc` | Quit |
+
+When the Effects panel is focused, use `↑`/`↓` (or `k`/`j`) to navigate the effect list.
+
+## Building
+
+Requires Rust (stable) and `libchafa-dev` (for the Chafa-backed image renderer):
+
+```bash
+# Ubuntu / Debian
+sudo apt-get install libchafa-dev libglib2.0-dev
+
+# macOS (Homebrew)
+brew install chafa
+
+cargo build --release
+cargo run --release
+```
+
+The `.cargo/config.toml` in this repository sets `PKG_CONFIG_PATH` for Linux so that `libchafa` is found automatically after the packages above are installed.
+
+## Architecture
+
+```
+Main Thread (UI)          Engine Thread (Worker)
+─────────────────         ──────────────────────
+ratatui + crossterm  ──WorkerCommand──▶  rayon pipeline
+                                         image::open()
+Sixel / half-block  ◀─WorkerResponse─   pipeline.apply_image()
+canvas rendering         ProcessedFrame
+                         Exported
+                         Error
+```
+
+- `src/app.rs` — `AppState`, event loop, key handling, randomisation engine  
+- `src/ui/` — layout, canvas (Sixel), effects sidebar, widget overlays  
+- `src/effects/` — per-effect math (`color`, `glitch`, `crt`, `composite`)  
+- `src/engine/` — worker thread, PNG export  
+- `src/config/` — YAML / JSON pipeline serialisation  
+
+## Image Formats
+
+Supported via the [`image`](https://github.com/image-rs/image) crate: **PNG, JPEG, GIF, BMP**.
+
+## License
+
+See [LICENSE](LICENSE).
