@@ -21,6 +21,111 @@ pub enum FocusedPanel {
     EffectsList,
 }
 
+/// A single entry in the file browser – either a directory or an image file.
+#[derive(Debug, Clone)]
+pub enum FileBrowserEntry {
+    Directory(std::path::PathBuf),
+    /// Path and pre-fetched file size in bytes.
+    ImageFile(std::path::PathBuf, u64),
+}
+
+/// State for the interactive file browser modal.
+#[derive(Debug)]
+pub struct FileBrowserState {
+    /// Current working directory being browsed.
+    pub cwd: std::path::PathBuf,
+    /// Sorted list of entries: directories first, then image files.
+    pub entries: Vec<FileBrowserEntry>,
+    /// Currently highlighted row index.
+    pub cursor: usize,
+}
+
+impl FileBrowserState {
+    /// Supported image extensions.
+    const IMAGE_EXTENSIONS: &'static [&'static str] =
+        &["png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif"];
+
+    /// Create a new browser rooted at `dir`, reading its entries immediately.
+    pub fn new(dir: std::path::PathBuf) -> Self {
+        let mut state = Self {
+            cwd: dir,
+            entries: Vec::new(),
+            cursor: 0,
+        };
+        state.refresh();
+        state
+    }
+
+    /// Re-read the current directory, sorting dirs first then image files.
+    pub fn refresh(&mut self) {
+        let mut dirs: Vec<std::path::PathBuf> = Vec::new();
+        let mut files: Vec<std::path::PathBuf> = Vec::new();
+
+        if let Ok(read_dir) = std::fs::read_dir(&self.cwd) {
+            for entry in read_dir.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    dirs.push(path);
+                } else if path.is_file() {
+                    let ext = path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .map(|e| e.to_lowercase());
+                    if let Some(e) = ext {
+                        if Self::IMAGE_EXTENSIONS.contains(&e.as_str()) {
+                            files.push(path);
+                        }
+                    }
+                }
+            }
+        }
+
+        dirs.sort();
+        files.sort();
+
+        self.entries = dirs
+            .into_iter()
+            .map(FileBrowserEntry::Directory)
+            .chain(files.into_iter().map(|path| {
+                let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                FileBrowserEntry::ImageFile(path, size)
+            }))
+            .collect();
+        self.cursor = 0;
+    }
+
+    /// Descend into the directory at `cursor`.
+    pub fn enter_dir(&mut self) {
+        if let Some(FileBrowserEntry::Directory(path)) = self.entries.get(self.cursor) {
+            let new_dir = path.clone();
+            self.cwd = new_dir;
+            self.refresh();
+        }
+    }
+
+    /// Ascend one level (go to parent directory).
+    pub fn go_up(&mut self) {
+        if let Some(parent) = self.cwd.parent().map(|p| p.to_path_buf()) {
+            self.cwd = parent;
+            self.refresh();
+        }
+    }
+
+    /// Move the cursor up by one row.
+    pub fn move_up(&mut self) {
+        if self.cursor > 0 {
+            self.cursor -= 1;
+        }
+    }
+
+    /// Move the cursor down by one row.
+    pub fn move_down(&mut self) {
+        if !self.entries.is_empty() && self.cursor < self.entries.len() - 1 {
+            self.cursor += 1;
+        }
+    }
+}
+
 /// Whether the application is accepting normal keyboard shortcuts or text input.
 #[derive(Debug, Clone, PartialEq)]
 pub enum InputMode {
@@ -30,6 +135,8 @@ pub enum InputMode {
     PathInput,
     /// User is browsing the add-effect menu.
     AddEffect,
+    /// User is browsing the filesystem via the interactive file browser modal.
+    FileBrowser,
     /// User is editing parameters of the selected pipeline effect.
     EditEffect { field_idx: usize },
 }
@@ -70,6 +177,8 @@ pub struct AppState {
     pub add_effect_cursor: usize,
     /// Buffer for the file-path typed by the user when in PathInput mode.
     pub path_input: String,
+    /// State for the interactive file-browser modal (Some when modal is open).
+    pub file_browser: Option<FileBrowserState>,
     /// Per-field string buffers used while editing effect parameters.
     pub edit_params: Vec<String>,
 }
@@ -99,6 +208,7 @@ impl AppState {
             selected_effect: 0,
             add_effect_cursor: 0,
             path_input: String::new(),
+            file_browser: None,
             edit_params: Vec::new(),
         }
     }
@@ -168,6 +278,10 @@ impl AppState {
         }
     }
 }
+
+/// Keyboard hint shown in the controls bar and inside the file-browser footer.
+pub const FILE_BROWSER_HINT: &str =
+    "↑↓/jk: navigate  Enter: open  Backspace/-: up  Esc: cancel";
 
 /// All effects available to add, with display names.
 pub const AVAILABLE_EFFECTS: &[(&str, fn() -> Effect)] = &[
@@ -250,6 +364,7 @@ fn handle_key(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
         InputMode::Normal => handle_normal(state, code, modifiers),
         InputMode::PathInput => handle_path_input(state, code),
         InputMode::AddEffect => handle_add_effect(state, code),
+        InputMode::FileBrowser => handle_file_browser(state, code),
         InputMode::EditEffect { .. } => handle_edit_effect(state, code),
     }
 }
@@ -260,10 +375,9 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
             state.should_quit = true;
         }
         KeyCode::Char('o') => {
-            state.input_mode = InputMode::PathInput;
-            state.path_input.clear();
-            state.status_message =
-                "Enter image path (Enter to load, Esc to cancel):".to_string();
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
+            state.file_browser = Some(FileBrowserState::new(cwd));
+            state.input_mode = InputMode::FileBrowser;
         }
         KeyCode::Tab => {
             state.focused_panel = match state.focused_panel {
@@ -433,6 +547,52 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
             );
             state.image_protocol = None;
             state.dispatch_process();
+        }
+        _ => {}
+    }
+}
+
+fn handle_file_browser(state: &mut AppState, code: KeyCode) {
+    match code {
+        KeyCode::Esc => {
+            state.input_mode = InputMode::Normal;
+            state.file_browser = None;
+            state.status_message = "Cancelled.".to_string();
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            if let Some(ref mut fb) = state.file_browser {
+                fb.move_up();
+            }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if let Some(ref mut fb) = state.file_browser {
+                fb.move_down();
+            }
+        }
+        KeyCode::Backspace | KeyCode::Char('-') => {
+            if let Some(ref mut fb) = state.file_browser {
+                fb.go_up();
+            }
+        }
+        KeyCode::Enter => {
+            // Clone what we need first to avoid the borrow-checker conflict.
+            let action = state
+                .file_browser
+                .as_ref()
+                .and_then(|fb| fb.entries.get(fb.cursor).cloned());
+            match action {
+                Some(FileBrowserEntry::Directory(_)) => {
+                    if let Some(ref mut fb) = state.file_browser {
+                        fb.enter_dir();
+                    }
+                }
+                Some(FileBrowserEntry::ImageFile(path, _)) => {
+                    state.input_mode = InputMode::Normal;
+                    state.file_browser = None;
+                    state.load_image(path);
+                }
+                None => {}
+            }
         }
         _ => {}
     }
