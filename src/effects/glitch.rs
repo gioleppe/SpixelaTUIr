@@ -1,3 +1,5 @@
+use std::fmt;
+
 use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
 use serde::{Deserialize, Serialize};
 
@@ -63,6 +65,29 @@ impl GlitchEffect {
             GlitchEffect::PixelSort { threshold } => GlitchEffect::PixelSort {
                 threshold: get(0, *threshold),
             },
+        }
+    }
+
+    /// Returns the variant name (e.g. `"Pixelate"`, `"RowJitter"`) for UI titles.
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            GlitchEffect::Pixelate { .. } => "Pixelate",
+            GlitchEffect::RowJitter { .. } => "RowJitter",
+            GlitchEffect::BlockShift { .. } => "BlockShift",
+            GlitchEffect::PixelSort { .. } => "PixelSort",
+        }
+    }
+}
+
+impl fmt::Display for GlitchEffect {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GlitchEffect::Pixelate { block_size } => write!(f, "Pixelate {block_size}px"),
+            GlitchEffect::RowJitter { magnitude } => write!(f, "RowJitter {magnitude:.2}"),
+            GlitchEffect::BlockShift { shift_x, shift_y } => {
+                write!(f, "BlockShift ({shift_x},{shift_y})")
+            }
+            GlitchEffect::PixelSort { threshold } => write!(f, "PixelSort {threshold:.2}"),
         }
     }
 }

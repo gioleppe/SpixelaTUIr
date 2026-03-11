@@ -1,3 +1,5 @@
+use std::fmt;
+
 use image::Rgba;
 use serde::{Deserialize, Serialize};
 
@@ -232,6 +234,37 @@ impl ColorEffect {
             ColorEffect::ColorQuantization { levels } => ColorEffect::ColorQuantization {
                 levels: get(0, *levels as f32) as u8,
             },
+        }
+    }
+
+    /// Returns the variant name (e.g. `"HueShift"`, `"Invert"`) for UI titles.
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            ColorEffect::Invert => "Invert",
+            ColorEffect::GradientMap { .. } => "GradientMap",
+            ColorEffect::HueShift { .. } => "HueShift",
+            ColorEffect::Contrast { .. } => "Contrast",
+            ColorEffect::Saturation { .. } => "Saturation",
+            ColorEffect::ColorQuantization { .. } => "ColorQuantization",
+        }
+    }
+}
+
+impl fmt::Display for ColorEffect {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ColorEffect::Invert => write!(f, "Invert"),
+            ColorEffect::GradientMap { preset_idx, .. } => {
+                let name = GRADIENT_PRESETS
+                    .get(*preset_idx)
+                    .map(|(n, _)| *n)
+                    .unwrap_or("Unknown");
+                write!(f, "Gradient {name}")
+            }
+            ColorEffect::HueShift { degrees } => write!(f, "HueShift {degrees:.0}°"),
+            ColorEffect::Contrast { factor } => write!(f, "Contrast ×{factor:.2}"),
+            ColorEffect::Saturation { factor } => write!(f, "Saturation ×{factor:.2}"),
+            ColorEffect::ColorQuantization { levels } => write!(f, "Quantize {levels}"),
         }
     }
 }

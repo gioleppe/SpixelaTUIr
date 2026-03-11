@@ -1,3 +1,5 @@
+use std::fmt;
+
 use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 
@@ -72,6 +74,28 @@ impl CompositeEffect {
                 width: get(2, *width as f32) as u32,
                 height: get(3, *height as f32) as u32,
             },
+        }
+    }
+
+    /// Returns the variant name (e.g. `"ImageBlend"`, `"CropRect"`) for UI titles.
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            CompositeEffect::ImageBlend { .. } => "ImageBlend",
+            CompositeEffect::CropRect { .. } => "CropRect",
+        }
+    }
+}
+
+impl fmt::Display for CompositeEffect {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CompositeEffect::ImageBlend { opacity } => write!(f, "Blend {opacity:.0}%"),
+            CompositeEffect::CropRect {
+                x,
+                y,
+                width,
+                height,
+            } => write!(f, "Crop {x},{y} {width}×{height}"),
         }
     }
 }

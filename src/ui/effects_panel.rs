@@ -7,9 +7,7 @@ use ratatui::{
 };
 
 use crate::app::{AVAILABLE_EFFECTS, AppState, FocusedPanel, InputMode};
-use crate::effects::{
-    Effect, color, color::ColorEffect, composite::CompositeEffect, crt::CrtEffect, glitch::GlitchEffect,
-};
+use crate::effects::color;
 
 /// Render the side-panel showing the active pipeline effects.
 pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -49,7 +47,7 @@ pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
         .enumerate()
         .map(|(i, ee)| {
             let selected = i == state.selected_effect && is_focused;
-            let label = effect_label(&ee.effect);
+            let label = ee.effect.to_string();
             let enabled = ee.enabled;
             let style = if selected && state.dragging_effect {
                 // Distinct "dragging" highlight: cyan background.
@@ -172,7 +170,7 @@ pub fn render_edit_effect_modal(frame: &mut Frame, state: &AppState) {
 
     frame.render_widget(Clear, popup_area);
 
-    let title = format!("Edit Effect: {}", effect_variant_name(effect));
+    let title = format!("Edit Effect: {}", effect.variant_name());
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
@@ -227,93 +225,4 @@ pub fn render_edit_effect_modal(frame: &mut Frame, state: &AppState) {
     let footer =
         Paragraph::new("  Enter: apply   Esc: cancel").style(Style::default().fg(Color::DarkGray));
     frame.render_widget(footer, chunks[1]);
-}
-
-/// Returns the human-readable variant name of an effect for use in the modal title.
-///
-/// Each variant maps to a `&'static str` matching its Rust identifier; e.g.
-/// `Effect::Color(ColorEffect::HueShift { .. })` returns `"HueShift"`.
-fn effect_variant_name(e: &Effect) -> &'static str {
-    match e {
-        Effect::Color(c) => match c {
-            ColorEffect::Invert => "Invert",
-            ColorEffect::GradientMap { .. } => "GradientMap",
-            ColorEffect::HueShift { .. } => "HueShift",
-            ColorEffect::Contrast { .. } => "Contrast",
-            ColorEffect::Saturation { .. } => "Saturation",
-            ColorEffect::ColorQuantization { .. } => "ColorQuantization",
-        },
-        Effect::Glitch(g) => match g {
-            GlitchEffect::Pixelate { .. } => "Pixelate",
-            GlitchEffect::RowJitter { .. } => "RowJitter",
-            GlitchEffect::BlockShift { .. } => "BlockShift",
-            GlitchEffect::PixelSort { .. } => "PixelSort",
-        },
-        Effect::Crt(c) => match c {
-            CrtEffect::Scanlines { .. } => "Scanlines",
-            CrtEffect::Curvature { .. } => "Curvature",
-            CrtEffect::PhosphorGlow { .. } => "PhosphorGlow",
-            CrtEffect::Noise { .. } => "Noise",
-            CrtEffect::Vignette { .. } => "Vignette",
-        },
-        Effect::Composite(c) => match c {
-            CompositeEffect::ImageBlend { .. } => "ImageBlend",
-            CompositeEffect::CropRect { .. } => "CropRect",
-        },
-    }
-}
-
-/// Short human-readable label for an effect.
-fn effect_label(e: &Effect) -> String {
-    match e {
-        Effect::Color(c) => match c {
-            ColorEffect::Invert => "Invert".to_string(),
-            ColorEffect::GradientMap { preset_idx, .. } => {
-                let name = color::GRADIENT_PRESETS.get(*preset_idx).map(|(n, _)| *n).unwrap_or("Unknown");
-                format!("Gradient {name}")
-            },
-            ColorEffect::HueShift { degrees } => format!("HueShift {degrees:.0}°"),
-            ColorEffect::Contrast { factor } => format!("Contrast ×{factor:.2}"),
-            ColorEffect::Saturation { factor } => format!("Saturation ×{factor:.2}"),
-            ColorEffect::ColorQuantization { levels } => format!("Quantize {levels}"),
-        },
-        Effect::Glitch(g) => match g {
-            GlitchEffect::Pixelate { block_size } => format!("Pixelate {block_size}px"),
-            GlitchEffect::RowJitter { magnitude } => format!("RowJitter {magnitude:.2}"),
-            GlitchEffect::BlockShift { shift_x, shift_y } => {
-                format!("BlockShift ({shift_x},{shift_y})")
-            }
-            GlitchEffect::PixelSort { threshold } => format!("PixelSort {threshold:.2}"),
-        },
-        Effect::Crt(c) => match c {
-            CrtEffect::Scanlines { spacing, opacity } => {
-                format!("Scanlines {spacing}px {opacity:.0}%")
-            }
-            CrtEffect::Curvature { strength } => format!("Curvature {strength:.2}"),
-            CrtEffect::PhosphorGlow { radius, intensity } => {
-                format!("PhosphorGlow r={radius} i={intensity:.2}")
-            }
-            CrtEffect::Noise {
-                intensity,
-                monochromatic,
-            } => {
-                let kind = if *monochromatic { "mono" } else { "rgb" };
-                format!("Noise {kind} {intensity:.2}")
-            }
-            CrtEffect::Vignette { radius, softness } => {
-                format!("Vignette r={radius:.2} s={softness:.2}")
-            }
-        },
-        Effect::Composite(c) => match c {
-            CompositeEffect::ImageBlend { opacity } => format!("Blend {opacity:.0}%"),
-            CompositeEffect::CropRect {
-                x,
-                y,
-                width,
-                height,
-            } => {
-                format!("Crop {x},{y} {width}×{height}")
-            }
-        },
-    }
 }

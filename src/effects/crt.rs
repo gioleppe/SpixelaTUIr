@@ -1,3 +1,5 @@
+use std::fmt;
+
 use image::Rgba;
 use serde::{Deserialize, Serialize};
 
@@ -147,6 +149,41 @@ impl CrtEffect {
                 radius: get(0, *radius),
                 softness: get(1, *softness),
             },
+        }
+    }
+
+    /// Returns the variant name (e.g. `"Scanlines"`, `"Noise"`) for UI titles.
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            CrtEffect::Scanlines { .. } => "Scanlines",
+            CrtEffect::Curvature { .. } => "Curvature",
+            CrtEffect::PhosphorGlow { .. } => "PhosphorGlow",
+            CrtEffect::Noise { .. } => "Noise",
+            CrtEffect::Vignette { .. } => "Vignette",
+        }
+    }
+}
+
+impl fmt::Display for CrtEffect {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CrtEffect::Scanlines { spacing, opacity } => {
+                write!(f, "Scanlines {spacing}px {opacity:.0}%")
+            }
+            CrtEffect::Curvature { strength } => write!(f, "Curvature {strength:.2}"),
+            CrtEffect::PhosphorGlow { radius, intensity } => {
+                write!(f, "PhosphorGlow r={radius} i={intensity:.2}")
+            }
+            CrtEffect::Noise {
+                intensity,
+                monochromatic,
+            } => {
+                let kind = if *monochromatic { "mono" } else { "rgb" };
+                write!(f, "Noise {kind} {intensity:.2}")
+            }
+            CrtEffect::Vignette { radius, softness } => {
+                write!(f, "Vignette r={radius:.2} s={softness:.2}")
+            }
         }
     }
 }
