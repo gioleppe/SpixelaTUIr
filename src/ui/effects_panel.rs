@@ -225,6 +225,7 @@ fn effect_variant_name(e: &Effect) -> &'static str {
     match e {
         Effect::Color(c) => match c {
             ColorEffect::Invert => "Invert",
+            ColorEffect::GradientMap { .. } => "GradientMap",
             ColorEffect::HueShift { .. } => "HueShift",
             ColorEffect::Contrast { .. } => "Contrast",
             ColorEffect::Saturation { .. } => "Saturation",
@@ -255,6 +256,7 @@ fn effect_label(e: &Effect) -> String {
     match e {
         Effect::Color(c) => match c {
             ColorEffect::Invert => "Invert".to_string(),
+            ColorEffect::GradientMap { stops } => format!("GradientMap {} stops", stops.len()),
             ColorEffect::HueShift { degrees } => format!("HueShift {degrees:.0}°"),
             ColorEffect::Contrast { factor } => format!("Contrast ×{factor:.2}"),
             ColorEffect::Saturation { factor } => format!("Saturation ×{factor:.2}"),

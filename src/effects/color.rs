@@ -14,6 +14,8 @@ pub enum ColorEffect {
     Saturation { factor: f32 },
     /// Reduce the available colour palette (posterisation).
     ColorQuantization { levels: u8 },
+    /// Remaps luminance to a custom colour gradient (e.g. sepia, duotone, synthwave).
+    GradientMap { stops: Vec<(f32, [u8; 3])> },
 }
 
 impl ColorEffect {
@@ -27,6 +29,42 @@ impl ColorEffect {
                     (f.clamp(0.0, 1.0) * 255.0) as u8
                 };
                 Rgba([apply(pixel[0]), apply(pixel[1]), apply(pixel[2]), pixel[3]])
+            }
+            ColorEffect::GradientMap { stops } => {
+                if stops.is_empty() {
+                    return pixel;
+                }
+                let luma = 0.2126 * (pixel[0] as f32 / 255.0)
+                    + 0.7152 * (pixel[1] as f32 / 255.0)
+                    + 0.0722 * (pixel[2] as f32 / 255.0);
+                
+                if stops.len() == 1 || luma <= stops[0].0 {
+                    let c = stops[0].1;
+                    return Rgba([c[0], c[1], c[2], pixel[3]]);
+                }
+                if luma >= stops.last().unwrap().0 {
+                    let c = stops.last().unwrap().1;
+                    return Rgba([c[0], c[1], c[2], pixel[3]]);
+                }
+                
+                let mut lower = &stops[0];
+                let mut upper = &stops[stops.len() - 1];
+                for i in 0..stops.len() - 1 {
+                    if luma >= stops[i].0 && luma <= stops[i + 1].0 {
+                        lower = &stops[i];
+                        upper = &stops[i + 1];
+                        break;
+                    }
+                }
+                
+                let range = upper.0 - lower.0;
+                let t = if range > 0.0 { (luma - lower.0) / range } else { 0.0 };
+                
+                let r = (lower.1[0] as f32 * (1.0 - t) + upper.1[0] as f32 * t) as u8;
+                let g = (lower.1[1] as f32 * (1.0 - t) + upper.1[1] as f32 * t) as u8;
+                let b = (lower.1[2] as f32 * (1.0 - t) + upper.1[2] as f32 * t) as u8;
+                
+                Rgba([r, g, b, pixel[3]])
             }
             ColorEffect::HueShift { degrees } => {
                 let (r, g, b) = (

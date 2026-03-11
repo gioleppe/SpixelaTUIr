@@ -18,38 +18,41 @@ use crate::app::AppState;
 /// When `state.show_histogram` is true a compact luminance histogram is
 /// overlaid in the top-right corner of the canvas (processed side).
 pub fn render_canvas(frame: &mut Frame, area: Rect, state: &mut AppState) {
-    let block = Block::default()
-        .title("Canvas")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
-
-    // Inner area available for the image (inside the block borders).
-    let inner = block.inner(area);
-
-    // Render the block border first.
-    frame.render_widget(block, area);
-
     if state.split_view {
-        render_split_canvas(frame, inner, state);
-    } else {
-        render_single_canvas(frame, inner, state);
-    }
-
-    // Histogram overlay (top-right corner of canvas, processed side).
-    if state.show_histogram {
-        // In split view the processed side is the right half.
-        let hist_area = if state.split_view && inner.width >= 4 {
+        // In split view, render the halves directly into the provided area
+        // to avoid double borders which can cause flickering with some Sixel terminals.
+        render_split_canvas(frame, area, state);
+        
+        // Histogram overlay (top-right corner of canvas, processed side).
+        if state.show_histogram {
             let halves = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-                .split(inner);
-            halves[1]
-        } else {
-            inner
-        };
-        if let Some(ref img) = state.preview_buffer {
-            let img_clone = img.clone();
-            render_histogram_overlay(frame, hist_area, &img_clone);
+                .split(area);
+            if let Some(ref img) = state.preview_buffer {
+                let img_clone = img.clone();
+                render_histogram_overlay(frame, halves[1], &img_clone);
+            }
+        }
+    } else {
+        let block = Block::default()
+            .title("Canvas")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan));
+
+        // Inner area available for the image (inside the block borders).
+        let inner = block.inner(area);
+
+        // Render the block border first.
+        frame.render_widget(block, area);
+        render_single_canvas(frame, inner, state);
+
+        // Histogram overlay (top-right corner of canvas).
+        if state.show_histogram {
+            if let Some(ref img) = state.preview_buffer {
+                let img_clone = img.clone();
+                render_histogram_overlay(frame, inner, &img_clone);
+            }
         }
     }
 }

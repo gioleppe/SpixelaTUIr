@@ -57,6 +57,7 @@ impl Effect {
         match self {
             Effect::Color(e) => match e {
                 ColorEffect::Invert => vec![],
+                ColorEffect::GradientMap { .. } => vec![],
                 ColorEffect::HueShift { degrees } => vec![ParamDescriptor {
                     name: "degrees",
                     value: *degrees,
@@ -233,6 +234,7 @@ impl Effect {
         match self {
             Effect::Color(e) => Effect::Color(match e {
                 ColorEffect::Invert => ColorEffect::Invert,
+                ColorEffect::GradientMap { stops } => ColorEffect::GradientMap { stops: stops.clone() },
                 ColorEffect::HueShift { degrees } => ColorEffect::HueShift {
                     degrees: get(0, *degrees),
                 },

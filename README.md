@@ -21,6 +21,7 @@ PNG, JPEG, GIF, BMP
 | Category | Effect | Description |
 |----------|--------|-------------|
 | **Color** | `HueShift` | Rotate the colour spectrum by N degrees (HSL) |
+| | `GradientMap` | Remaps luminance to a custom colour gradient |
 | | `Saturation` | Scale colour intensity (HSL) |
 | | `Contrast` | Expand or compress the tonal range |
 | | `Invert` | Mathematical RGB inversion |

@@ -67,7 +67,7 @@ Add a `enabled: bool` field to each `Effect` variant (or wrap effects in an
 panel to toggle the selected effect on/off without removing it from the
 pipeline, so the user can A/B compare quickly.
 
-### 13. Gradient-map colour-grading effect
+### 13. Gradient-map colour-grading effect ✅ Done
 Add a new `ColorEffect::GradientMap { stops: Vec<(f32, [u8;3])> }` that
 remaps luminance to a custom colour gradient (e.g. sepia, duotone,
 synthwave).
