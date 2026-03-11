@@ -1,5 +1,6 @@
 pub mod canvas;
 pub mod effects_panel;
+pub mod file_browser;
 pub mod layout;
 pub mod widgets;
 
@@ -18,4 +19,5 @@ pub fn render(frame: &mut Frame, state: &mut AppState) {
     // Overlays (rendered on top of everything).
     widgets::render_path_input(frame, state);
     effects_panel::render_add_effect_menu(frame, state);
+    file_browser::render_file_browser_modal(frame, state);
 }
