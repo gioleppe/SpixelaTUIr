@@ -338,9 +338,14 @@ pub struct Pipeline {
 impl Pipeline {
     /// Apply all **enabled** effects in the pipeline to a full image buffer.
     pub fn apply_image(&self, mut img: DynamicImage) -> DynamicImage {
-        for ee in &self.effects {
+        for (i, ee) in self.effects.iter().enumerate() {
             if ee.enabled {
+                log::debug!("Pipeline step {i}: applying {:?}", ee.effect);
+                let step_start = std::time::Instant::now();
                 img = ee.effect.apply_image(img);
+                log::debug!("Pipeline step {i}: completed in {:?}", step_start.elapsed());
+            } else {
+                log::debug!("Pipeline step {i}: skipped (disabled)");
             }
         }
         img

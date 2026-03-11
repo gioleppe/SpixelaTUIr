@@ -2386,6 +2386,7 @@ dependencies = [
  "crossterm",
  "image",
  "imageproc",
+ "log",
  "ratatui",
  "ratatui-image",
  "serde",

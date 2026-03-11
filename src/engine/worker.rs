@@ -36,6 +36,7 @@ pub enum WorkerResponse {
 
 /// Worker thread entry point. Receives commands and dispatches work.
 pub fn run(rx: Receiver<WorkerCommand>) {
+    log::info!("Worker thread started");
     // `pending` holds a non-Process command that was discovered while draining
     // stale Process jobs; it will be handled at the top of the next iteration.
     let mut pending: Option<WorkerCommand> = None;
@@ -83,7 +84,15 @@ pub fn run(rx: Receiver<WorkerCommand>) {
                 }
 
                 // Apply the full pipeline (each effect may operate on the whole image).
+                log::debug!(
+                    "Worker: applying pipeline ({} effects) to {}x{} image",
+                    latest_pipeline.effects.len(),
+                    latest_image.width(),
+                    latest_image.height()
+                );
+                let start = std::time::Instant::now();
                 let result = latest_pipeline.apply_image(latest_image);
+                log::debug!("Worker: pipeline applied in {:?}", start.elapsed());
                 let _ = latest_resp_tx.send(WorkerResponse::ProcessedFrame(result));
             }
             WorkerCommand::Export {
@@ -91,15 +100,23 @@ pub fn run(rx: Receiver<WorkerCommand>) {
                 output_path,
                 format,
                 response_tx,
-            } => match crate::engine::export::export_image(&image, output_path, &format) {
-                Ok(saved_path) => {
-                    let _ = response_tx.send(WorkerResponse::Exported(saved_path));
+            } => {
+                log::info!("Worker: exporting to {}", output_path.display());
+                match crate::engine::export::export_image(&image, output_path, &format) {
+                    Ok(saved_path) => {
+                        log::info!("Worker: export succeeded → {}", saved_path.display());
+                        let _ = response_tx.send(WorkerResponse::Exported(saved_path));
+                    }
+                    Err(e) => {
+                        log::error!("Worker: export failed: {e}");
+                        let _ = response_tx.send(WorkerResponse::Error(e.to_string()));
+                    }
                 }
-                Err(e) => {
-                    let _ = response_tx.send(WorkerResponse::Error(e.to_string()));
-                }
-            },
-            WorkerCommand::Quit => break,
+            }
+            WorkerCommand::Quit => {
+                log::info!("Worker thread shutting down");
+                break;
+            }
         }
     }
 }

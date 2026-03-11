@@ -346,9 +346,15 @@ impl AppState {
 
     /// Load an image from disk, create a proxy, and dispatch to the worker thread.
     pub fn load_image(&mut self, path: std::path::PathBuf) {
+        log::info!("Loading image: {}", path.display());
         match image::open(&path) {
             Ok(img) => {
                 let size = PROXY_RESOLUTIONS[self.proxy_resolution_index];
+                log::debug!(
+                    "Image loaded ({}x{}), creating proxy at {size}px",
+                    img.width(),
+                    img.height()
+                );
                 let proxy = img.thumbnail(size, size);
                 self.image_path = Some(path.clone());
                 self.source_asset = Some(img);
@@ -360,6 +366,7 @@ impl AppState {
                 self.status_message = format!("Loading: {}", path.display());
             }
             Err(e) => {
+                log::error!("Failed to open image {}: {e}", path.display());
                 self.status_message = format!("Error opening image: {e}");
             }
         }
@@ -371,6 +378,12 @@ impl AppState {
     /// into the command, so the worker never reads from disk during editing.
     pub fn dispatch_process(&self) {
         if let Some(proxy) = &self.proxy_asset {
+            log::debug!(
+                "Dispatching process: {} enabled effect(s), proxy {}x{}",
+                self.pipeline.effects.iter().filter(|e| e.enabled).count(),
+                proxy.width(),
+                proxy.height()
+            );
             let _ = self.worker_tx.send(WorkerCommand::Process {
                 image: proxy.clone(),
                 pipeline: self.pipeline.clone(),
@@ -384,6 +397,7 @@ impl AppState {
     pub fn reload_proxy(&mut self) {
         if let Some(source) = self.source_asset.take() {
             let size = PROXY_RESOLUTIONS[self.proxy_resolution_index];
+            log::debug!("Reloading proxy at {size}px");
             let proxy = source.thumbnail(size, size);
             self.source_asset = Some(source);
             self.original_image_protocol =
@@ -404,6 +418,7 @@ impl AppState {
     /// very next render pass — avoiding the Sixel clear+redraw blink that would
     /// otherwise occur because a fresh protocol starts with `hash = 0`.
     pub fn set_preview(&mut self, img: image::DynamicImage) {
+        log::debug!("Preview updated ({}x{})", img.width(), img.height());
         let mut new_protocol = self.picker.new_resize_protocol(img.clone());
         // Pre-encode the protocol for the last known render area so the
         // next `render_stateful_widget` call sees no change and skips
@@ -430,6 +445,11 @@ impl AppState {
     /// Dispatch an export of the current preview buffer with the given path and format.
     pub fn dispatch_export(&self, output_path: std::path::PathBuf, format: ExportFormat) {
         if let Some(ref img) = self.preview_buffer {
+            log::info!(
+                "Dispatching export: {} as {}",
+                output_path.display(),
+                format.display_name()
+            );
             let _ = self.worker_tx.send(WorkerCommand::Export {
                 image: img.clone(),
                 output_path,
@@ -544,6 +564,7 @@ where
         while let Ok(response) = state.worker_rx.try_recv() {
             match response {
                 WorkerResponse::ProcessedFrame(img) => {
+                    log::debug!("Received processed frame from worker");
                     let label = state
                         .image_path
                         .as_ref()
@@ -553,9 +574,11 @@ where
                     state.status_message = format!("Ready | {label}");
                 }
                 WorkerResponse::Exported(path) => {
+                    log::info!("Export complete: {}", path.display());
                     state.status_message = format!("Exported → {}", path.display());
                 }
                 WorkerResponse::Error(e) => {
+                    log::error!("Engine error: {e}");
                     state.status_message = format!("Engine error: {e}");
                 }
             }
@@ -583,6 +606,7 @@ where
 }
 
 fn handle_key(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
+    log::debug!("Key press: {code:?} (modifiers: {modifiers:?}) in mode {:?}", state.input_mode);
     match state.input_mode {
         InputMode::Normal => handle_normal(state, code, modifiers),
         InputMode::PathInput => handle_path_input(state, code),

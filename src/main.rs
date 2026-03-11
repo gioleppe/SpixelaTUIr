@@ -8,19 +8,31 @@ use std::io;
 
 mod app;
 mod config;
+mod debug;
 mod effects;
 mod engine;
 mod ui;
 
 fn main() -> Result<()> {
+    // Parse CLI flags
+    let args: Vec<String> = std::env::args().collect();
+    let debug_mode = args.iter().any(|a| a == "--debug");
+
+    if debug_mode {
+        debug::init()?;
+        log::info!("SpixelaTUIr starting (debug mode)");
+    }
+
     // Install panic hook to restore terminal state before printing the trace
     std::panic::set_hook(Box::new(|info| {
+        log::error!("PANIC: {info}");
         let _ = disable_raw_mode();
         let _ = execute!(io::stdout(), LeaveAlternateScreen);
         eprintln!("Panic: {info}");
     }));
 
     // Set up terminal
+    log::debug!("Setting up terminal (raw mode + alternate screen)");
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -28,13 +40,16 @@ fn main() -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // Run the application
+    log::info!("Entering main loop");
     let result = app::run(&mut terminal);
 
     // Restore terminal
+    log::debug!("Restoring terminal");
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
+    log::info!("SpixelaTUIr exiting");
     result
 }
 
