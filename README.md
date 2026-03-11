@@ -31,6 +31,27 @@ PNG, JPEG, GIF, BMP
 - **Side-by-side split view** — press `v` to divide the canvas horizontally, showing the original (before) on the left and the processed preview (after) on the right
 - **Live histogram overlay** — press `H` to display a compact luminance histogram in the top-right corner of the canvas, computed from the current preview buffer with no extra processing thread
 
+## Installation
+
+### Prerequisites
+
+Before installing SpixelaTUIr, ensure you have the following dependencies installed:
+
+- **Rust (stable)**: Install from [rustup.rs](https://rustup.rs/)
+- **libchafa-dev** (for image rendering support):
+  - Ubuntu/Debian: `sudo apt-get install libchafa-dev libglib2.0-dev`
+  - macOS (Homebrew): `brew install chafa`
+
+### Installing with Cargo
+
+To install SpixelaTUIr locally using Cargo, navigate to the project directory and run:
+
+```bash
+cargo install --path .
+```
+
+This will build the project in release mode and install the `spixelatuir` binary to `~/.cargo/bin`, making it available in your PATH.
+
 ## Effects
 
 | Category | Effect | Description |
