@@ -260,6 +260,8 @@ pub struct AppState {
     pub save_pipeline_dialog: SavePipelineDialogState,
     /// Index into `PROXY_RESOLUTIONS` – controls live-preview quality.
     pub proxy_resolution_index: usize,
+    /// True while the user is actively moving an effect with K / J (drag-to-reorder).
+    pub dragging_effect: bool,
 }
 
 impl AppState {
@@ -308,6 +310,7 @@ impl AppState {
             },
             // Default to index 1 (512 px) — preserves prior behaviour.
             proxy_resolution_index: 1,
+            dragging_effect: false,
         }
     }
 
@@ -531,6 +534,8 @@ fn handle_key(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
 }
 
 fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
+    // Any keypress ends the drag highlight by default; move_effect_* will re-enable it.
+    state.dragging_effect = false;
     match code {
         KeyCode::Char('q') | KeyCode::Esc => {
             state.should_quit = true;
@@ -691,6 +696,7 @@ fn move_effect_up(state: &mut AppState) {
     if idx > 0 {
         state.pipeline.effects.swap(idx, idx - 1);
         state.selected_effect -= 1;
+        state.dragging_effect = true;
         state.status_message = "Moved effect up. Re-processing…".to_string();
         state.image_protocol = None;
         state.dispatch_process();
@@ -704,6 +710,7 @@ fn move_effect_down(state: &mut AppState) {
     if idx < last {
         state.pipeline.effects.swap(idx, idx + 1);
         state.selected_effect += 1;
+        state.dragging_effect = true;
         state.status_message = "Moved effect down. Re-processing…".to_string();
         state.image_protocol = None;
         state.dispatch_process();

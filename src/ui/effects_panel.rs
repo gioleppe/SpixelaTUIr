@@ -54,7 +54,13 @@ pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
         .map(|(i, e)| {
             let selected = i == state.selected_effect && is_focused;
             let label = effect_label(e);
-            let style = if selected {
+            let style = if selected && state.dragging_effect {
+                // Distinct "dragging" highlight: cyan background.
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+            } else if selected {
                 Style::default()
                     .fg(Color::Black)
                     .bg(Color::Yellow)
