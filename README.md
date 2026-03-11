@@ -40,6 +40,7 @@ Before installing SpixelaTUIr, ensure you have the following dependencies instal
 - **Rust (stable)**: Install from [rustup.rs](https://rustup.rs/)
 - **libchafa-dev** (for image rendering support):
   - Ubuntu/Debian: `sudo apt-get install libchafa-dev libglib2.0-dev`
+  - Fedora: `sudo dnf install chafa-devel`
   - macOS (Homebrew): `brew install chafa`
 
 ### Installing with Cargo
