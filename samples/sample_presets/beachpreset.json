@@ -1,0 +1,65 @@
+{
+  "effects": [
+    {
+      "enabled": true,
+      "effect": {
+        "Color": {
+          "ColorQuantization": {
+            "levels": 2
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Color": {
+          "Saturation": {
+            "factor": 0.31746227
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Color": {
+          "Contrast": {
+            "factor": 0.8567778
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Glitch": {
+          "Pixelate": {
+            "block_size": 2
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Crt": {
+          "Vignette": {
+            "radius": 0.7,
+            "softness": 0.7
+          }
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "effect": {
+        "Glitch": {
+          "PixelSort": {
+            "threshold": 0.5
+          }
+        }
+      }
+    }
+  ]
+}
