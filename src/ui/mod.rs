@@ -20,6 +20,7 @@ pub fn render(frame: &mut Frame, state: &mut AppState) {
     widgets::render_path_input(frame, state);
     effects_panel::render_add_effect_menu(frame, state);
     widgets::render_export_dialog(frame, state);
+    widgets::render_save_pipeline_input(frame, state);
     file_browser::render_file_browser_modal(frame, state);
     effects_panel::render_edit_effect_modal(frame, state);
 }

@@ -22,7 +22,7 @@ pub enum FocusedPanel {
     EffectsList,
 }
 
-/// A single entry in the file browser – either a directory or an image file.
+/// A single entry in the file browser – either a directory or a selectable file.
 #[derive(Debug, Clone)]
 pub enum FileBrowserEntry {
     Directory(std::path::PathBuf),
@@ -30,15 +30,26 @@ pub enum FileBrowserEntry {
     ImageFile(std::path::PathBuf, u64),
 }
 
+/// What the interactive file browser was opened for.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FileBrowserPurpose {
+    /// Selecting an image to load as the current source.
+    OpenImage,
+    /// Selecting a YAML / JSON pipeline file to import.
+    LoadPipeline,
+}
+
 /// State for the interactive file browser modal.
 #[derive(Debug)]
 pub struct FileBrowserState {
     /// Current working directory being browsed.
     pub cwd: std::path::PathBuf,
-    /// Sorted list of entries: directories first, then image files.
+    /// Sorted list of entries: directories first, then matching files.
     pub entries: Vec<FileBrowserEntry>,
     /// Currently highlighted row index.
     pub cursor: usize,
+    /// Why the browser was opened (determines which file extensions are shown).
+    pub purpose: FileBrowserPurpose,
 }
 
 impl FileBrowserState {
@@ -46,18 +57,30 @@ impl FileBrowserState {
     const IMAGE_EXTENSIONS: &'static [&'static str] =
         &["png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif"];
 
+    /// Supported pipeline file extensions.
+    const PIPELINE_EXTENSIONS: &'static [&'static str] = &["yaml", "yml", "json"];
+
     /// Create a new browser rooted at `dir`, reading its entries immediately.
-    pub fn new(dir: std::path::PathBuf) -> Self {
+    pub fn new(dir: std::path::PathBuf, purpose: FileBrowserPurpose) -> Self {
         let mut state = Self {
             cwd: dir,
             entries: Vec::new(),
             cursor: 0,
+            purpose,
         };
         state.refresh();
         state
     }
 
-    /// Re-read the current directory, sorting dirs first then image files.
+    /// File extensions accepted for the current purpose.
+    fn accepted_extensions(&self) -> &'static [&'static str] {
+        match self.purpose {
+            FileBrowserPurpose::OpenImage => Self::IMAGE_EXTENSIONS,
+            FileBrowserPurpose::LoadPipeline => Self::PIPELINE_EXTENSIONS,
+        }
+    }
+
+    /// Re-read the current directory, sorting dirs first then matching files.
     pub fn refresh(&mut self) {
         let mut dirs: Vec<std::path::PathBuf> = Vec::new();
         let mut files: Vec<std::path::PathBuf> = Vec::new();
@@ -73,7 +96,7 @@ impl FileBrowserState {
                         .and_then(|e| e.to_str())
                         .map(|e| e.to_lowercase());
                     if let Some(e) = ext {
-                        if Self::IMAGE_EXTENSIONS.contains(&e.as_str()) {
+                        if self.accepted_extensions().contains(&e.as_str()) {
                             files.push(path);
                         }
                     }
@@ -142,6 +165,8 @@ pub enum InputMode {
     EditEffect { field_idx: usize },
     /// User is configuring an export via the export dialog.
     ExportDialog,
+    /// User is typing a destination path to save the current pipeline.
+    SavePipelineInput,
 }
 
 /// State for the export dialog modal.
@@ -339,6 +364,9 @@ pub const FILE_BROWSER_HINT: &str =
 /// Available proxy resolution tiers (max pixels on the long edge).
 /// Index 1 (512 px) is the default — matches the previous hardcoded value.
 pub const PROXY_RESOLUTIONS: &[u32] = &[256, 512, 768, 1024];
+/// Keyboard hint shown when the file browser is open to load a pipeline.
+pub const PIPELINE_BROWSER_HINT: &str =
+    "↑↓/jk: navigate  Enter: load  Backspace/-: up  Esc: cancel";
 
 /// All effects available to add, with display names.
 pub const AVAILABLE_EFFECTS: &[(&str, fn() -> Effect)] = &[
@@ -424,6 +452,7 @@ fn handle_key(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
         InputMode::FileBrowser => handle_file_browser(state, code),
         InputMode::EditEffect { .. } => handle_edit_effect(state, code),
         InputMode::ExportDialog => handle_export_dialog(state, code),
+        InputMode::SavePipelineInput => handle_save_pipeline_input(state, code),
     }
 }
 
@@ -434,7 +463,7 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
         }
         KeyCode::Char('o') => {
             let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
-            state.file_browser = Some(FileBrowserState::new(cwd));
+            state.file_browser = Some(FileBrowserState::new(cwd, FileBrowserPurpose::OpenImage));
             state.input_mode = InputMode::FileBrowser;
         }
         KeyCode::Tab => {
@@ -554,6 +583,23 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
                 state.proxy_resolution_index += 1;
                 state.reload_proxy();
             }
+        // Save the current pipeline to a JSON file (Ctrl+S).
+        KeyCode::Char('s') if modifiers.contains(KeyModifiers::CONTROL) => {
+            if state.pipeline.effects.is_empty() {
+                state.status_message = "Pipeline is empty – nothing to save.".to_string();
+            } else {
+                state.path_input.clear();
+                state.input_mode = InputMode::SavePipelineInput;
+                state.status_message =
+                    "Enter path to save pipeline (e.g. my_pipeline.json)".to_string();
+            }
+        }
+        // Load a pipeline from a JSON or YAML file via the file browser (Ctrl+L).
+        KeyCode::Char('l') if modifiers.contains(KeyModifiers::CONTROL) => {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
+            state.file_browser =
+                Some(FileBrowserState::new(cwd, FileBrowserPurpose::LoadPipeline));
+            state.input_mode = InputMode::FileBrowser;
         }
         _ => {}
     }
@@ -663,6 +709,10 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
                 .file_browser
                 .as_ref()
                 .and_then(|fb| fb.entries.get(fb.cursor).cloned());
+            let purpose = state
+                .file_browser
+                .as_ref()
+                .map(|fb| fb.purpose.clone());
             match action {
                 Some(FileBrowserEntry::Directory(_)) => {
                     if let Some(ref mut fb) = state.file_browser {
@@ -672,7 +722,27 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
                 Some(FileBrowserEntry::ImageFile(path, _)) => {
                     state.input_mode = InputMode::Normal;
                     state.file_browser = None;
-                    state.load_image(path);
+                    match purpose {
+                        Some(FileBrowserPurpose::LoadPipeline) => {
+                            match crate::config::parser::load_pipeline(&path) {
+                                Ok(pipeline) => {
+                                    state.pipeline = pipeline;
+                                    state.clamp_selection();
+                                    state.image_protocol = None;
+                                    state.dispatch_process();
+                                    state.status_message =
+                                        format!("Pipeline loaded from {}", path.display());
+                                }
+                                Err(e) => {
+                                    state.status_message =
+                                        format!("Error loading pipeline: {e}");
+                                }
+                            }
+                        }
+                        _ => {
+                            state.load_image(path);
+                        }
+                    }
                 }
                 None => {}
             }
@@ -824,6 +894,42 @@ fn handle_export_dialog(state: &mut AppState, code: KeyCode) {
             }
             _ => {}
         },
+        _ => {}
+    }
+}
+
+/// Handle keyboard input when the user is typing a path to save the current pipeline.
+fn handle_save_pipeline_input(state: &mut AppState, code: KeyCode) {
+    match code {
+        KeyCode::Esc => {
+            state.input_mode = InputMode::Normal;
+            state.path_input.clear();
+            state.status_message = "Save cancelled.".to_string();
+        }
+        KeyCode::Enter => {
+            let raw = state.path_input.trim().to_string();
+            state.path_input.clear();
+            state.input_mode = InputMode::Normal;
+            if raw.is_empty() {
+                state.status_message = "Save cancelled.".to_string();
+                return;
+            }
+            let path = std::path::PathBuf::from(&raw);
+            match crate::config::parser::save_pipeline(&state.pipeline, &path) {
+                Ok(()) => {
+                    state.status_message = format!("Pipeline saved → {}", path.display());
+                }
+                Err(e) => {
+                    state.status_message = format!("Error saving pipeline: {e}");
+                }
+            }
+        }
+        KeyCode::Backspace => {
+            state.path_input.pop();
+        }
+        KeyCode::Char(c) => {
+            state.path_input.push(c);
+        }
         _ => {}
     }
 }
@@ -1016,5 +1122,110 @@ mod tests {
         assert_eq!(state.selected_effect, 0);
         // First effect must remain the original Invert, not the Pixelate.
         assert!(matches!(state.pipeline.effects[0], Effect::Color(ColorEffect::Invert)));
+    }
+
+    // ── Pipeline save / load ──────────────────────────────────────────────────
+
+    fn make_state_empty() -> AppState {
+        let (worker_tx, _worker_rx) = std::sync::mpsc::channel();
+        let (resp_tx, resp_rx) = std::sync::mpsc::channel();
+        let picker = ratatui_image::picker::Picker::halfblocks();
+        AppState::new(worker_tx, resp_rx, resp_tx, picker)
+    }
+
+    #[test]
+    fn ctrl_s_on_empty_pipeline_shows_error() {
+        let mut state = make_state_empty();
+        handle_normal(&mut state, KeyCode::Char('s'), KeyModifiers::CONTROL);
+        assert_eq!(state.input_mode, InputMode::Normal, "mode must stay Normal");
+        assert!(
+            state.status_message.contains("empty"),
+            "status should mention empty pipeline: {}",
+            state.status_message
+        );
+    }
+
+    #[test]
+    fn ctrl_s_with_effects_enters_save_mode() {
+        let mut state = make_state_with_effects();
+        handle_normal(&mut state, KeyCode::Char('s'), KeyModifiers::CONTROL);
+        assert_eq!(state.input_mode, InputMode::SavePipelineInput);
+        assert!(state.path_input.is_empty());
+    }
+
+    #[test]
+    fn save_pipeline_input_esc_cancels() {
+        let mut state = make_state_with_effects();
+        state.input_mode = InputMode::SavePipelineInput;
+        state.path_input = "something".to_string();
+        handle_save_pipeline_input(&mut state, KeyCode::Esc);
+        assert_eq!(state.input_mode, InputMode::Normal);
+        assert!(state.path_input.is_empty());
+        assert!(state.status_message.contains("cancel") || state.status_message.contains("Cancel"));
+    }
+
+    #[test]
+    fn save_pipeline_input_empty_enter_cancels_gracefully() {
+        let mut state = make_state_with_effects();
+        state.input_mode = InputMode::SavePipelineInput;
+        // path_input is already empty
+        handle_save_pipeline_input(&mut state, KeyCode::Enter);
+        assert_eq!(state.input_mode, InputMode::Normal);
+        assert!(state.path_input.is_empty());
+    }
+
+    #[test]
+    fn save_pipeline_roundtrip() {
+        let tmp = std::env::temp_dir().join("spixelatuir_test_pipeline.json");
+        let pipeline = Pipeline {
+            effects: vec![
+                Effect::Color(ColorEffect::Invert),
+                Effect::Glitch(GlitchEffect::Pixelate { block_size: 4 }),
+            ],
+        };
+
+        crate::config::parser::save_pipeline(&pipeline, &tmp)
+            .expect("save should succeed");
+
+        let loaded = crate::config::parser::load_pipeline(&tmp)
+            .expect("load should succeed");
+
+        assert_eq!(loaded.effects.len(), 2);
+        assert!(matches!(loaded.effects[0], Effect::Color(ColorEffect::Invert)));
+        assert!(
+            matches!(loaded.effects[1], Effect::Glitch(GlitchEffect::Pixelate { block_size: 4 }))
+        );
+
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn ctrl_l_enters_file_browser_with_pipeline_purpose() {
+        let mut state = make_state_empty();
+        handle_normal(&mut state, KeyCode::Char('l'), KeyModifiers::CONTROL);
+        assert_eq!(state.input_mode, InputMode::FileBrowser);
+        assert!(
+            state
+                .file_browser
+                .as_ref()
+                .map(|fb| fb.purpose == FileBrowserPurpose::LoadPipeline)
+                .unwrap_or(false),
+            "file browser should have LoadPipeline purpose"
+        );
+    }
+
+    #[test]
+    fn ctrl_o_enters_file_browser_with_open_image_purpose() {
+        let mut state = make_state_empty();
+        handle_normal(&mut state, KeyCode::Char('o'), KeyModifiers::NONE);
+        assert_eq!(state.input_mode, InputMode::FileBrowser);
+        assert!(
+            state
+                .file_browser
+                .as_ref()
+                .map(|fb| fb.purpose == FileBrowserPurpose::OpenImage)
+                .unwrap_or(false),
+            "file browser should have OpenImage purpose"
+        );
     }
 }

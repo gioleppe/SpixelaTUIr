@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{AppState, FileBrowserEntry, InputMode, FILE_BROWSER_HINT};
+use crate::app::{AppState, FileBrowserEntry, FileBrowserPurpose, InputMode, FILE_BROWSER_HINT, PIPELINE_BROWSER_HINT};
 
 /// Render the floating file-browser modal over the whole terminal area.
 pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
@@ -31,9 +31,13 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
     // Clear the area behind the popup.
     frame.render_widget(Clear, popup_area);
 
-    // Outer border with title.
+    // Outer border with title reflecting the browser's purpose.
+    let title = match fb.purpose {
+        FileBrowserPurpose::OpenImage => " Open Image ",
+        FileBrowserPurpose::LoadPipeline => " Load Pipeline ",
+    };
     let block = Block::default()
-        .title(" Open Image ")
+        .title(title)
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Cyan));
     frame.render_widget(block, popup_area);
@@ -122,7 +126,11 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
     // Footer hint.
     let footer_y = inner_y + inner_height - 1;
     let footer_area = Rect::new(inner_x, footer_y, inner_width, 1);
-    let footer = Paragraph::new(FILE_BROWSER_HINT)
+    let hint = match fb.purpose {
+        FileBrowserPurpose::OpenImage => FILE_BROWSER_HINT,
+        FileBrowserPurpose::LoadPipeline => PIPELINE_BROWSER_HINT,
+    };
+    let footer = Paragraph::new(hint)
         .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(footer, footer_area);
 }

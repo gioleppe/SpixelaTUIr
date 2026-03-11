@@ -9,6 +9,7 @@ A high-performance, terminal-based image glitching and processing tool written i
 - **Multi-threaded** — image processing runs on a dedicated worker thread using [rayon](https://github.com/rayon-rs/rayon) for data-parallel pixel ops, keeping the UI responsive at 60 FPS
 - **PNG export** — save the current processed preview to disk with safe auto-incrementing filenames
 - **Pipeline randomisation** — instantly randomise all effect parameters with a single keypress
+- **Pipeline save / load** — export your favourite pipeline to a JSON file and re-import it in any future session
 
 ## Effects
 
@@ -45,6 +46,8 @@ A high-performance, terminal-based image glitching and processing tool written i
 | `e` | Export the current preview as a PNG |
 | `[` | Decrease preview resolution tier (1024 → 768 → 512 → 256 px) |
 | `]` | Increase preview resolution tier (256 → 512 → 768 → 1024 px) |
+| `Ctrl+S` | Save the current pipeline to a JSON file |
+| `Ctrl+L` | Load / import a pipeline from a JSON or YAML file (file browser) |
 | `q` / `Esc` | Quit |
 
 ## Building
