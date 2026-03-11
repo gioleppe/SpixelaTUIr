@@ -972,13 +972,31 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
             let effect = AVAILABLE_EFFECTS[state.add_effect_cursor].1();
             state.push_undo();
             state.pipeline.effects.push(EnabledEffect::new(effect));
-            state.input_mode = InputMode::Normal;
-            state.selected_effect = state.pipeline.effects.len() - 1;
+            
+            let last_idx = state.pipeline.effects.len() - 1;
+            state.selected_effect = last_idx;
             state.pipeline_dirty = true;
-            state.status_message = format!(
-                "Added '{}'. Re-processing…",
-                AVAILABLE_EFFECTS[state.add_effect_cursor].0
-            );
+            
+            let descriptors = state.pipeline.effects[last_idx].effect.param_descriptors();
+            if !descriptors.is_empty() {
+                // If the effect has parameters (like GradientMap), open the edit modal immediately.
+                state.edit_params = descriptors
+                    .iter()
+                    .map(|d| format_param_value(d.value))
+                    .collect();
+                state.input_mode = InputMode::EditEffect { field_idx: 0 };
+                state.status_message = format!(
+                    "Added '{}' – edit parameters (Enter: apply, Esc: cancel)",
+                    AVAILABLE_EFFECTS[state.add_effect_cursor].0
+                );
+            } else {
+                state.input_mode = InputMode::Normal;
+                state.status_message = format!(
+                    "Added '{}'. Re-processing…",
+                    AVAILABLE_EFFECTS[state.add_effect_cursor].0
+                );
+            }
+            
             state.image_protocol = None;
             state.dispatch_process();
         }
