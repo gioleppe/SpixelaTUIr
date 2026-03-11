@@ -17,21 +17,6 @@ pub enum CrtEffect {
 }
 
 impl CrtEffect {
-    /// Apply per-pixel CRT transformation.
-    ///
-    /// Effects that require coordinate context (scanlines, vignette) need the
-    /// caller to supply the pixel's (x, y) position and the image dimensions.
-    pub fn apply_pixel(&self, pixel: Rgba<u8>) -> Rgba<u8> {
-        match self {
-            // Per-pixel stubs – full implementations live in apply_image().
-            CrtEffect::Scanlines { .. } => pixel,
-            CrtEffect::Curvature { .. } => pixel,
-            CrtEffect::PhosphorGlow { .. } => pixel,
-            CrtEffect::Noise { .. } => pixel,
-            CrtEffect::Vignette { .. } => pixel,
-        }
-    }
-
     /// Apply this effect to a pixel given its position and image dimensions.
     pub fn apply_pixel_with_coords(
         &self,

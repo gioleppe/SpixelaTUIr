@@ -34,16 +34,6 @@ pub enum Effect {
 }
 
 impl Effect {
-    /// Apply this effect to a single pixel (stateless, no coordinate context).
-    pub fn apply_pixel(&self, pixel: Rgba<u8>) -> Rgba<u8> {
-        match self {
-            Effect::Color(e) => e.apply_pixel(pixel),
-            Effect::Glitch(e) => e.apply_pixel(pixel),
-            Effect::Crt(e) => e.apply_pixel(pixel),
-            Effect::Composite(e) => e.apply_pixel(pixel),
-        }
-    }
-
     /// Apply this effect to an entire image buffer, enabling effects that need
     /// full spatial context (row jitter, pixel sort, scanlines with coordinates, …).
     pub fn apply_image(&self, img: DynamicImage) -> DynamicImage {
@@ -325,14 +315,6 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    /// Apply all effects in the pipeline to a single pixel.
-    pub fn apply_pixel(&self, mut pixel: Rgba<u8>) -> Rgba<u8> {
-        for effect in &self.effects {
-            pixel = effect.apply_pixel(pixel);
-        }
-        pixel
-    }
-
     /// Apply all effects in the pipeline to a full image buffer.
     pub fn apply_image(&self, mut img: DynamicImage) -> DynamicImage {
         for effect in &self.effects {

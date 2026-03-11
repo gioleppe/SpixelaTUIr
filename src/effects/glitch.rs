@@ -15,11 +15,6 @@ pub enum GlitchEffect {
 }
 
 impl GlitchEffect {
-    /// Apply per-pixel transformation (simplified stub for pipeline composition).
-    pub fn apply_pixel(&self, pixel: Rgba<u8>) -> Rgba<u8> {
-        pixel
-    }
-
     /// Apply this effect to an entire image, enabling full spatial context.
     pub fn apply_image(&self, img: DynamicImage) -> DynamicImage {
         match self {

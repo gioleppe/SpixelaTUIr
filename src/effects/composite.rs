@@ -1,4 +1,4 @@
-use image::{DynamicImage, Rgba};
+use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 
 /// Compositing effects: image blend and crop/rect.
@@ -16,11 +16,6 @@ pub enum CompositeEffect {
 }
 
 impl CompositeEffect {
-    /// Apply per-pixel compositing transformation (passthrough stub).
-    pub fn apply_pixel(&self, pixel: Rgba<u8>) -> Rgba<u8> {
-        pixel
-    }
-
     /// Apply this effect to a full image buffer.
     pub fn apply_image(&self, img: DynamicImage) -> DynamicImage {
         match self {
