@@ -20,14 +20,15 @@ pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
         Style::default().fg(Color::DarkGray)
     };
 
+    let effect_count = state.pipeline.effects.len();
     let title = if is_focused {
-        "Effects [Tab]"
+        format!("Effects ({effect_count}) [Tab]")
     } else {
-        "Effects [Tab to focus]"
+        format!("Effects ({effect_count}) [Tab to focus]")
     };
 
     let block = Block::default()
-        .title(title)
+        .title(title.as_str())
         .borders(Borders::ALL)
         .border_style(border_style);
 
