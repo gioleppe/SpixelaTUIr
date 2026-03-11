@@ -32,15 +32,18 @@ A high-performance, terminal-based image glitching and processing tool written i
 
 | Key | Action |
 |-----|--------|
-| `o` | Open an image (floating path input) |
+| `o` | Open an image (file browser) |
 | `Tab` | Toggle keyboard focus between Canvas and Effects panel |
+| `↑` / `k` | Navigate effect list up (requires Effects panel focus) |
+| `↓` / `j` | Navigate effect list down (requires Effects panel focus) |
 | `a` | Add an effect from the preset menu (requires Effects panel focus) |
-| `d` | Delete the selected effect and re-process |
+| `d` / `Delete` | Delete the selected effect and re-process (requires Effects panel focus) |
+| `Enter` | Edit parameters of the selected effect (requires Effects panel focus) |
+| `K` / `Shift+↑` | Move selected effect one position up in the pipeline |
+| `J` / `Shift+↓` | Move selected effect one position down in the pipeline |
 | `r` | Randomise all effect parameter values |
 | `e` | Export the current preview as a PNG |
 | `q` / `Esc` | Quit |
-
-When the Effects panel is focused, use `↑`/`↓` (or `k`/`j`) to navigate the effect list.
 
 ## Building
 

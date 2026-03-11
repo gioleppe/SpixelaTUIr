@@ -33,3 +33,9 @@ Respect the established directory structure:
 * `src/engine/`: Worker thread logic, multi-threading setup, and export sequencing.
 * `src/effects/`: Pure mathematical implementations of the image glitches/filters.
 * `src/config/`: Serde parsing for loading/saving custom `Pipeline` configurations.
+
+## 7. README Maintenance
+* **Keep README up to date.** Whenever you add, remove, or rename a keyboard shortcut in `src/app.rs`, update the **Keyboard Shortcuts** table in `README.md` in the same commit/change.
+* **Key binding source of truth:** `handle_normal()` in `src/app.rs` is the canonical source of all global key bindings. Cross-check the README table against it whenever key handling changes.
+* **Effects table:** If a new `Effect` variant is added to the pipeline (in `src/effects/`), add a corresponding row to the **Effects** table in `README.md`.
+* **Architecture section:** If new threads, channels, or major data-flow paths are introduced, update the Architecture diagram in `README.md`.
