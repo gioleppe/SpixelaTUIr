@@ -12,6 +12,7 @@ use crate::effects::{
     crt::CrtEffect,
     glitch::GlitchEffect,
 };
+use crate::engine::export::{EXPORT_FORMATS, ExportFormat};
 use crate::engine::worker::{WorkerCommand, WorkerResponse};
 
 /// Which panel currently has keyboard focus.
@@ -30,6 +31,32 @@ pub enum InputMode {
     PathInput,
     /// User is browsing the add-effect menu.
     AddEffect,
+    /// User is configuring an export via the export dialog.
+    ExportDialog,
+}
+
+/// State for the export dialog modal.
+#[derive(Debug, Clone)]
+pub struct ExportDialogState {
+    /// Output directory (editable).
+    pub directory: String,
+    /// Base filename without extension (editable).
+    pub filename: String,
+    /// Index into `EXPORT_FORMATS`.
+    pub format_index: usize,
+    /// Which field has focus: 0 = Directory, 1 = Filename, 2 = Format.
+    pub focused_field: usize,
+}
+
+impl ExportDialogState {
+    /// Return the effective filename, falling back to `"output"` when the field is blank.
+    pub fn effective_filename(&self) -> &str {
+        if self.filename.is_empty() {
+            "output"
+        } else {
+            &self.filename
+        }
+    }
 }
 
 /// Central application state
@@ -68,6 +95,8 @@ pub struct AppState {
     pub add_effect_cursor: usize,
     /// Buffer for the file-path typed by the user when in PathInput mode.
     pub path_input: String,
+    /// State for the export dialog when in ExportDialog mode.
+    pub export_dialog: ExportDialogState,
 }
 
 impl AppState {
@@ -95,6 +124,15 @@ impl AppState {
             selected_effect: 0,
             add_effect_cursor: 0,
             path_input: String::new(),
+            export_dialog: ExportDialogState {
+                directory: std::env::current_dir()
+                    .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                    .to_string_lossy()
+                    .into_owned(),
+                filename: String::new(),
+                format_index: 0,
+                focused_field: 1,
+            },
         }
     }
 
@@ -143,21 +181,13 @@ impl AppState {
         }
     }
 
-    /// Dispatch a PNG export of the current preview buffer.
-    pub fn dispatch_export(&self) {
+    /// Dispatch an export of the current preview buffer with the given path and format.
+    pub fn dispatch_export(&self, output_path: std::path::PathBuf, format: ExportFormat) {
         if let Some(ref img) = self.preview_buffer {
-            let path = self
-                .image_path
-                .as_ref()
-                .map(|p| {
-                    let stem = p.file_stem().unwrap_or_default().to_string_lossy();
-                    std::path::PathBuf::from(format!("{stem}_out.png"))
-                })
-                .unwrap_or_else(|| std::path::PathBuf::from("output.png"));
-
             let _ = self.worker_tx.send(WorkerCommand::Export {
                 image: img.clone(),
-                output_path: path,
+                output_path,
+                format,
                 response_tx: self.worker_resp_tx.clone(),
             });
         }
@@ -245,6 +275,7 @@ fn handle_key(state: &mut AppState, code: KeyCode) {
         InputMode::Normal => handle_normal(state, code),
         InputMode::PathInput => handle_path_input(state, code),
         InputMode::AddEffect => handle_add_effect(state, code),
+        InputMode::ExportDialog => handle_export_dialog(state, code),
     }
 }
 
@@ -305,11 +336,20 @@ fn handle_normal(state: &mut AppState, code: KeyCode) {
             state.image_protocol = None;
             state.dispatch_process();
         }
-        // Export current preview to PNG.
+        // Open export dialog.
         KeyCode::Char('e') => {
             if state.preview_buffer.is_some() {
-                state.dispatch_export();
-                state.status_message = "Exporting…".to_string();
+                // Populate dialog defaults from the current image path.
+                let default_filename = state
+                    .image_path
+                    .as_ref()
+                    .and_then(|p| p.file_stem())
+                    .map(|s| format!("{}_out", s.to_string_lossy()))
+                    .unwrap_or_else(|| "output".to_string());
+                state.export_dialog.filename = default_filename;
+                state.export_dialog.format_index = 0;
+                state.export_dialog.focused_field = 1;
+                state.input_mode = InputMode::ExportDialog;
             } else {
                 state.status_message = "No processed image to export.".to_string();
             }
@@ -365,6 +405,77 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
             state.image_protocol = None;
             state.dispatch_process();
         }
+        _ => {}
+    }
+}
+
+fn handle_export_dialog(state: &mut AppState, code: KeyCode) {
+    const FIELD_DIRECTORY: usize = 0;
+    const FIELD_FILENAME: usize = 1;
+    const FIELD_FORMAT: usize = 2;
+    const FIELD_COUNT: usize = 3;
+
+    match code {
+        KeyCode::Esc => {
+            state.input_mode = InputMode::Normal;
+            state.status_message = "Export cancelled.".to_string();
+        }
+        KeyCode::Enter => {
+            // Build the output path from dialog state.
+            let format = EXPORT_FORMATS[state.export_dialog.format_index].clone();
+            let ext = format.extension();
+            let dir = std::path::PathBuf::from(&state.export_dialog.directory);
+            let filename = state.export_dialog.effective_filename().to_string();
+            let output_path = dir.join(format!("{filename}.{ext}"));
+            state.dispatch_export(output_path, format);
+            state.input_mode = InputMode::Normal;
+            state.status_message = "Exporting…".to_string();
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            if state.export_dialog.focused_field > 0 {
+                state.export_dialog.focused_field -= 1;
+            }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if state.export_dialog.focused_field < FIELD_COUNT - 1 {
+                state.export_dialog.focused_field += 1;
+            }
+        }
+        // Format cycling.
+        KeyCode::Left | KeyCode::Right | KeyCode::Char(' ')
+            if state.export_dialog.focused_field == FIELD_FORMAT =>
+        {
+            let n = EXPORT_FORMATS.len();
+            state.export_dialog.format_index = match code {
+                KeyCode::Left => {
+                    if state.export_dialog.format_index == 0 {
+                        n - 1
+                    } else {
+                        state.export_dialog.format_index - 1
+                    }
+                }
+                _ => (state.export_dialog.format_index + 1) % n,
+            };
+        }
+        // Text editing for Directory and Filename fields.
+        KeyCode::Backspace => match state.export_dialog.focused_field {
+            FIELD_DIRECTORY => {
+                state.export_dialog.directory.pop();
+            }
+            FIELD_FILENAME => {
+                state.export_dialog.filename.pop();
+            }
+            _ => {}
+        },
+        KeyCode::Char(c) => match state.export_dialog.focused_field {
+            FIELD_DIRECTORY => {
+                state.export_dialog.directory.push(c);
+            }
+            FIELD_FILENAME => {
+                state.export_dialog.filename.push(c);
+            }
+            _ => {}
+        },
         _ => {}
     }
 }
