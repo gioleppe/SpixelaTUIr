@@ -166,6 +166,8 @@ pub enum InputMode {
     SavePipelineDialog,
     /// User is viewing the full keyboard-shortcut help overlay.
     HelpModal,
+    /// Waiting for the user to confirm clearing the pipeline (Ctrl+D).
+    ConfirmClearPipeline,
 }
 
 /// State for the export dialog modal.
@@ -530,6 +532,7 @@ fn handle_key(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
         InputMode::ExportDialog => handle_export_dialog(state, code),
         InputMode::SavePipelineDialog => handle_save_pipeline_dialog(state, code),
         InputMode::HelpModal => handle_help_modal(state, code),
+        InputMode::ConfirmClearPipeline => handle_confirm_clear_pipeline(state, code),
     }
 }
 
@@ -681,6 +684,16 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
             let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
             state.file_browser = Some(FileBrowserState::new(cwd, FileBrowserPurpose::LoadPipeline));
             state.input_mode = InputMode::FileBrowser;
+        }
+        // Clear all effects with a confirmation prompt (Ctrl+D).
+        KeyCode::Char('d') if modifiers.contains(KeyModifiers::CONTROL) => {
+            if !state.pipeline.effects.is_empty() {
+                state.input_mode = InputMode::ConfirmClearPipeline;
+                state.status_message =
+                    "Clear all effects? Press Enter to confirm or Esc to cancel.".to_string();
+            } else {
+                state.status_message = "Pipeline is already empty.".to_string();
+            }
         }
         // Open the full keyboard-shortcut help overlay.
         KeyCode::Char('h') => {
@@ -1064,6 +1077,24 @@ fn handle_help_modal(state: &mut AppState, code: KeyCode) {
     }
 }
 
+/// Handle the confirmation prompt for clearing all pipeline effects (Ctrl+D).
+fn handle_confirm_clear_pipeline(state: &mut AppState, code: KeyCode) {
+    match code {
+        KeyCode::Enter => {
+            state.pipeline.effects.clear();
+            state.selected_effect = 0;
+            state.image_protocol = None;
+            state.dispatch_process();
+            state.input_mode = InputMode::Normal;
+            state.status_message = "Pipeline cleared.".to_string();
+        }
+        KeyCode::Esc => {
+            state.input_mode = InputMode::Normal;
+            state.status_message = "Clear cancelled.".to_string();
+        }
+        _ => {}
+    }
+}
 /// Randomize the numeric parameters of every effect in the pipeline.
 fn randomize_pipeline(pipeline: &mut Pipeline) {
     use std::collections::hash_map::DefaultHasher;

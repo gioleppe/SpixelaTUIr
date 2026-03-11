@@ -48,6 +48,7 @@ PNG, JPEG, GIF, BMP
 | `]` | Increase preview resolution tier (256 → 512 → 768 → 1024 px) |
 | `Ctrl+S` | Save the current pipeline via a dialog (always writes JSON) |
 | `Ctrl+L` | Load / import a pipeline from a JSON or YAML file (file browser) |
+| `Ctrl+D` | Clear all effects at once (shows a confirmation prompt) |
 | `h` | Open the full keyboard-shortcut help overlay |
 | `q` / `Esc` | Quit |
 
