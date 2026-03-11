@@ -5,7 +5,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{AppState, InputMode};
+use crate::app::{AppState, InputMode, FILE_BROWSER_HINT};
 
 /// Render the status bar at the top of the screen.
 pub fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -20,9 +20,7 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
     let help = match state.input_mode {
         InputMode::PathInput => "Type path  Enter: load  Esc: cancel",
         InputMode::AddEffect => "j/k: navigate  Enter: add  Esc: cancel",
-        InputMode::FileBrowser => {
-            "↑↓/jk: navigate  Enter: open  Backspace/-: up  Esc: cancel"
-        }
+        InputMode::FileBrowser => FILE_BROWSER_HINT,
         InputMode::Normal => {
             "q: Quit  o: Open  e: Export  Tab: Switch panel  [Effects] a: Add  d: Del  r: Random"
         }

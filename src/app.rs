@@ -25,7 +25,8 @@ pub enum FocusedPanel {
 #[derive(Debug, Clone)]
 pub enum FileBrowserEntry {
     Directory(std::path::PathBuf),
-    ImageFile(std::path::PathBuf),
+    /// Path and pre-fetched file size in bytes.
+    ImageFile(std::path::PathBuf, u64),
 }
 
 /// State for the interactive file browser modal.
@@ -85,7 +86,10 @@ impl FileBrowserState {
         self.entries = dirs
             .into_iter()
             .map(FileBrowserEntry::Directory)
-            .chain(files.into_iter().map(FileBrowserEntry::ImageFile))
+            .chain(files.into_iter().map(|path| {
+                let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                FileBrowserEntry::ImageFile(path, size)
+            }))
             .collect();
         self.cursor = 0;
     }
@@ -269,6 +273,10 @@ impl AppState {
         }
     }
 }
+
+/// Keyboard hint shown in the controls bar and inside the file-browser footer.
+pub const FILE_BROWSER_HINT: &str =
+    "↑↓/jk: navigate  Enter: open  Backspace/-: up  Esc: cancel";
 
 /// All effects available to add, with display names.
 pub const AVAILABLE_EFFECTS: &[(&str, fn() -> Effect)] = &[
@@ -509,7 +517,7 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
                         fb.enter_dir();
                     }
                 }
-                Some(FileBrowserEntry::ImageFile(path)) => {
+                Some(FileBrowserEntry::ImageFile(path, _)) => {
                     state.input_mode = InputMode::Normal;
                     state.file_browser = None;
                     state.load_image(path);

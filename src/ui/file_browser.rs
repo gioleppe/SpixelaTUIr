@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{AppState, FileBrowserEntry, InputMode};
+use crate::app::{AppState, FileBrowserEntry, InputMode, FILE_BROWSER_HINT};
 
 /// Render the floating file-browser modal over the whole terminal area.
 pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
@@ -83,14 +83,12 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
                         .unwrap_or_else(|| path.display().to_string());
                     ("  ", format!("{name}/"), Color::Blue)
                 }
-                FileBrowserEntry::ImageFile(path) => {
+                FileBrowserEntry::ImageFile(path, size) => {
                     let name = path
                         .file_name()
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_else(|| path.display().to_string());
-                    let size_str = std::fs::metadata(path)
-                        .map(|m| format_size(m.len()))
-                        .unwrap_or_default();
+                    let size_str = format_size(*size);
                     let padded = format!(
                         "{:<width$} {:>8}",
                         name,
@@ -124,9 +122,8 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
     // Footer hint.
     let footer_y = inner_y + inner_height - 1;
     let footer_area = Rect::new(inner_x, footer_y, inner_width, 1);
-    let footer =
-        Paragraph::new("↑↓/jk: navigate  Enter: open  Backspace/-: up  Esc: cancel")
-            .style(Style::default().fg(Color::DarkGray));
+    let footer = Paragraph::new(FILE_BROWSER_HINT)
+        .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(footer, footer_area);
 }
 
