@@ -21,8 +21,11 @@ pub enum ColorEffect {
     },
 }
 
+/// A single gradient color stop: position (0.0–1.0) and RGB color.
+pub type GradientStop = (f32, [u8; 3]);
+
 /// Predefined color gradients for the GradientMap effect.
-pub const GRADIENT_PRESETS: &[(&str, &[(f32, [u8; 3])])] = &[
+pub const GRADIENT_PRESETS: &[(&str, &[GradientStop])] = &[
     (
         "Synthwave",
         &[

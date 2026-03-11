@@ -48,11 +48,11 @@ pub fn render_canvas(frame: &mut Frame, area: Rect, state: &mut AppState) {
         render_single_canvas(frame, inner, state);
 
         // Histogram overlay (top-right corner of canvas).
-        if state.show_histogram {
-            if let Some(ref img) = state.preview_buffer {
-                let img_clone = img.clone();
-                render_histogram_overlay(frame, inner, &img_clone);
-            }
+        if state.show_histogram
+            && let Some(ref img) = state.preview_buffer
+        {
+            let img_clone = img.clone();
+            render_histogram_overlay(frame, inner, &img_clone);
         }
     }
 }

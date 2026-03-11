@@ -1181,10 +1181,10 @@ fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
                 // we keep the modal open so the user can edit the newly revealed RGB fields.
                 let mut keep_open = false;
                 if let (Effect::Color(ColorEffect::GradientMap { preset_idx: old_p, .. }), 
-                        Effect::Color(ColorEffect::GradientMap { preset_idx: new_p, .. })) = (old_effect, &updated) {
-                    if *old_p != *new_p && *new_p == color::GRADIENT_PRESETS.len() - 1 {
-                        keep_open = true;
-                    }
+                        Effect::Color(ColorEffect::GradientMap { preset_idx: new_p, .. })) = (old_effect, &updated)
+                    && *old_p != *new_p && *new_p == color::GRADIENT_PRESETS.len() - 1
+                {
+                    keep_open = true;
                 }
 
                 state.push_undo();

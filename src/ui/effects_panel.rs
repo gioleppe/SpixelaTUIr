@@ -204,14 +204,14 @@ pub fn render_edit_effect_modal(frame: &mut Frame, state: &AppState) {
             };
 
             // Custom formatting for GradientMap's "preset" parameter.
-            if d.name == "preset" {
-                if let Some((preset_name, _)) = color::GRADIENT_PRESETS.get(d.value as usize) {
-                    value_display = if focused {
-                        format!("[ {preset_name} ]")
-                    } else {
-                        format!("  {preset_name}  ")
-                    };
-                }
+            if d.name == "preset"
+                && let Some((preset_name, _)) = color::GRADIENT_PRESETS.get(d.value as usize)
+            {
+                value_display = if focused {
+                    format!("[ {preset_name} ]")
+                } else {
+                    format!("  {preset_name}  ")
+                };
             }
 
             ListItem::new(Line::from(vec![
