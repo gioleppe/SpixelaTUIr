@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{backend::Backend, Terminal};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use std::sync::mpsc;
@@ -225,7 +225,7 @@ where
         if event::poll(Duration::from_millis(16))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    handle_key(&mut state, key.code);
+                    handle_key(&mut state, key.code, key.modifiers);
                 }
             }
         }
@@ -240,15 +240,15 @@ where
     Ok(())
 }
 
-fn handle_key(state: &mut AppState, code: KeyCode) {
+fn handle_key(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
     match state.input_mode {
-        InputMode::Normal => handle_normal(state, code),
+        InputMode::Normal => handle_normal(state, code, modifiers),
         InputMode::PathInput => handle_path_input(state, code),
         InputMode::AddEffect => handle_add_effect(state, code),
     }
 }
 
-fn handle_normal(state: &mut AppState, code: KeyCode) {
+fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
     match code {
         KeyCode::Char('q') | KeyCode::Esc => {
             state.should_quit = true;
@@ -264,6 +264,26 @@ fn handle_normal(state: &mut AppState, code: KeyCode) {
                 FocusedPanel::Canvas => FocusedPanel::EffectsList,
                 FocusedPanel::EffectsList => FocusedPanel::Canvas,
             };
+        }
+        // Move selected effect one position up (Shift+Up or K).
+        KeyCode::Up
+            if state.focused_panel == FocusedPanel::EffectsList
+                && modifiers.contains(KeyModifiers::SHIFT) =>
+        {
+            move_effect_up(state);
+        }
+        KeyCode::Char('K') if state.focused_panel == FocusedPanel::EffectsList => {
+            move_effect_up(state);
+        }
+        // Move selected effect one position down (Shift+Down or J).
+        KeyCode::Down
+            if state.focused_panel == FocusedPanel::EffectsList
+                && modifiers.contains(KeyModifiers::SHIFT) =>
+        {
+            move_effect_down(state);
+        }
+        KeyCode::Char('J') if state.focused_panel == FocusedPanel::EffectsList => {
+            move_effect_down(state);
         }
         // Effects-list navigation (when effects panel is focused).
         KeyCode::Up | KeyCode::Char('k')
@@ -315,6 +335,31 @@ fn handle_normal(state: &mut AppState, code: KeyCode) {
             }
         }
         _ => {}
+    }
+}
+
+/// Move the selected effect one position up in the pipeline.
+fn move_effect_up(state: &mut AppState) {
+    let idx = state.selected_effect;
+    if idx > 0 {
+        state.pipeline.effects.swap(idx, idx - 1);
+        state.selected_effect -= 1;
+        state.status_message = "Moved effect up. Re-processing…".to_string();
+        state.image_protocol = None;
+        state.dispatch_process();
+    }
+}
+
+/// Move the selected effect one position down in the pipeline.
+fn move_effect_down(state: &mut AppState) {
+    let idx = state.selected_effect;
+    let last = state.pipeline.effects.len().saturating_sub(1);
+    if idx < last {
+        state.pipeline.effects.swap(idx, idx + 1);
+        state.selected_effect += 1;
+        state.status_message = "Moved effect down. Re-processing…".to_string();
+        state.image_protocol = None;
+        state.dispatch_process();
     }
 }
 
@@ -422,5 +467,99 @@ fn randomize_pipeline(pipeline: &mut Pipeline) {
             },
             Effect::Composite(_) => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::effects::{Effect, Pipeline, color::ColorEffect, glitch::GlitchEffect};
+    use std::sync::mpsc;
+
+    fn make_state_with_effects() -> AppState {
+        let (worker_tx, _worker_rx) = mpsc::channel();
+        let (resp_tx, resp_rx) = mpsc::channel();
+        let picker = ratatui_image::picker::Picker::halfblocks();
+        let mut state = AppState::new(worker_tx, resp_rx, resp_tx, picker);
+        state.pipeline = Pipeline {
+            effects: vec![
+                Effect::Color(ColorEffect::Invert),
+                Effect::Glitch(GlitchEffect::Pixelate { block_size: 8 }),
+                Effect::Color(ColorEffect::HueShift { degrees: 30.0 }),
+            ],
+        };
+        state.focused_panel = FocusedPanel::EffectsList;
+        state.selected_effect = 1;
+        state
+    }
+
+    #[test]
+    fn move_effect_up_with_k() {
+        let mut state = make_state_with_effects();
+        handle_normal(&mut state, KeyCode::Char('K'), KeyModifiers::NONE);
+        assert_eq!(state.selected_effect, 0);
+        assert!(matches!(state.pipeline.effects[0], Effect::Glitch(_)));
+        assert!(matches!(state.pipeline.effects[1], Effect::Color(ColorEffect::Invert)));
+        assert!(state.status_message.contains("up"));
+    }
+
+    #[test]
+    fn move_effect_up_with_shift_up() {
+        let mut state = make_state_with_effects();
+        handle_normal(&mut state, KeyCode::Up, KeyModifiers::SHIFT);
+        assert_eq!(state.selected_effect, 0);
+        assert!(matches!(state.pipeline.effects[0], Effect::Glitch(_)));
+        assert!(matches!(state.pipeline.effects[1], Effect::Color(ColorEffect::Invert)));
+        assert!(state.status_message.contains("up"));
+    }
+
+    #[test]
+    fn move_effect_down_with_j() {
+        let mut state = make_state_with_effects();
+        handle_normal(&mut state, KeyCode::Char('J'), KeyModifiers::NONE);
+        assert_eq!(state.selected_effect, 2);
+        assert!(matches!(state.pipeline.effects[1], Effect::Color(_)));
+        assert!(matches!(state.pipeline.effects[2], Effect::Glitch(_)));
+        assert!(state.status_message.contains("down"));
+    }
+
+    #[test]
+    fn move_effect_down_with_shift_down() {
+        let mut state = make_state_with_effects();
+        handle_normal(&mut state, KeyCode::Down, KeyModifiers::SHIFT);
+        assert_eq!(state.selected_effect, 2);
+        assert!(matches!(state.pipeline.effects[1], Effect::Color(_)));
+        assert!(matches!(state.pipeline.effects[2], Effect::Glitch(_)));
+        assert!(state.status_message.contains("down"));
+    }
+
+    #[test]
+    fn move_effect_up_noop_at_first() {
+        let mut state = make_state_with_effects();
+        state.selected_effect = 0;
+        let effects_before = state.pipeline.effects.clone();
+        handle_normal(&mut state, KeyCode::Char('K'), KeyModifiers::NONE);
+        assert_eq!(state.selected_effect, 0);
+        assert_eq!(state.pipeline.effects.len(), effects_before.len());
+    }
+
+    #[test]
+    fn move_effect_down_noop_at_last() {
+        let mut state = make_state_with_effects();
+        state.selected_effect = 2;
+        let effects_before = state.pipeline.effects.clone();
+        handle_normal(&mut state, KeyCode::Char('J'), KeyModifiers::NONE);
+        assert_eq!(state.selected_effect, 2);
+        assert_eq!(state.pipeline.effects.len(), effects_before.len());
+    }
+
+    #[test]
+    fn plain_up_does_not_swap() {
+        let mut state = make_state_with_effects();
+        // Plain Up (no SHIFT) should only move cursor, not reorder effects.
+        handle_normal(&mut state, KeyCode::Up, KeyModifiers::NONE);
+        assert_eq!(state.selected_effect, 0);
+        // First effect must remain the original Invert, not the Pixelate.
+        assert!(matches!(state.pipeline.effects[0], Effect::Color(ColorEffect::Invert)));
     }
 }

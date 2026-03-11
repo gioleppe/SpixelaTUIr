@@ -66,9 +66,15 @@ pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
                 Style::default().fg(Color::White)
             };
             let prefix = if selected { "▶ " } else { "  " };
+            let suffix = if selected && is_focused && state.pipeline.effects.len() > 1 {
+                " ↕"
+            } else {
+                ""
+            };
             ListItem::new(Line::from(vec![
                 Span::styled(prefix, style),
                 Span::styled(label, style),
+                Span::styled(suffix, style),
             ]))
         })
         .collect();
