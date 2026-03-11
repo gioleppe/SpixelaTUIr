@@ -1,6 +1,6 @@
 use ratatui::{
     Frame,
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
@@ -11,12 +11,12 @@ use crate::app::AppState;
 
 /// Render the image canvas area.
 ///
-/// If a processed preview frame exists, it is rendered via ratatui-image using
-/// the best available terminal graphics protocol (Sixel → Kitty → half-blocks).
-/// Otherwise a placeholder is shown.
-///
-/// When `state.show_histogram` is true a compact luminance/RGB histogram is
-/// overlaid in the top-right corner of the inner canvas area.
+/// Normal mode: the processed preview fills the entire canvas.  
+/// Split-view mode (`state.split_view = true`): the canvas is divided
+/// horizontally — left half shows the original proxy ("Before"), right half
+/// shows the processed preview ("After").  
+/// When `state.show_histogram` is true a compact luminance histogram is
+/// overlaid in the top-right corner of the canvas (processed side).
 pub fn render_canvas(frame: &mut Frame, area: Rect, state: &mut AppState) {
     let block = Block::default()
         .title("Canvas")
@@ -29,8 +29,34 @@ pub fn render_canvas(frame: &mut Frame, area: Rect, state: &mut AppState) {
     // Render the block border first.
     frame.render_widget(block, area);
 
+    if state.split_view {
+        render_split_canvas(frame, inner, state);
+    } else {
+        render_single_canvas(frame, inner, state);
+    }
+
+    // Histogram overlay (top-right corner of canvas, processed side).
+    if state.show_histogram {
+        // In split view the processed side is the right half.
+        let hist_area = if state.split_view && inner.width >= 4 {
+            let halves = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(inner);
+            halves[1]
+        } else {
+            inner
+        };
+        if let Some(ref img) = state.preview_buffer {
+            let img_clone = img.clone();
+            render_histogram_overlay(frame, hist_area, &img_clone);
+        }
+    }
+}
+
+/// Render the full canvas with a single processed preview.
+fn render_single_canvas(frame: &mut Frame, inner: Rect, state: &mut AppState) {
     if let Some(ref mut protocol) = state.image_protocol {
-        // Render the image using ratatui-image (Sixel/half-blocks depending on terminal).
         let image_widget = StatefulImage::default().resize(Resize::Fit(None));
         frame.render_stateful_widget(image_widget, inner, protocol);
     } else {
@@ -42,12 +68,59 @@ pub fn render_canvas(frame: &mut Frame, area: Rect, state: &mut AppState) {
         let placeholder = Paragraph::new(msg).style(Style::default().fg(Color::DarkGray));
         frame.render_widget(placeholder, inner);
     }
+}
 
-    // Histogram overlay (top-right corner of inner canvas area).
-    if state.show_histogram
-        && let Some(ref img) = state.preview_buffer
-    {
-        render_histogram_overlay(frame, inner, img);
+/// Render the canvas split horizontally: Before (left) | After (right).
+fn render_split_canvas(frame: &mut Frame, inner: Rect, state: &mut AppState) {
+    let halves = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(inner);
+
+    // ── Before (left) ─────────────────────────────────────────────────────
+    let before_block = Block::default()
+        .title("Before")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray));
+    let before_inner = before_block.inner(halves[0]);
+    frame.render_widget(before_block, halves[0]);
+
+    if let Some(ref mut proto) = state.original_image_protocol {
+        let widget = StatefulImage::default().resize(Resize::Fit(None));
+        frame.render_stateful_widget(widget, before_inner, proto);
+    } else {
+        let msg = if state.image_path.is_some() {
+            "Loading…"
+        } else {
+            "No image loaded."
+        };
+        frame.render_widget(
+            Paragraph::new(msg).style(Style::default().fg(Color::DarkGray)),
+            before_inner,
+        );
+    }
+
+    // ── After (right) ──────────────────────────────────────────────────────
+    let after_block = Block::default()
+        .title("After")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+    let after_inner = after_block.inner(halves[1]);
+    frame.render_widget(after_block, halves[1]);
+
+    if let Some(ref mut protocol) = state.image_protocol {
+        let image_widget = StatefulImage::default().resize(Resize::Fit(None));
+        frame.render_stateful_widget(image_widget, after_inner, protocol);
+    } else {
+        let msg = if state.image_path.is_some() {
+            "Processing… please wait."
+        } else {
+            "No image loaded."
+        };
+        frame.render_widget(
+            Paragraph::new(msg).style(Style::default().fg(Color::DarkGray)),
+            after_inner,
+        );
     }
 }
 
@@ -94,26 +167,16 @@ fn render_histogram_overlay(frame: &mut Frame, canvas_inner: Rect, img: &image::
         .collect();
 
     // Build lines bottom-up: each terminal row represents one "level" of the bar.
-    let bar_chars = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
     let mut lines: Vec<Line> = (0..HIST_HEIGHT)
         .rev()
         .map(|row| {
             let spans: Vec<Span> = bar_heights
                 .iter()
                 .map(|&h| {
-                    // How many full rows this bar occupies above this row level.
-                    let filled = h.saturating_sub(row as u8);
-                    let ch = if filled == 0 {
-                        ' '
-                    } else if filled >= 1 {
-                        bar_chars[8] // full block
-                    } else {
-                        ' '
-                    };
-                    Span::styled(
-                        ch.to_string(),
-                        Style::default().fg(Color::Green),
-                    )
+                    // A bar of height `h` fills rows 0..h from the bottom.
+                    // `row` is the current row index from bottom (0 = bottom-most).
+                    let ch = if h > row as u8 { '█' } else { ' ' };
+                    Span::styled(ch.to_string(), Style::default().fg(Color::Green))
                 })
                 .collect();
             Line::from(spans)

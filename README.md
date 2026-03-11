@@ -12,6 +12,9 @@ PNG, JPEG, GIF, BMP
 - **Pipeline save / load** — export your favourite pipeline to a JSON file and re-import it in any future session
 - **Undo / redo** — up to 20 levels of pipeline undo (`Ctrl+Z`) and redo (`Ctrl+Y`)
 - **Unsaved-changes guard** — a confirmation prompt prevents accidentally quitting with an unsaved pipeline
+- **Per-effect enable/disable** — toggle individual effects on/off with `Space` in the Effects panel without removing them, for quick A/B comparisons; disabled effects are shown in grey with a `✗` indicator
+- **Side-by-side split view** — press `v` to divide the canvas horizontally, showing the original (before) on the left and the processed preview (after) on the right
+- **Live histogram overlay** — press `H` to display a compact luminance histogram in the top-right corner of the canvas, computed from the current preview buffer with no extra processing thread
 
 ## Effects
 
@@ -42,12 +45,15 @@ PNG, JPEG, GIF, BMP
 | `a` | Add an effect from the preset menu (requires Effects panel focus) |
 | `d` / `Delete` | Delete the selected effect and re-process (requires Effects panel focus) |
 | `Enter` | Edit parameters of the selected effect (requires Effects panel focus) |
+| `Space` | Toggle the selected effect on/off (requires Effects panel focus); disabled effects are skipped during rendering but stay in the pipeline |
 | `K` / `Shift+↑` | Move selected effect one position up in the pipeline (cyan highlight while dragging) |
 | `J` / `Shift+↓` | Move selected effect one position down in the pipeline (cyan highlight while dragging) |
 | `r` | Randomise all effect parameter values |
 | `e` | Export the current preview as an image (dialog with directory/filename/format) |
 | `[` | Decrease preview resolution tier (1024 → 768 → 512 → 256 px) |
 | `]` | Increase preview resolution tier (256 → 512 → 768 → 1024 px) |
+| `v` | Toggle side-by-side before/after split view (left = original, right = processed) |
+| `H` | Toggle live luminance histogram overlay in the top-right corner of the canvas |
 | `Ctrl+S` | Save the current pipeline via a dialog (always writes JSON) |
 | `Ctrl+L` | Load / import a pipeline from a JSON or YAML file (file browser) |
 | `Ctrl+D` | Clear all effects at once (shows a confirmation prompt) |

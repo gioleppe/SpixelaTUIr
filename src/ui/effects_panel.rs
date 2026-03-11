@@ -75,7 +75,7 @@ pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
             } else {
                 ""
             };
-            let toggle_indicator = if enabled { " " } else { "✗" };
+            let toggle_indicator = if enabled { "✓" } else { "✗" };
             ListItem::new(Line::from(vec![
                 Span::styled(prefix, style),
                 Span::styled(toggle_indicator, style),
