@@ -807,12 +807,19 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
                         Some(FileBrowserPurpose::LoadPipeline) => {
                             match crate::config::parser::load_pipeline(&path) {
                                 Ok(pipeline) => {
+                                    let effect_count = pipeline.effects.len();
+                                    let filename = path
+                                        .file_name()
+                                        .map(|n| n.to_string_lossy().into_owned())
+                                        .unwrap_or_else(|| path.display().to_string());
                                     state.pipeline = pipeline;
                                     state.clamp_selection();
                                     state.image_protocol = None;
                                     state.dispatch_process();
-                                    state.status_message =
-                                        format!("Pipeline loaded from {}", path.display());
+                                    state.status_message = format!(
+                                        "Loaded {effect_count} effect{} from {filename}",
+                                        if effect_count == 1 { "" } else { "s" }
+                                    );
                                 }
                                 Err(e) => {
                                     state.status_message = format!("Error loading pipeline: {e}");
