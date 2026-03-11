@@ -278,6 +278,8 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
   r             Randomise all effect parameters\n\
   [             Decrease preview resolution\n\
   ]             Increase preview resolution\n\
+  v             Toggle side-by-side split view\n\
+  H             Toggle live histogram overlay\n\
   Tab           Toggle focus: Canvas ↔ Effects\n\
   h             Open / close this help\n\
 \n\

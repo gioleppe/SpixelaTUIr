@@ -272,6 +272,8 @@ pub struct AppState {
     pub undo_stack: std::collections::VecDeque<Pipeline>,
     /// Stack of pipeline states that were undone, for redo.
     pub redo_stack: std::collections::VecDeque<Pipeline>,
+    /// Whether to show the live luminance/RGB histogram overlay on the canvas.
+    pub show_histogram: bool,
 }
 
 impl AppState {
@@ -325,6 +327,7 @@ impl AppState {
             quit_requested: false,
             undo_stack: std::collections::VecDeque::new(),
             redo_stack: std::collections::VecDeque::new(),
+            show_histogram: false,
         }
     }
 
@@ -799,6 +802,15 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
         // Open the full keyboard-shortcut help overlay.
         KeyCode::Char('h') => {
             state.input_mode = InputMode::HelpModal;
+        }
+        // Toggle live histogram overlay.
+        KeyCode::Char('H') => {
+            state.show_histogram = !state.show_histogram;
+            state.status_message = if state.show_histogram {
+                "Histogram overlay enabled.".to_string()
+            } else {
+                "Histogram overlay disabled.".to_string()
+            };
         }
         _ => {}
     }
