@@ -6,13 +6,9 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{AppState, AVAILABLE_EFFECTS, FocusedPanel, InputMode};
+use crate::app::{AppState, FocusedPanel, InputMode, AVAILABLE_EFFECTS};
 use crate::effects::{
-    Effect,
-    color::ColorEffect,
-    composite::CompositeEffect,
-    crt::CrtEffect,
-    glitch::GlitchEffect,
+    color::ColorEffect, composite::CompositeEffect, crt::CrtEffect, glitch::GlitchEffect, Effect,
 };
 
 /// Render the side-panel showing the active pipeline effects.
@@ -206,8 +202,8 @@ pub fn render_edit_effect_modal(frame: &mut Frame, state: &AppState) {
     let list = List::new(items);
     frame.render_widget(list, chunks[0]);
 
-    let footer = Paragraph::new("  Enter: apply   Esc: cancel")
-        .style(Style::default().fg(Color::DarkGray));
+    let footer =
+        Paragraph::new("  Enter: apply   Esc: cancel").style(Style::default().fg(Color::DarkGray));
     frame.render_widget(footer, chunks[1]);
 }
 
@@ -270,7 +266,10 @@ fn effect_label(e: &Effect) -> String {
             CrtEffect::PhosphorGlow { radius, intensity } => {
                 format!("PhosphorGlow r={radius} i={intensity:.2}")
             }
-            CrtEffect::Noise { intensity, monochromatic } => {
+            CrtEffect::Noise {
+                intensity,
+                monochromatic,
+            } => {
                 let kind = if *monochromatic { "mono" } else { "rgb" };
                 format!("Noise {kind} {intensity:.2}")
             }
@@ -280,7 +279,12 @@ fn effect_label(e: &Effect) -> String {
         },
         Effect::Composite(c) => match c {
             CompositeEffect::ImageBlend { opacity } => format!("Blend {opacity:.0}%"),
-            CompositeEffect::CropRect { x, y, width, height } => {
+            CompositeEffect::CropRect {
+                x,
+                y,
+                width,
+                height,
+            } => {
                 format!("Crop {x},{y} {width}×{height}")
             }
         },

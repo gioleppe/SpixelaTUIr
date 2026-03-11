@@ -11,8 +11,8 @@ use crate::engine::export::EXPORT_FORMATS;
 /// Render the status bar at the top of the screen.
 pub fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
     let status = format!("SpixelaTUIr | {}", state.status_message);
-    let paragraph = Paragraph::new(status)
-        .style(Style::default().fg(Color::White).bg(Color::DarkGray));
+    let paragraph =
+        Paragraph::new(status).style(Style::default().fg(Color::White).bg(Color::DarkGray));
     frame.render_widget(paragraph, area);
 }
 
@@ -64,9 +64,11 @@ pub fn render_path_input(frame: &mut Frame, state: &AppState) {
         .title("Open image (Enter to load, Esc to cancel)")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Yellow));
-    let paragraph = Paragraph::new(display_text)
-        .block(block)
-        .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD));
+    let paragraph = Paragraph::new(display_text).block(block).style(
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
+    );
     frame.render_widget(paragraph, popup_area);
 }
 
@@ -131,26 +133,17 @@ pub fn render_export_dialog(frame: &mut Frame, state: &AppState) {
     // Directory row.
     let dir_cursor = if dialog.focused_field == 0 { "_" } else { "" };
     let dir_text = format!("  Directory  {}{}", dialog.directory, dir_cursor);
-    frame.render_widget(
-        Paragraph::new(dir_text).style(field_style(0)),
-        rows[0],
-    );
+    frame.render_widget(Paragraph::new(dir_text).style(field_style(0)), rows[0]);
 
     // Filename row.
     let fn_cursor = if dialog.focused_field == 1 { "_" } else { "" };
     let fn_text = format!("  Filename   {}{}", dialog.filename, fn_cursor);
-    frame.render_widget(
-        Paragraph::new(fn_text).style(field_style(1)),
-        rows[1],
-    );
+    frame.render_widget(Paragraph::new(fn_text).style(field_style(1)), rows[1]);
 
     // Format row.
     let format_name = EXPORT_FORMATS[dialog.format_index].display_name();
     let fmt_text = format!("  Format     [ {format_name} ]  (←/→ to change)");
-    frame.render_widget(
-        Paragraph::new(fmt_text).style(field_style(2)),
-        rows[2],
-    );
+    frame.render_widget(Paragraph::new(fmt_text).style(field_style(2)), rows[2]);
 
     // Preview path row.
     let ext = EXPORT_FORMATS[dialog.format_index].extension();
@@ -187,8 +180,10 @@ pub fn render_save_pipeline_input(frame: &mut Frame, state: &AppState) {
         .title(" Save Pipeline (Enter to save, Esc to cancel) ")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Green));
-    let paragraph = Paragraph::new(display_text)
-        .block(block)
-        .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD));
+    let paragraph = Paragraph::new(display_text).block(block).style(
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
+    );
     frame.render_widget(paragraph, popup_area);
 }

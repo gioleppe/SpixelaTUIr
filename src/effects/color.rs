@@ -20,9 +20,7 @@ impl ColorEffect {
     /// Apply a colour transformation to a single pixel.
     pub fn apply_pixel(&self, pixel: Rgba<u8>) -> Rgba<u8> {
         match self {
-            ColorEffect::Invert => {
-                Rgba([255 - pixel[0], 255 - pixel[1], 255 - pixel[2], pixel[3]])
-            }
+            ColorEffect::Invert => Rgba([255 - pixel[0], 255 - pixel[1], 255 - pixel[2], pixel[3]]),
             ColorEffect::Contrast { factor } => {
                 let apply = |c: u8| -> u8 {
                     let f = (c as f32 / 255.0 - 0.5) * factor + 0.5;
@@ -31,7 +29,11 @@ impl ColorEffect {
                 Rgba([apply(pixel[0]), apply(pixel[1]), apply(pixel[2]), pixel[3]])
             }
             ColorEffect::HueShift { degrees } => {
-                let (r, g, b) = (pixel[0] as f32 / 255.0, pixel[1] as f32 / 255.0, pixel[2] as f32 / 255.0);
+                let (r, g, b) = (
+                    pixel[0] as f32 / 255.0,
+                    pixel[1] as f32 / 255.0,
+                    pixel[2] as f32 / 255.0,
+                );
                 let (h, s, l) = rgb_to_hsl(r, g, b);
                 let h2 = (h + degrees / 360.0).fract();
                 let (r2, g2, b2) = hsl_to_rgb(h2, s, l);
@@ -43,7 +45,11 @@ impl ColorEffect {
                 ])
             }
             ColorEffect::Saturation { factor } => {
-                let (r, g, b) = (pixel[0] as f32 / 255.0, pixel[1] as f32 / 255.0, pixel[2] as f32 / 255.0);
+                let (r, g, b) = (
+                    pixel[0] as f32 / 255.0,
+                    pixel[1] as f32 / 255.0,
+                    pixel[2] as f32 / 255.0,
+                );
                 let (h, s, l) = rgb_to_hsl(r, g, b);
                 let s2 = (s * factor).clamp(0.0, 1.0);
                 let (r2, g2, b2) = hsl_to_rgb(h, s2, l);
@@ -61,7 +67,12 @@ impl ColorEffect {
                     let idx = (c as f32 / step).round();
                     (idx * step).clamp(0.0, 255.0) as u8
                 };
-                Rgba([quantize(pixel[0]), quantize(pixel[1]), quantize(pixel[2]), pixel[3]])
+                Rgba([
+                    quantize(pixel[0]),
+                    quantize(pixel[1]),
+                    quantize(pixel[2]),
+                    pixel[3],
+                ])
             }
         }
     }
@@ -78,10 +89,16 @@ fn rgb_to_hsl(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
         return (0.0, 0.0, l);
     }
     let d = max - min;
-    let s = if l > 0.5 { d / (2.0 - max - min) } else { d / (max + min) };
+    let s = if l > 0.5 {
+        d / (2.0 - max - min)
+    } else {
+        d / (max + min)
+    };
     let h = if max == r {
         let mut h = (g - b) / d;
-        if g < b { h += 6.0 }
+        if g < b {
+            h += 6.0
+        }
         h / 6.0
     } else if max == g {
         ((b - r) / d + 2.0) / 6.0
@@ -92,11 +109,21 @@ fn rgb_to_hsl(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
 }
 
 fn hue_to_rgb(p: f32, q: f32, mut t: f32) -> f32 {
-    if t < 0.0 { t += 1.0 }
-    if t > 1.0 { t -= 1.0 }
-    if t < 1.0 / 6.0 { return p + (q - p) * 6.0 * t; }
-    if t < 1.0 / 2.0 { return q; }
-    if t < 2.0 / 3.0 { return p + (q - p) * (2.0 / 3.0 - t) * 6.0; }
+    if t < 0.0 {
+        t += 1.0
+    }
+    if t > 1.0 {
+        t -= 1.0
+    }
+    if t < 1.0 / 6.0 {
+        return p + (q - p) * 6.0 * t;
+    }
+    if t < 1.0 / 2.0 {
+        return q;
+    }
+    if t < 2.0 / 3.0 {
+        return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+    }
     p
 }
 
@@ -105,7 +132,11 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
     if s.abs() < f32::EPSILON {
         return (l, l, l);
     }
-    let q = if l < 0.5 { l * (1.0 + s) } else { l + s - l * s };
+    let q = if l < 0.5 {
+        l * (1.0 + s)
+    } else {
+        l + s - l * s
+    };
     let p = 2.0 * l - q;
     (
         hue_to_rgb(p, q, h + 1.0 / 3.0),
@@ -163,7 +194,11 @@ mod tests {
         let e = ColorEffect::ColorQuantization { levels: 2 };
         for v in [0u8, 64, 128, 192, 255] {
             let out = e.apply_pixel(px(v, v, v));
-            assert!(out[0] == 0 || out[0] == 255, "Expected 0 or 255, got {}", out[0]);
+            assert!(
+                out[0] == 0 || out[0] == 255,
+                "Expected 0 or 255, got {}",
+                out[0]
+            );
         }
     }
 }

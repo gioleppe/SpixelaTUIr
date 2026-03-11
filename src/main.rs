@@ -45,7 +45,7 @@ mod snapshot_tests {
     use std::sync::mpsc;
 
     use crate::app::AppState;
-    use crate::effects::{Effect, Pipeline, color::ColorEffect, glitch::GlitchEffect};
+    use crate::effects::{color::ColorEffect, glitch::GlitchEffect, Effect, Pipeline};
 
     fn make_state() -> AppState {
         let (worker_tx, _worker_rx) = mpsc::channel();
@@ -59,7 +59,9 @@ mod snapshot_tests {
         let mut state = make_state();
         let backend = TestBackend::new(100, 30);
         let mut terminal = Terminal::new(backend).unwrap();
-        terminal.draw(|frame| crate::ui::render(frame, &mut state)).unwrap();
+        terminal
+            .draw(|frame| crate::ui::render(frame, &mut state))
+            .unwrap();
 
         let buffer = terminal.backend().buffer().clone();
         let snapshot: String = (0..30u16)
@@ -91,7 +93,9 @@ mod snapshot_tests {
 
         let backend = TestBackend::new(100, 30);
         let mut terminal = Terminal::new(backend).unwrap();
-        terminal.draw(|frame| crate::ui::render(frame, &mut state)).unwrap();
+        terminal
+            .draw(|frame| crate::ui::render(frame, &mut state))
+            .unwrap();
 
         let buffer = terminal.backend().buffer().clone();
         let snapshot: String = (0..30u16)
@@ -105,7 +109,13 @@ mod snapshot_tests {
             .collect::<Vec<_>>()
             .join("\n");
 
-        assert!(snapshot.contains("Invert"), "Should show Invert in effects list");
-        assert!(snapshot.contains("Pixelate"), "Should show Pixelate in effects list");
+        assert!(
+            snapshot.contains("Invert"),
+            "Should show Invert in effects list"
+        );
+        assert!(
+            snapshot.contains("Pixelate"),
+            "Should show Pixelate in effects list"
+        );
     }
 }

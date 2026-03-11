@@ -94,7 +94,10 @@ fn safe_path(mut path: PathBuf) -> PathBuf {
         .extension()
         .map(|e| format!(".{}", e.to_string_lossy()))
         .unwrap_or_default();
-    let parent = path.parent().unwrap_or_else(|| std::path::Path::new(".")).to_path_buf();
+    let parent = path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .to_path_buf();
     let mut n = 1u32;
     loop {
         path = parent.join(format!("{stem}_{n}{ext}"));

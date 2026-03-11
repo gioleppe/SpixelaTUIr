@@ -51,36 +51,44 @@ fn pixelate(img: DynamicImage, block_size: u32) -> DynamicImage {
 
     // Each horizontal strip of `block_size` rows is fully independent, so
     // rayon can process all strips in parallel without any shared mutable state.
-    out_raw.par_chunks_mut(strip_stride).enumerate().for_each(|(strip_idx, strip)| {
-        let by = strip_idx * bsize;
-        let actual_bh = bsize.min(h_usize - by);
+    out_raw
+        .par_chunks_mut(strip_stride)
+        .enumerate()
+        .for_each(|(strip_idx, strip)| {
+            let by = strip_idx * bsize;
+            let actual_bh = bsize.min(h_usize - by);
 
-        for bx in (0..w_usize).step_by(bsize) {
-            let actual_bw = bsize.min(w_usize - bx);
-            let cnt = (actual_bh * actual_bw) as u64;
+            for bx in (0..w_usize).step_by(bsize) {
+                let actual_bw = bsize.min(w_usize - bx);
+                let cnt = (actual_bh * actual_bw) as u64;
 
-            // Compute average colour across the block.
-            let (mut sr, mut sg, mut sb, mut sa) = (0u64, 0u64, 0u64, 0u64);
-            for dy in 0..actual_bh {
-                for dx in 0..actual_bw {
-                    let idx = ((by + dy) * w_usize + (bx + dx)) * 4;
-                    sr += raw[idx] as u64;
-                    sg += raw[idx + 1] as u64;
-                    sb += raw[idx + 2] as u64;
-                    sa += raw[idx + 3] as u64;
+                // Compute average colour across the block.
+                let (mut sr, mut sg, mut sb, mut sa) = (0u64, 0u64, 0u64, 0u64);
+                for dy in 0..actual_bh {
+                    for dx in 0..actual_bw {
+                        let idx = ((by + dy) * w_usize + (bx + dx)) * 4;
+                        sr += raw[idx] as u64;
+                        sg += raw[idx + 1] as u64;
+                        sb += raw[idx + 2] as u64;
+                        sa += raw[idx + 3] as u64;
+                    }
+                }
+                let avg = [
+                    (sr / cnt) as u8,
+                    (sg / cnt) as u8,
+                    (sb / cnt) as u8,
+                    (sa / cnt) as u8,
+                ];
+
+                // Fill every pixel in the block with the average colour.
+                for dy in 0..actual_bh {
+                    for dx in 0..actual_bw {
+                        let dst = dy * row_stride + (bx + dx) * 4;
+                        strip[dst..dst + 4].copy_from_slice(&avg);
+                    }
                 }
             }
-            let avg = [(sr / cnt) as u8, (sg / cnt) as u8, (sb / cnt) as u8, (sa / cnt) as u8];
-
-            // Fill every pixel in the block with the average colour.
-            for dy in 0..actual_bh {
-                for dx in 0..actual_bw {
-                    let dst = dy * row_stride + (bx + dx) * 4;
-                    strip[dst..dst + 4].copy_from_slice(&avg);
-                }
-            }
-        }
-    });
+        });
 
     let out = image::ImageBuffer::from_raw(w, h, out_raw).expect("buffer size mismatch");
     DynamicImage::ImageRgba8(out)
@@ -139,15 +147,18 @@ fn block_shift(img: DynamicImage, shift_x: i32, shift_y: i32) -> DynamicImage {
 
     // Each destination row is filled from a (possibly different) source row,
     // and rows never overlap, so all rows can be processed in parallel.
-    out_raw.par_chunks_mut(w_usize * 4).enumerate().for_each(|(y, row)| {
-        let src_y = ((y as i32 + shift_y).rem_euclid(h as i32)) as usize;
-        for x in 0..w_usize {
-            let src_x = ((x as i32 + shift_x).rem_euclid(w as i32)) as usize;
-            let src_idx = (src_y * w_usize + src_x) * 4;
-            let dst_idx = x * 4;
-            row[dst_idx..dst_idx + 4].copy_from_slice(&raw[src_idx..src_idx + 4]);
-        }
-    });
+    out_raw
+        .par_chunks_mut(w_usize * 4)
+        .enumerate()
+        .for_each(|(y, row)| {
+            let src_y = ((y as i32 + shift_y).rem_euclid(h as i32)) as usize;
+            for x in 0..w_usize {
+                let src_x = ((x as i32 + shift_x).rem_euclid(w as i32)) as usize;
+                let src_idx = (src_y * w_usize + src_x) * 4;
+                let dst_idx = x * 4;
+                row[dst_idx..dst_idx + 4].copy_from_slice(&raw[src_idx..src_idx + 4]);
+            }
+        });
 
     let out = image::ImageBuffer::from_raw(w, h, out_raw).expect("buffer size mismatch");
     DynamicImage::ImageRgba8(out)
@@ -233,7 +244,11 @@ mod tests {
     #[test]
     fn block_shift_preserves_dimensions() {
         let img = solid_image(60, 45, Rgba([200, 100, 50, 255]));
-        let out = GlitchEffect::BlockShift { shift_x: 10, shift_y: -5 }.apply_image(img);
+        let out = GlitchEffect::BlockShift {
+            shift_x: 10,
+            shift_y: -5,
+        }
+        .apply_image(img);
         assert_eq!(out.dimensions(), (60, 45));
     }
 
@@ -241,7 +256,11 @@ mod tests {
     fn block_shift_solid_image_unchanged() {
         let color = Rgba([200u8, 100, 50, 255]);
         let img = solid_image(60, 45, color);
-        let out = GlitchEffect::BlockShift { shift_x: 10, shift_y: -5 }.apply_image(img);
+        let out = GlitchEffect::BlockShift {
+            shift_x: 10,
+            shift_y: -5,
+        }
+        .apply_image(img);
         let rgba = out.to_rgba8();
         // Shifting a uniform image must not change any pixel.
         for p in rgba.pixels() {

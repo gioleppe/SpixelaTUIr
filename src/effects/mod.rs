@@ -70,64 +70,169 @@ impl Effect {
         match self {
             Effect::Color(e) => match e {
                 ColorEffect::Invert => vec![],
-                ColorEffect::HueShift { degrees } => vec![
-                    ParamDescriptor { name: "degrees", value: *degrees, min: 0.0, max: 360.0 },
-                ],
-                ColorEffect::Contrast { factor } => vec![
-                    ParamDescriptor { name: "factor", value: *factor, min: 0.1, max: 3.0 },
-                ],
-                ColorEffect::Saturation { factor } => vec![
-                    ParamDescriptor { name: "factor", value: *factor, min: 0.0, max: 2.0 },
-                ],
-                ColorEffect::ColorQuantization { levels } => vec![
-                    ParamDescriptor { name: "levels", value: *levels as f32, min: 2.0, max: 16.0 },
-                ],
+                ColorEffect::HueShift { degrees } => vec![ParamDescriptor {
+                    name: "degrees",
+                    value: *degrees,
+                    min: 0.0,
+                    max: 360.0,
+                }],
+                ColorEffect::Contrast { factor } => vec![ParamDescriptor {
+                    name: "factor",
+                    value: *factor,
+                    min: 0.1,
+                    max: 3.0,
+                }],
+                ColorEffect::Saturation { factor } => vec![ParamDescriptor {
+                    name: "factor",
+                    value: *factor,
+                    min: 0.0,
+                    max: 2.0,
+                }],
+                ColorEffect::ColorQuantization { levels } => vec![ParamDescriptor {
+                    name: "levels",
+                    value: *levels as f32,
+                    min: 2.0,
+                    max: 16.0,
+                }],
             },
             Effect::Glitch(e) => match e {
-                GlitchEffect::Pixelate { block_size } => vec![
-                    ParamDescriptor { name: "block_size", value: *block_size as f32, min: 1.0, max: 64.0 },
-                ],
-                GlitchEffect::RowJitter { magnitude } => vec![
-                    ParamDescriptor { name: "magnitude", value: *magnitude, min: 0.0, max: 1.0 },
-                ],
+                GlitchEffect::Pixelate { block_size } => vec![ParamDescriptor {
+                    name: "block_size",
+                    value: *block_size as f32,
+                    min: 1.0,
+                    max: 64.0,
+                }],
+                GlitchEffect::RowJitter { magnitude } => vec![ParamDescriptor {
+                    name: "magnitude",
+                    value: *magnitude,
+                    min: 0.0,
+                    max: 1.0,
+                }],
                 GlitchEffect::BlockShift { shift_x, shift_y } => vec![
-                    ParamDescriptor { name: "shift_x", value: *shift_x as f32, min: -200.0, max: 200.0 },
-                    ParamDescriptor { name: "shift_y", value: *shift_y as f32, min: -200.0, max: 200.0 },
+                    ParamDescriptor {
+                        name: "shift_x",
+                        value: *shift_x as f32,
+                        min: -200.0,
+                        max: 200.0,
+                    },
+                    ParamDescriptor {
+                        name: "shift_y",
+                        value: *shift_y as f32,
+                        min: -200.0,
+                        max: 200.0,
+                    },
                 ],
-                GlitchEffect::PixelSort { threshold } => vec![
-                    ParamDescriptor { name: "threshold", value: *threshold, min: 0.0, max: 1.0 },
-                ],
+                GlitchEffect::PixelSort { threshold } => vec![ParamDescriptor {
+                    name: "threshold",
+                    value: *threshold,
+                    min: 0.0,
+                    max: 1.0,
+                }],
             },
             Effect::Crt(e) => match e {
                 CrtEffect::Scanlines { spacing, opacity } => vec![
-                    ParamDescriptor { name: "spacing", value: *spacing as f32, min: 1.0, max: 20.0 },
-                    ParamDescriptor { name: "opacity", value: *opacity, min: 0.0, max: 1.0 },
+                    ParamDescriptor {
+                        name: "spacing",
+                        value: *spacing as f32,
+                        min: 1.0,
+                        max: 20.0,
+                    },
+                    ParamDescriptor {
+                        name: "opacity",
+                        value: *opacity,
+                        min: 0.0,
+                        max: 1.0,
+                    },
                 ],
-                CrtEffect::Curvature { strength } => vec![
-                    ParamDescriptor { name: "strength", value: *strength, min: 0.0, max: 1.0 },
-                ],
+                CrtEffect::Curvature { strength } => vec![ParamDescriptor {
+                    name: "strength",
+                    value: *strength,
+                    min: 0.0,
+                    max: 1.0,
+                }],
                 CrtEffect::PhosphorGlow { radius, intensity } => vec![
-                    ParamDescriptor { name: "radius", value: *radius as f32, min: 1.0, max: 20.0 },
-                    ParamDescriptor { name: "intensity", value: *intensity, min: 0.0, max: 1.0 },
+                    ParamDescriptor {
+                        name: "radius",
+                        value: *radius as f32,
+                        min: 1.0,
+                        max: 20.0,
+                    },
+                    ParamDescriptor {
+                        name: "intensity",
+                        value: *intensity,
+                        min: 0.0,
+                        max: 1.0,
+                    },
                 ],
-                CrtEffect::Noise { intensity, monochromatic } => vec![
-                    ParamDescriptor { name: "intensity", value: *intensity, min: 0.0, max: 1.0 },
-                    ParamDescriptor { name: "monochromatic", value: if *monochromatic { 1.0 } else { 0.0 }, min: 0.0, max: 1.0 },
+                CrtEffect::Noise {
+                    intensity,
+                    monochromatic,
+                } => vec![
+                    ParamDescriptor {
+                        name: "intensity",
+                        value: *intensity,
+                        min: 0.0,
+                        max: 1.0,
+                    },
+                    ParamDescriptor {
+                        name: "monochromatic",
+                        value: if *monochromatic { 1.0 } else { 0.0 },
+                        min: 0.0,
+                        max: 1.0,
+                    },
                 ],
                 CrtEffect::Vignette { radius, softness } => vec![
-                    ParamDescriptor { name: "radius", value: *radius, min: 0.0, max: 2.0 },
-                    ParamDescriptor { name: "softness", value: *softness, min: 0.0, max: 2.0 },
+                    ParamDescriptor {
+                        name: "radius",
+                        value: *radius,
+                        min: 0.0,
+                        max: 2.0,
+                    },
+                    ParamDescriptor {
+                        name: "softness",
+                        value: *softness,
+                        min: 0.0,
+                        max: 2.0,
+                    },
                 ],
             },
             Effect::Composite(e) => match e {
-                CompositeEffect::ImageBlend { opacity } => vec![
-                    ParamDescriptor { name: "opacity", value: *opacity, min: 0.0, max: 1.0 },
-                ],
-                CompositeEffect::CropRect { x, y, width, height } => vec![
-                    ParamDescriptor { name: "x", value: *x as f32, min: 0.0, max: 4096.0 },
-                    ParamDescriptor { name: "y", value: *y as f32, min: 0.0, max: 4096.0 },
-                    ParamDescriptor { name: "width", value: *width as f32, min: 1.0, max: 4096.0 },
-                    ParamDescriptor { name: "height", value: *height as f32, min: 1.0, max: 4096.0 },
+                CompositeEffect::ImageBlend { opacity } => vec![ParamDescriptor {
+                    name: "opacity",
+                    value: *opacity,
+                    min: 0.0,
+                    max: 1.0,
+                }],
+                CompositeEffect::CropRect {
+                    x,
+                    y,
+                    width,
+                    height,
+                } => vec![
+                    ParamDescriptor {
+                        name: "x",
+                        value: *x as f32,
+                        min: 0.0,
+                        max: 4096.0,
+                    },
+                    ParamDescriptor {
+                        name: "y",
+                        value: *y as f32,
+                        min: 0.0,
+                        max: 4096.0,
+                    },
+                    ParamDescriptor {
+                        name: "width",
+                        value: *width as f32,
+                        min: 1.0,
+                        max: 4096.0,
+                    },
+                    ParamDescriptor {
+                        name: "height",
+                        value: *height as f32,
+                        min: 1.0,
+                        max: 4096.0,
+                    },
                 ],
             },
         }
@@ -141,9 +246,15 @@ impl Effect {
         match self {
             Effect::Color(e) => Effect::Color(match e {
                 ColorEffect::Invert => ColorEffect::Invert,
-                ColorEffect::HueShift { degrees } => ColorEffect::HueShift { degrees: get(0, *degrees) },
-                ColorEffect::Contrast { factor } => ColorEffect::Contrast { factor: get(0, *factor) },
-                ColorEffect::Saturation { factor } => ColorEffect::Saturation { factor: get(0, *factor) },
+                ColorEffect::HueShift { degrees } => ColorEffect::HueShift {
+                    degrees: get(0, *degrees),
+                },
+                ColorEffect::Contrast { factor } => ColorEffect::Contrast {
+                    factor: get(0, *factor),
+                },
+                ColorEffect::Saturation { factor } => ColorEffect::Saturation {
+                    factor: get(0, *factor),
+                },
                 ColorEffect::ColorQuantization { levels } => ColorEffect::ColorQuantization {
                     levels: get(0, *levels as f32) as u8,
                 },
@@ -152,24 +263,33 @@ impl Effect {
                 GlitchEffect::Pixelate { block_size } => GlitchEffect::Pixelate {
                     block_size: get(0, *block_size as f32) as u32,
                 },
-                GlitchEffect::RowJitter { magnitude } => GlitchEffect::RowJitter { magnitude: get(0, *magnitude) },
+                GlitchEffect::RowJitter { magnitude } => GlitchEffect::RowJitter {
+                    magnitude: get(0, *magnitude),
+                },
                 GlitchEffect::BlockShift { shift_x, shift_y } => GlitchEffect::BlockShift {
                     shift_x: get(0, *shift_x as f32) as i32,
                     shift_y: get(1, *shift_y as f32) as i32,
                 },
-                GlitchEffect::PixelSort { threshold } => GlitchEffect::PixelSort { threshold: get(0, *threshold) },
+                GlitchEffect::PixelSort { threshold } => GlitchEffect::PixelSort {
+                    threshold: get(0, *threshold),
+                },
             }),
             Effect::Crt(e) => Effect::Crt(match e {
                 CrtEffect::Scanlines { spacing, opacity } => CrtEffect::Scanlines {
                     spacing: get(0, *spacing as f32) as u32,
                     opacity: get(1, *opacity),
                 },
-                CrtEffect::Curvature { strength } => CrtEffect::Curvature { strength: get(0, *strength) },
+                CrtEffect::Curvature { strength } => CrtEffect::Curvature {
+                    strength: get(0, *strength),
+                },
                 CrtEffect::PhosphorGlow { radius, intensity } => CrtEffect::PhosphorGlow {
                     radius: get(0, *radius as f32) as u32,
                     intensity: get(1, *intensity),
                 },
-                CrtEffect::Noise { intensity, monochromatic } => CrtEffect::Noise {
+                CrtEffect::Noise {
+                    intensity,
+                    monochromatic,
+                } => CrtEffect::Noise {
                     intensity: get(0, *intensity),
                     // Boolean encoded as float: value >= 0.5 → true (see ParamDescriptor docs).
                     monochromatic: get(1, if *monochromatic { 1.0 } else { 0.0 }) >= 0.5,
@@ -180,8 +300,15 @@ impl Effect {
                 },
             }),
             Effect::Composite(e) => Effect::Composite(match e {
-                CompositeEffect::ImageBlend { opacity } => CompositeEffect::ImageBlend { opacity: get(0, *opacity) },
-                CompositeEffect::CropRect { x, y, width, height } => CompositeEffect::CropRect {
+                CompositeEffect::ImageBlend { opacity } => CompositeEffect::ImageBlend {
+                    opacity: get(0, *opacity),
+                },
+                CompositeEffect::CropRect {
+                    x,
+                    y,
+                    width,
+                    height,
+                } => CompositeEffect::CropRect {
                     x: get(0, *x as f32) as u32,
                     y: get(1, *y as f32) as u32,
                     width: get(2, *width as f32) as u32,

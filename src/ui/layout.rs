@@ -20,9 +20,9 @@ pub fn build_layout(area: Rect) -> Vec<Rect> {
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),  // status bar
-            Constraint::Min(10),    // body
-            Constraint::Length(3),  // controls
+            Constraint::Length(1), // status bar
+            Constraint::Min(10),   // body
+            Constraint::Length(3), // controls
         ])
         .split(area);
 
@@ -30,8 +30,8 @@ pub fn build_layout(area: Rect) -> Vec<Rect> {
     let body = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Min(20),        // canvas (takes remaining space)
-            Constraint::Length(26),     // effects panel (fixed 26 columns)
+            Constraint::Min(20),    // canvas (takes remaining space)
+            Constraint::Length(26), // effects panel (fixed 26 columns)
         ])
         .split(outer[1]);
 

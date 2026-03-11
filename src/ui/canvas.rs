@@ -35,8 +35,7 @@ pub fn render_canvas(frame: &mut Frame, area: Rect, state: &mut AppState) {
         } else {
             "No image loaded. Press 'o' to open a file."
         };
-        let placeholder = Paragraph::new(msg)
-            .style(Style::default().fg(Color::DarkGray));
+        let placeholder = Paragraph::new(msg).style(Style::default().fg(Color::DarkGray));
         frame.render_widget(placeholder, inner);
     }
 }

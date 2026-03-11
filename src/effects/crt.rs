@@ -43,12 +43,18 @@ impl CrtEffect {
     ) -> Rgba<u8> {
         match self {
             CrtEffect::Scanlines { spacing, opacity } => {
-                if spacing == &0 { return pixel; }
+                if spacing == &0 {
+                    return pixel;
+                }
                 if y % spacing == 0 {
-                    let darken = |c: u8| -> u8 {
-                        ((c as f32) * (1.0 - opacity.clamp(0.0, 1.0))) as u8
-                    };
-                    Rgba([darken(pixel[0]), darken(pixel[1]), darken(pixel[2]), pixel[3]])
+                    let darken =
+                        |c: u8| -> u8 { ((c as f32) * (1.0 - opacity.clamp(0.0, 1.0))) as u8 };
+                    Rgba([
+                        darken(pixel[0]),
+                        darken(pixel[1]),
+                        darken(pixel[2]),
+                        pixel[3],
+                    ])
                 } else {
                     pixel
                 }
@@ -62,9 +68,17 @@ impl CrtEffect {
                 let t = ((dist - radius) / softness.max(0.001)).clamp(0.0, 1.0);
                 let factor = 1.0 - t * t * (3.0 - 2.0 * t); // smooth-step
                 let darken = |c: u8| -> u8 { (c as f32 * factor) as u8 };
-                Rgba([darken(pixel[0]), darken(pixel[1]), darken(pixel[2]), pixel[3]])
+                Rgba([
+                    darken(pixel[0]),
+                    darken(pixel[1]),
+                    darken(pixel[2]),
+                    pixel[3],
+                ])
             }
-            CrtEffect::Noise { intensity, monochromatic } => {
+            CrtEffect::Noise {
+                intensity,
+                monochromatic,
+            } => {
                 // Deterministic noise seeded by pixel position.
                 let seed = (x.wrapping_mul(2654435761) ^ y.wrapping_mul(2246822519)) as f32;
                 let n = (seed.sin() * 43758.5453).fract(); // 0..1
@@ -80,7 +94,12 @@ impl CrtEffect {
                     let dr = (((seed_r * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);
                     let dg = (((seed_g * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);
                     let db = (((seed_b * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);
-                    Rgba([add(pixel[0], dr), add(pixel[1], dg), add(pixel[2], db), pixel[3]])
+                    Rgba([
+                        add(pixel[0], dr),
+                        add(pixel[1], dg),
+                        add(pixel[2], db),
+                        pixel[3],
+                    ])
                 }
             }
             // Full-image ops fall back gracefully in per-pixel mode.

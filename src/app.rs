@@ -6,13 +6,10 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use crate::effects::{
-    Effect, Pipeline,
-    color::ColorEffect,
-    composite::CompositeEffect,
-    crt::CrtEffect,
-    glitch::GlitchEffect,
+    color::ColorEffect, composite::CompositeEffect, crt::CrtEffect, glitch::GlitchEffect, Effect,
+    Pipeline,
 };
-use crate::engine::export::{EXPORT_FORMATS, ExportFormat};
+use crate::engine::export::{ExportFormat, EXPORT_FORMATS};
 use crate::engine::worker::{WorkerCommand, WorkerResponse};
 
 /// Which panel currently has keyboard focus.
@@ -358,8 +355,7 @@ impl AppState {
 }
 
 /// Keyboard hint shown in the controls bar and inside the file-browser footer.
-pub const FILE_BROWSER_HINT: &str =
-    "↑↓/jk: navigate  Enter: open  Backspace/-: up  Esc: cancel";
+pub const FILE_BROWSER_HINT: &str = "↑↓/jk: navigate  Enter: open  Backspace/-: up  Esc: cancel";
 
 /// Available proxy resolution tiers (max pixels on the long edge).
 /// Index 1 (512 px) is the default — matches the previous hardcoded value.
@@ -370,20 +366,63 @@ pub const PIPELINE_BROWSER_HINT: &str =
 
 /// All effects available to add, with display names.
 pub const AVAILABLE_EFFECTS: &[(&str, fn() -> Effect)] = &[
-    ("Invert",             || Effect::Color(ColorEffect::Invert)),
-    ("HueShift +30°",      || Effect::Color(ColorEffect::HueShift { degrees: 30.0 })),
-    ("Contrast ×1.5",      || Effect::Color(ColorEffect::Contrast { factor: 1.5 })),
-    ("Saturation ×1.5",    || Effect::Color(ColorEffect::Saturation { factor: 1.5 })),
-    ("Desaturate",         || Effect::Color(ColorEffect::Saturation { factor: 0.0 })),
-    ("Quantize (4 levels)",|| Effect::Color(ColorEffect::ColorQuantization { levels: 4 })),
-    ("Pixelate (8px)",     || Effect::Glitch(GlitchEffect::Pixelate { block_size: 8 })),
-    ("Row Jitter",         || Effect::Glitch(GlitchEffect::RowJitter { magnitude: 0.05 })),
-    ("Block Shift",        || Effect::Glitch(GlitchEffect::BlockShift { shift_x: 10, shift_y: 0 })),
-    ("Pixel Sort",         || Effect::Glitch(GlitchEffect::PixelSort { threshold: 0.5 })),
-    ("Scanlines",          || Effect::Crt(CrtEffect::Scanlines { spacing: 2, opacity: 0.5 })),
-    ("Noise (RGB)",        || Effect::Crt(CrtEffect::Noise { intensity: 0.1, monochromatic: false })),
-    ("Vignette",           || Effect::Crt(CrtEffect::Vignette { radius: 0.7, softness: 0.3 })),
-    ("Crop 50%",           || Effect::Composite(CompositeEffect::CropRect { x: 50, y: 50, width: 200, height: 200 })),
+    ("Invert", || Effect::Color(ColorEffect::Invert)),
+    ("HueShift +30°", || {
+        Effect::Color(ColorEffect::HueShift { degrees: 30.0 })
+    }),
+    ("Contrast ×1.5", || {
+        Effect::Color(ColorEffect::Contrast { factor: 1.5 })
+    }),
+    ("Saturation ×1.5", || {
+        Effect::Color(ColorEffect::Saturation { factor: 1.5 })
+    }),
+    ("Desaturate", || {
+        Effect::Color(ColorEffect::Saturation { factor: 0.0 })
+    }),
+    ("Quantize (4 levels)", || {
+        Effect::Color(ColorEffect::ColorQuantization { levels: 4 })
+    }),
+    ("Pixelate (8px)", || {
+        Effect::Glitch(GlitchEffect::Pixelate { block_size: 8 })
+    }),
+    ("Row Jitter", || {
+        Effect::Glitch(GlitchEffect::RowJitter { magnitude: 0.05 })
+    }),
+    ("Block Shift", || {
+        Effect::Glitch(GlitchEffect::BlockShift {
+            shift_x: 10,
+            shift_y: 0,
+        })
+    }),
+    ("Pixel Sort", || {
+        Effect::Glitch(GlitchEffect::PixelSort { threshold: 0.5 })
+    }),
+    ("Scanlines", || {
+        Effect::Crt(CrtEffect::Scanlines {
+            spacing: 2,
+            opacity: 0.5,
+        })
+    }),
+    ("Noise (RGB)", || {
+        Effect::Crt(CrtEffect::Noise {
+            intensity: 0.1,
+            monochromatic: false,
+        })
+    }),
+    ("Vignette", || {
+        Effect::Crt(CrtEffect::Vignette {
+            radius: 0.7,
+            softness: 0.3,
+        })
+    }),
+    ("Crop 50%", || {
+        Effect::Composite(CompositeEffect::CropRect {
+            x: 50,
+            y: 50,
+            width: 200,
+            height: 200,
+        })
+    }),
 ];
 
 /// Entry point for the application event loop.
@@ -493,16 +532,12 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
             move_effect_down(state);
         }
         // Effects-list navigation (when effects panel is focused).
-        KeyCode::Up | KeyCode::Char('k')
-            if state.focused_panel == FocusedPanel::EffectsList =>
-        {
+        KeyCode::Up | KeyCode::Char('k') if state.focused_panel == FocusedPanel::EffectsList => {
             if state.selected_effect > 0 {
                 state.selected_effect -= 1;
             }
         }
-        KeyCode::Down | KeyCode::Char('j')
-            if state.focused_panel == FocusedPanel::EffectsList =>
-        {
+        KeyCode::Down | KeyCode::Char('j') if state.focused_panel == FocusedPanel::EffectsList => {
             let max = state.pipeline.effects.len().saturating_sub(1);
             if state.selected_effect < max {
                 state.selected_effect += 1;
@@ -598,8 +633,7 @@ fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifiers) {
         // Load a pipeline from a JSON or YAML file via the file browser (Ctrl+L).
         KeyCode::Char('l') if modifiers.contains(KeyModifiers::CONTROL) => {
             let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
-            state.file_browser =
-                Some(FileBrowserState::new(cwd, FileBrowserPurpose::LoadPipeline));
+            state.file_browser = Some(FileBrowserState::new(cwd, FileBrowserPurpose::LoadPipeline));
             state.input_mode = InputMode::FileBrowser;
         }
         _ => {}
@@ -661,10 +695,14 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
             state.input_mode = InputMode::Normal;
         }
         KeyCode::Up | KeyCode::Char('k') => {
-            if state.add_effect_cursor > 0 { state.add_effect_cursor -= 1; }
+            if state.add_effect_cursor > 0 {
+                state.add_effect_cursor -= 1;
+            }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if state.add_effect_cursor < n - 1 { state.add_effect_cursor += 1; }
+            if state.add_effect_cursor < n - 1 {
+                state.add_effect_cursor += 1;
+            }
         }
         KeyCode::Enter => {
             let effect = AVAILABLE_EFFECTS[state.add_effect_cursor].1();
@@ -710,10 +748,7 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
                 .file_browser
                 .as_ref()
                 .and_then(|fb| fb.entries.get(fb.cursor).cloned());
-            let purpose = state
-                .file_browser
-                .as_ref()
-                .map(|fb| fb.purpose.clone());
+            let purpose = state.file_browser.as_ref().map(|fb| fb.purpose.clone());
             match action {
                 Some(FileBrowserEntry::Directory(_)) => {
                     if let Some(ref mut fb) = state.file_browser {
@@ -735,8 +770,7 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
                                         format!("Pipeline loaded from {}", path.display());
                                 }
                                 Err(e) => {
-                                    state.status_message =
-                                        format!("Error loading pipeline: {e}");
+                                    state.status_message = format!("Error loading pipeline: {e}");
                                 }
                             }
                         }
@@ -774,12 +808,16 @@ fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
         }
         KeyCode::Up | KeyCode::Char('k') => {
             if field_idx > 0 {
-                state.input_mode = InputMode::EditEffect { field_idx: field_idx - 1 };
+                state.input_mode = InputMode::EditEffect {
+                    field_idx: field_idx - 1,
+                };
             }
         }
         KeyCode::Down | KeyCode::Char('j') => {
             if field_idx + 1 < num_fields {
-                state.input_mode = InputMode::EditEffect { field_idx: field_idx + 1 };
+                state.input_mode = InputMode::EditEffect {
+                    field_idx: field_idx + 1,
+                };
             }
         }
         KeyCode::Backspace => {
@@ -794,8 +832,7 @@ fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
         }
         KeyCode::Enter => {
             if !state.pipeline.effects.is_empty() {
-                let descriptors =
-                    state.pipeline.effects[state.selected_effect].param_descriptors();
+                let descriptors = state.pipeline.effects[state.selected_effect].param_descriptors();
                 let values: Vec<f32> = state
                     .edit_params
                     .iter()
@@ -948,7 +985,9 @@ fn randomize_pipeline(pipeline: &mut Pipeline) {
     // LCG: cheap deterministic random sequence from seed.
     let mut rng = seed;
     let mut next = move || -> f32 {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((rng >> 33) as f32) / (u32::MAX as f32)
     };
 
@@ -1061,7 +1100,10 @@ mod tests {
         handle_normal(&mut state, KeyCode::Char('K'), KeyModifiers::NONE);
         assert_eq!(state.selected_effect, 0);
         assert!(matches!(state.pipeline.effects[0], Effect::Glitch(_)));
-        assert!(matches!(state.pipeline.effects[1], Effect::Color(ColorEffect::Invert)));
+        assert!(matches!(
+            state.pipeline.effects[1],
+            Effect::Color(ColorEffect::Invert)
+        ));
         assert!(state.status_message.contains("up"));
     }
 
@@ -1071,7 +1113,10 @@ mod tests {
         handle_normal(&mut state, KeyCode::Up, KeyModifiers::SHIFT);
         assert_eq!(state.selected_effect, 0);
         assert!(matches!(state.pipeline.effects[0], Effect::Glitch(_)));
-        assert!(matches!(state.pipeline.effects[1], Effect::Color(ColorEffect::Invert)));
+        assert!(matches!(
+            state.pipeline.effects[1],
+            Effect::Color(ColorEffect::Invert)
+        ));
         assert!(state.status_message.contains("up"));
     }
 
@@ -1122,7 +1167,10 @@ mod tests {
         handle_normal(&mut state, KeyCode::Up, KeyModifiers::NONE);
         assert_eq!(state.selected_effect, 0);
         // First effect must remain the original Invert, not the Pixelate.
-        assert!(matches!(state.pipeline.effects[0], Effect::Color(ColorEffect::Invert)));
+        assert!(matches!(
+            state.pipeline.effects[0],
+            Effect::Color(ColorEffect::Invert)
+        ));
     }
 
     // ── Pipeline save / load ──────────────────────────────────────────────────
@@ -1185,17 +1233,19 @@ mod tests {
             ],
         };
 
-        crate::config::parser::save_pipeline(&pipeline, &tmp)
-            .expect("save should succeed");
+        crate::config::parser::save_pipeline(&pipeline, &tmp).expect("save should succeed");
 
-        let loaded = crate::config::parser::load_pipeline(&tmp)
-            .expect("load should succeed");
+        let loaded = crate::config::parser::load_pipeline(&tmp).expect("load should succeed");
 
         assert_eq!(loaded.effects.len(), 2);
-        assert!(matches!(loaded.effects[0], Effect::Color(ColorEffect::Invert)));
-        assert!(
-            matches!(loaded.effects[1], Effect::Glitch(GlitchEffect::Pixelate { block_size: 4 }))
-        );
+        assert!(matches!(
+            loaded.effects[0],
+            Effect::Color(ColorEffect::Invert)
+        ));
+        assert!(matches!(
+            loaded.effects[1],
+            Effect::Glitch(GlitchEffect::Pixelate { block_size: 4 })
+        ));
 
         let _ = std::fs::remove_file(&tmp);
     }

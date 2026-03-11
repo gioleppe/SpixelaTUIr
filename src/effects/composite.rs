@@ -24,7 +24,12 @@ impl CompositeEffect {
     /// Apply this effect to a full image buffer.
     pub fn apply_image(&self, img: DynamicImage) -> DynamicImage {
         match self {
-            CompositeEffect::CropRect { x, y, width, height } => {
+            CompositeEffect::CropRect {
+                x,
+                y,
+                width,
+                height,
+            } => {
                 // Clamp to the image bounds to prevent panics.
                 let img_w = img.width();
                 let img_h = img.height();

@@ -51,7 +51,11 @@ pub fn run(rx: Receiver<WorkerCommand>) {
         };
 
         match cmd {
-            WorkerCommand::Process { image, pipeline, response_tx } => {
+            WorkerCommand::Process {
+                image,
+                pipeline,
+                response_tx,
+            } => {
                 // Drain any additional Process commands queued since this one
                 // arrived so that only the most-recent user intent is executed.
                 let mut latest_image = image;
@@ -60,7 +64,11 @@ pub fn run(rx: Receiver<WorkerCommand>) {
 
                 loop {
                     match rx.try_recv() {
-                        Ok(WorkerCommand::Process { image: img, pipeline: pipe, response_tx: tx }) => {
+                        Ok(WorkerCommand::Process {
+                            image: img,
+                            pipeline: pipe,
+                            response_tx: tx,
+                        }) => {
                             latest_image = img;
                             latest_pipeline = pipe;
                             latest_resp_tx = tx;
@@ -78,16 +86,19 @@ pub fn run(rx: Receiver<WorkerCommand>) {
                 let result = latest_pipeline.apply_image(latest_image);
                 let _ = latest_resp_tx.send(WorkerResponse::ProcessedFrame(result));
             }
-            WorkerCommand::Export { image, output_path, format, response_tx } => {
-                match crate::engine::export::export_image(&image, output_path, &format) {
-                    Ok(saved_path) => {
-                        let _ = response_tx.send(WorkerResponse::Exported(saved_path));
-                    }
-                    Err(e) => {
-                        let _ = response_tx.send(WorkerResponse::Error(e.to_string()));
-                    }
+            WorkerCommand::Export {
+                image,
+                output_path,
+                format,
+                response_tx,
+            } => match crate::engine::export::export_image(&image, output_path, &format) {
+                Ok(saved_path) => {
+                    let _ = response_tx.send(WorkerResponse::Exported(saved_path));
                 }
-            }
+                Err(e) => {
+                    let _ = response_tx.send(WorkerResponse::Error(e.to_string()));
+                }
+            },
             WorkerCommand::Quit => break,
         }
     }

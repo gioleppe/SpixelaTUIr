@@ -6,7 +6,10 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{AppState, FileBrowserEntry, FileBrowserPurpose, InputMode, FILE_BROWSER_HINT, PIPELINE_BROWSER_HINT};
+use crate::app::{
+    AppState, FileBrowserEntry, FileBrowserPurpose, InputMode, FILE_BROWSER_HINT,
+    PIPELINE_BROWSER_HINT,
+};
 
 /// Render the floating file-browser modal over the whole terminal area.
 pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
@@ -54,8 +57,11 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
     // Current directory path line.
     let path_text = fb.cwd.display().to_string();
     let path_area = Rect::new(inner_x, inner_y, inner_width, 1);
-    let path_paragraph = Paragraph::new(path_text)
-        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+    let path_paragraph = Paragraph::new(path_text).style(
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    );
     frame.render_widget(path_paragraph, path_area);
 
     // We need at least path row + blank separator + list row + footer.
@@ -130,8 +136,7 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
         FileBrowserPurpose::OpenImage => FILE_BROWSER_HINT,
         FileBrowserPurpose::LoadPipeline => PIPELINE_BROWSER_HINT,
     };
-    let footer = Paragraph::new(hint)
-        .style(Style::default().fg(Color::DarkGray));
+    let footer = Paragraph::new(hint).style(Style::default().fg(Color::DarkGray));
     frame.render_widget(footer, footer_area);
 }
 
