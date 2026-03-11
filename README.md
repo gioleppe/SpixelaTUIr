@@ -11,7 +11,7 @@ PNG, JPEG, GIF, BMP
 - **Pipeline randomisation** — instantly randomise all effect parameters with a single keypress
 - **Pipeline save / load** — export your favourite pipeline to a JSON file and re-import it in any future session
 - **Undo / redo** — up to 20 levels of pipeline undo (`Ctrl+Z`) and redo (`Ctrl+Y`)
-- **Unsaved-changes guard** — a confirmation prompt prevents accidentally quitting with an unsaved pipeline
+- **Unsaved-changes guard** — a prominent centered confirmation modal prevents accidentally quitting with an unsaved pipeline
 - **Per-effect enable/disable** — toggle individual effects on/off with `Space` in the Effects panel without removing them, for quick A/B comparisons; disabled effects are shown in grey with a `✗` indicator
 - **Side-by-side split view** — press `v` to divide the canvas horizontally, showing the original (before) on the left and the processed preview (after) on the right
 - **Live histogram overlay** — press `H` to display a compact luminance histogram in the top-right corner of the canvas, computed from the current preview buffer with no extra processing thread
@@ -60,7 +60,7 @@ PNG, JPEG, GIF, BMP
 | `Ctrl+Z` | Undo the last pipeline change (up to 20 levels) |
 | `Ctrl+Y` | Redo the last undone pipeline change |
 | `h` | Open the full keyboard-shortcut help overlay |
-| `q` / `Esc` | Quit (prompts to confirm if there are unsaved pipeline changes; press `q` again to force-quit) |
+| `q` / `Esc` | Quit (shows a confirmation modal if there are unsaved pipeline changes: `y`/Enter to quit, `n`/Esc to cancel, `s` to save pipeline) |
 
 ## Building
 

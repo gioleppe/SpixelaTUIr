@@ -41,6 +41,7 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         InputMode::SavePipelineDialog => "j/k: navigate fields  Enter: save as JSON  Esc: cancel",
         InputMode::HelpModal => "h / Esc: close help",
         InputMode::ConfirmClearPipeline => "Enter: confirm clear  Esc: cancel",
+        InputMode::ConfirmQuit => "y / Enter: quit  n / Esc: cancel  s: save & stay",
         InputMode::Normal => {
             "q: Quit  o: Open  e: Export  Ctrl+S: Save  Ctrl+L: Load  Ctrl+Z/Y: Undo/Redo  Ctrl+D: Clear  r: Random  [/]: Preview  v: Split  H: Histogram  h: Help"
         }
@@ -301,4 +302,57 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
         .border_style(Style::default().fg(Color::Yellow));
     let paragraph = Paragraph::new(help_text).block(block);
     frame.render_widget(paragraph, popup_area);
+}
+
+/// Render the quit-confirmation modal when the user tries to quit with unsaved pipeline changes.
+pub fn render_quit_confirm_modal(frame: &mut Frame, state: &AppState) {
+    if state.input_mode != InputMode::ConfirmQuit {
+        return;
+    }
+
+    let total = frame.area();
+
+    let popup_width = total.width.min(52);
+    let popup_height = 7u16;
+    let x = (total.width.saturating_sub(popup_width)) / 2;
+    let y = (total.height.saturating_sub(popup_height)) / 2;
+    let popup_area = Rect::new(x, y, popup_width, popup_height);
+
+    frame.render_widget(Clear, popup_area);
+
+    let outer_block = Block::default()
+        .title("  ⚠  Unsaved Changes  ")
+        .borders(Borders::ALL)
+        .border_style(
+            Style::default()
+                .fg(Color::Red)
+                .add_modifier(Modifier::BOLD),
+        );
+    frame.render_widget(outer_block, popup_area);
+
+    let inner = Rect::new(
+        popup_area.x + 1,
+        popup_area.y + 1,
+        popup_area.width.saturating_sub(2),
+        popup_area.height.saturating_sub(2),
+    );
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // blank
+            Constraint::Length(1), // warning text
+            Constraint::Length(1), // blank
+            Constraint::Length(1), // key hints
+            Constraint::Min(0),
+        ])
+        .split(inner);
+
+    let warning = Paragraph::new("  You have unsaved pipeline changes.")
+        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+    frame.render_widget(warning, rows[1]);
+
+    let hints = Paragraph::new("  [y] Quit  [n] Cancel  [s] Save & stay")
+        .style(Style::default().fg(Color::White));
+    frame.render_widget(hints, rows[3]);
 }
