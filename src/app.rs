@@ -6,7 +6,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use crate::effects::{
-    Effect, EnabledEffect, Pipeline, color::ColorEffect, composite::CompositeEffect,
+    Effect, EnabledEffect, Pipeline, color, color::ColorEffect, composite::CompositeEffect,
     crt::CrtEffect, glitch::GlitchEffect,
 };
 use crate::engine::export::{EXPORT_FORMATS, ExportFormat};
@@ -487,45 +487,10 @@ pub const PIPELINE_BROWSER_HINT: &str =
 pub type EffectEntry = (&'static str, fn() -> Effect);
 pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
     ("Invert", || Effect::Color(ColorEffect::Invert)),
-    ("Gradient (Synthwave)", || {
+    ("Gradient Map", || {
         Effect::Color(ColorEffect::GradientMap {
-            stops: vec![
-                (0.0, [15, 5, 45]),
-                (0.3, [70, 10, 110]),
-                (0.6, [240, 20, 150]),
-                (0.8, [255, 140, 50]),
-                (1.0, [255, 255, 100]),
-            ],
-        })
-    }),
-    ("Gradient (Sepia)", || {
-        Effect::Color(ColorEffect::GradientMap {
-            stops: vec![
-                (0.0, [30, 15, 5]),
-                (0.5, [140, 90, 50]),
-                (1.0, [240, 210, 180]),
-            ],
-        })
-    }),
-    ("Gradient (Cyberpunk)", || {
-        Effect::Color(ColorEffect::GradientMap {
-            stops: vec![
-                (0.0, [5, 5, 20]),
-                (0.2, [60, 0, 120]),
-                (0.5, [255, 0, 180]),
-                (0.8, [0, 255, 255]),
-                (1.0, [255, 255, 255]),
-            ],
-        })
-    }),
-    ("Gradient (Night Vision)", || {
-        Effect::Color(ColorEffect::GradientMap {
-            stops: vec![
-                (0.0, [0, 10, 0]),
-                (0.2, [0, 50, 0]),
-                (0.8, [50, 255, 50]),
-                (1.0, [200, 255, 200]),
-            ],
+            preset_idx: 0,
+            stops: color::GRADIENT_PRESETS[0].1.to_vec(),
         })
     }),
     ("HueShift +30°", || {
@@ -1398,7 +1363,11 @@ fn randomize_pipeline(pipeline: &mut Pipeline) {
                 ColorEffect::Saturation { factor } => *factor = next() * 2.0,
                 ColorEffect::ColorQuantization { levels } => *levels = 2 + (next() * 6.0) as u8,
                 ColorEffect::Invert => {}
-                ColorEffect::GradientMap { .. } => {} // too complex to randomize nicely for now
+                ColorEffect::GradientMap { preset_idx, stops } => {
+                    *preset_idx = (next() * color::GRADIENT_PRESETS.len() as f32) as usize
+                        % color::GRADIENT_PRESETS.len();
+                    *stops = color::GRADIENT_PRESETS[*preset_idx].1.to_vec();
+                }
             },
             Effect::Glitch(e) => match e {
                 GlitchEffect::Pixelate { block_size } => *block_size = 2 + (next() * 20.0) as u32,

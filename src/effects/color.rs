@@ -15,8 +15,53 @@ pub enum ColorEffect {
     /// Reduce the available colour palette (posterisation).
     ColorQuantization { levels: u8 },
     /// Remaps luminance to a custom colour gradient (e.g. sepia, duotone, synthwave).
-    GradientMap { stops: Vec<(f32, [u8; 3])> },
+    GradientMap {
+        preset_idx: usize,
+        stops: Vec<(f32, [u8; 3])>,
+    },
 }
+
+/// Predefined color gradients for the GradientMap effect.
+pub const GRADIENT_PRESETS: &[(&str, &[(f32, [u8; 3])])] = &[
+    (
+        "Synthwave",
+        &[
+            (0.0, [15, 5, 45]),
+            (0.3, [70, 10, 110]),
+            (0.6, [240, 20, 150]),
+            (0.8, [255, 140, 50]),
+            (1.0, [255, 255, 100]),
+        ],
+    ),
+    (
+        "Sepia",
+        &[
+            (0.0, [30, 15, 5]),
+            (0.5, [140, 90, 50]),
+            (1.0, [240, 210, 180]),
+        ],
+    ),
+    (
+        "Cyberpunk",
+        &[
+            (0.0, [5, 5, 20]),
+            (0.2, [60, 0, 120]),
+            (0.5, [255, 0, 180]),
+            (0.8, [0, 255, 255]),
+            (1.0, [255, 255, 255]),
+        ],
+    ),
+    (
+        "Night Vision",
+        &[
+            (0.0, [0, 10, 0]),
+            (0.2, [0, 50, 0]),
+            (0.8, [50, 255, 50]),
+            (1.0, [200, 255, 200]),
+        ],
+    ),
+    ("Custom", &[(0.0, [0, 0, 0]), (1.0, [255, 255, 255])]),
+];
 
 impl ColorEffect {
     /// Apply a colour transformation to a single pixel.
@@ -30,7 +75,7 @@ impl ColorEffect {
                 };
                 Rgba([apply(pixel[0]), apply(pixel[1]), apply(pixel[2]), pixel[3]])
             }
-            ColorEffect::GradientMap { stops } => {
+            ColorEffect::GradientMap { stops, .. } => {
                 if stops.is_empty() {
                     return pixel;
                 }

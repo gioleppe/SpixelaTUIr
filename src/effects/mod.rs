@@ -57,7 +57,55 @@ impl Effect {
         match self {
             Effect::Color(e) => match e {
                 ColorEffect::Invert => vec![],
-                ColorEffect::GradientMap { .. } => vec![],
+                ColorEffect::GradientMap { preset_idx, stops } => {
+                    let mut params = vec![ParamDescriptor {
+                        name: "preset",
+                        value: *preset_idx as f32,
+                        min: 0.0,
+                        max: (color::GRADIENT_PRESETS.len() - 1) as f32,
+                    }];
+
+                    // If it's the "Custom" preset (last one), allow editing colors.
+                    if *preset_idx == color::GRADIENT_PRESETS.len() - 1 && stops.len() >= 2 {
+                        params.push(ParamDescriptor {
+                            name: "r1",
+                            value: stops[0].1[0] as f32,
+                            min: 0.0,
+                            max: 255.0,
+                        });
+                        params.push(ParamDescriptor {
+                            name: "g1",
+                            value: stops[0].1[1] as f32,
+                            min: 0.0,
+                            max: 255.0,
+                        });
+                        params.push(ParamDescriptor {
+                            name: "b1",
+                            value: stops[0].1[2] as f32,
+                            min: 0.0,
+                            max: 255.0,
+                        });
+                        params.push(ParamDescriptor {
+                            name: "r2",
+                            value: stops[1].1[0] as f32,
+                            min: 0.0,
+                            max: 255.0,
+                        });
+                        params.push(ParamDescriptor {
+                            name: "g2",
+                            value: stops[1].1[1] as f32,
+                            min: 0.0,
+                            max: 255.0,
+                        });
+                        params.push(ParamDescriptor {
+                            name: "b2",
+                            value: stops[1].1[2] as f32,
+                            min: 0.0,
+                            max: 255.0,
+                        });
+                    }
+                    params
+                }
                 ColorEffect::HueShift { degrees } => vec![ParamDescriptor {
                     name: "degrees",
                     value: *degrees,
@@ -234,7 +282,33 @@ impl Effect {
         match self {
             Effect::Color(e) => Effect::Color(match e {
                 ColorEffect::Invert => ColorEffect::Invert,
-                ColorEffect::GradientMap { stops } => ColorEffect::GradientMap { stops: stops.clone() },
+                ColorEffect::GradientMap { preset_idx, stops } => {
+                    let new_preset_idx = get(0, *preset_idx as f32) as usize;
+                    if new_preset_idx != *preset_idx {
+                        // Preset changed, load the new preset's default stops.
+                        ColorEffect::GradientMap {
+                            preset_idx: new_preset_idx,
+                            stops: color::GRADIENT_PRESETS[new_preset_idx].1.to_vec(),
+                        }
+                    } else if new_preset_idx == color::GRADIENT_PRESETS.len() - 1 {
+                        // "Custom" preset, update colors from params if provided.
+                        let mut new_stops = stops.clone();
+                        if new_stops.len() >= 2 && values.len() >= 7 {
+                            new_stops[0].1 = [get(1, 0.0) as u8, get(2, 0.0) as u8, get(3, 0.0) as u8];
+                            new_stops[1].1 = [get(4, 0.0) as u8, get(5, 0.0) as u8, get(6, 0.0) as u8];
+                        }
+                        ColorEffect::GradientMap {
+                            preset_idx: new_preset_idx,
+                            stops: new_stops,
+                        }
+                    } else {
+                        // Preset unchanged (and not custom), keep current stops.
+                        ColorEffect::GradientMap {
+                            preset_idx: *preset_idx,
+                            stops: stops.clone(),
+                        }
+                    }
+                }
                 ColorEffect::HueShift { degrees } => ColorEffect::HueShift {
                     degrees: get(0, *degrees),
                 },

@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::app::{AVAILABLE_EFFECTS, AppState, FocusedPanel, InputMode};
 use crate::effects::{
-    Effect, color::ColorEffect, composite::CompositeEffect, crt::CrtEffect, glitch::GlitchEffect,
+    Effect, color, color::ColorEffect, composite::CompositeEffect, crt::CrtEffect, glitch::GlitchEffect,
 };
 
 /// Render the side-panel showing the active pipeline effects.
@@ -256,7 +256,16 @@ fn effect_label(e: &Effect) -> String {
     match e {
         Effect::Color(c) => match c {
             ColorEffect::Invert => "Invert".to_string(),
-            ColorEffect::GradientMap { stops } => format!("GradientMap {} stops", stops.len()),
+            ColorEffect::GradientMap { preset_idx, stops } => {
+                let name = color::GRADIENT_PRESETS.get(*preset_idx).map(|(n, _)| *n).unwrap_or("Unknown");
+                if name == "Custom" && stops.len() >= 2 {
+                    let c1 = stops[0].1;
+                    let c2 = stops[1].1;
+                    format!("Gradient Custom #{:02x}{:02x}{:02x}→#{:02x}{:02x}{:02x}", c1[0], c1[1], c1[2], c2[0], c2[1], c2[2])
+                } else {
+                    format!("Gradient {name}")
+                }
+            },
             ColorEffect::HueShift { degrees } => format!("HueShift {degrees:.0}°"),
             ColorEffect::Contrast { factor } => format!("Contrast ×{factor:.2}"),
             ColorEffect::Saturation { factor } => format!("Saturation ×{factor:.2}"),
