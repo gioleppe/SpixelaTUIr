@@ -255,7 +255,10 @@ impl AppState {
     pub fn load_image(&mut self, path: std::path::PathBuf) {
         match image::open(&path) {
             Ok(img) => {
-                let proxy = img.thumbnail(800, 800);
+                // Cap the proxy at 512 px on the long edge — this is large enough
+                // for a crisp Sixel preview while keeping pixel counts low enough
+                // for fast pipeline iterations.
+                let proxy = img.thumbnail(512, 512);
                 self.image_path = Some(path.clone());
                 self.source_asset = Some(img);
                 self.proxy_asset = Some(proxy);
@@ -271,10 +274,13 @@ impl AppState {
     }
 
     /// Send the current proxy image through the pipeline via the worker thread.
+    ///
+    /// The proxy (pre-decoded, downscaled `DynamicImage`) is cloned directly
+    /// into the command, so the worker never reads from disk during editing.
     pub fn dispatch_process(&self) {
-        if let Some(path) = &self.image_path {
+        if let Some(proxy) = &self.proxy_asset {
             let _ = self.worker_tx.send(WorkerCommand::Process {
-                image_path: path.clone(),
+                image: proxy.clone(),
                 pipeline: self.pipeline.clone(),
                 response_tx: self.worker_resp_tx.clone(),
             });

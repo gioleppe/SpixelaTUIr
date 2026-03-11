@@ -3,7 +3,7 @@ pub mod composite;
 pub mod crt;
 pub mod glitch;
 
-use image::{DynamicImage, ImageBuffer, Rgba};
+use image::{DynamicImage, GenericImageView, Rgba};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -219,27 +219,21 @@ impl Pipeline {
 // ── Helper ───────────────────────────────────────────────────────────────────
 
 /// Apply a pixel-level function in parallel across all pixels, using rayon.
+///
+/// Operates directly on the raw RGBA byte slice via `par_chunks_mut(4)` to
+/// avoid allocating a large intermediate `Vec<(u32, u32, Rgba<u8>)>` (which
+/// would triple the image data in memory simultaneously).
 pub fn apply_per_pixel_parallel<F>(img: DynamicImage, f: F) -> DynamicImage
 where
     F: Fn(Rgba<u8>, u32, u32) -> Rgba<u8> + Sync + Send,
 {
-    let rgba = img.to_rgba8();
-    let (width, height) = rgba.dimensions();
-
-    // Collect (x, y, pixel) tuples.
-    let pixels: Vec<(u32, u32, Rgba<u8>)> = rgba
-        .enumerate_pixels()
-        .map(|(x, y, p)| (x, y, *p))
-        .collect();
-
-    let processed: Vec<(u32, u32, Rgba<u8>)> = pixels
-        .par_iter()
-        .map(|(x, y, p)| (*x, *y, f(*p, *x, *y)))
-        .collect();
-
-    let mut out = ImageBuffer::new(width, height);
-    for (x, y, p) in processed {
-        out.put_pixel(x, y, p);
-    }
-    DynamicImage::ImageRgba8(out)
+    let (width, _height) = img.dimensions();
+    let mut rgba = img.into_rgba8();
+    rgba.par_chunks_mut(4).enumerate().for_each(|(i, chunk)| {
+        let x = (i as u32) % width;
+        let y = (i as u32) / width;
+        let result = f(Rgba([chunk[0], chunk[1], chunk[2], chunk[3]]), x, y);
+        chunk.copy_from_slice(&result.0);
+    });
+    DynamicImage::ImageRgba8(rgba)
 }
