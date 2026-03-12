@@ -518,10 +518,23 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
     }
 }
 
-/// If the file browser cursor currently points at an image file, dispatch a
-/// thumbnail-load request to the worker thread.  Otherwise clear any stale
-/// preview so the panel shows the "no preview" placeholder instead.
+/// If the file browser cursor currently points at an image file **and the
+/// browser was opened for image selection**, dispatch a thumbnail-load request
+/// to the worker thread.  Otherwise clear any stale preview so the panel shows
+/// the "no preview" placeholder instead.
 fn dispatch_file_browser_preview_for_cursor(state: &mut AppState) {
+    // Only load thumbnails when the browser is in OpenImage mode; the pipeline
+    // browser does not show a preview pane so there is no need to dispatch.
+    let is_open_image = state
+        .file_browser
+        .as_ref()
+        .map(|fb| fb.purpose == FileBrowserPurpose::OpenImage)
+        .unwrap_or(false);
+
+    if !is_open_image {
+        return;
+    }
+
     let entry = state
         .file_browser
         .as_ref()

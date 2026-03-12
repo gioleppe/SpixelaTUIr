@@ -216,7 +216,7 @@ pub fn run(rx: Receiver<WorkerCommand>) {
                     }
                     Err(e) => {
                         log::debug!("Worker: could not load preview for {}: {e}", path.display());
-                        // Silently ignore — the UI will keep any existing placeholder.
+                        // Silently ignore -- the UI will keep any existing placeholder.
                     }
                 }
             }
