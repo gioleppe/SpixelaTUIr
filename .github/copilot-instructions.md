@@ -2,33 +2,55 @@
 
 You are an expert Rust developer and AI coding assistant working on "SpixelaTUIr", a high-performance, TUI-based image glitching and processing application. Adhere to the following guidelines strictly when writing, refactoring, or suggesting code for this repository.
 
-## 1. Core Architecture & State Management
+## 0. Project Overview
+**SpixelaTUIr** is a terminal-based image glitching and processing tool written in Rust (Edition 2024). Users apply a real-time chain of effects to images with a live preview rendered in the terminal using the Sixel graphics protocol (or ANSI half-block fallback).
+
+### Key Technologies
+- **TUI Framework:** `ratatui` + `crossterm`
+- **Image Rendering:** `ratatui-image` (Sixel, Kitty, half-blocks)
+- **Image Processing:** `image`, `imageproc`, `rayon`
+- **Serialization:** `serde`, `serde_json`, `serde_yml`
+- **Architecture:** Multi-threaded worker-thread model (UI thread ↔ Engine thread via `mpsc`)
+
+## 1. Building and Testing
+
+```sh
+cargo build --release      # compile in release mode
+cargo run --release        # build and run
+cargo test                 # run all tests (unit + snapshot)
+cargo fmt                  # format code — run before every commit
+cargo clippy               # lint — must pass with zero warnings before committing
+```
+
+> **Always run `cargo fmt` and `cargo clippy` before committing.** CI enforces both.
+
+## 2. Core Architecture & State Management
 * **Strict Decoupling:** Never perform image processing math inside the `ratatui` UI drawing functions. The UI loop must be as lightweight as possible to maintain 60 FPS.
 * **Message Passing:** Communication between the Main Thread (UI) and the Engine Thread (Worker) must be handled via `std::sync::mpsc` channels. 
     * UI sends `WorkerCommand` enums (e.g., `Process { image, pipeline, response_tx }`, `Export { ... }`, `Quit`).
     * Engine sends back `WorkerResponse` enums (`ProcessedFrame(DynamicImage)`, `Exported(PathBuf)`, `Error(String)`).
 * **State Structuring:** Maintain a single source of truth in the UI thread for widget states (sliders, menus), but keep the heavy `DynamicImage` assets (source, proxy, preview buffer, animation frames) managed efficiently, minimizing clones.
 
-## 2. Image Processing & Performance
+## 3. Image Processing & Performance
 * **Data Parallelism:** Image processing is highly CPU-bound. Use the `rayon` crate for all heavy pixel iterations. Prefer `.par_iter_mut()` or `.par_chunks_mut()` over standard iterators when applying effects like Pixel Sort, Inversion, or Hue Shifting.
 * **Proxy First:** Always perform live preview math on a `proxy_asset` (a `DynamicImage` downscaled to match the terminal's Sixel pixel dimensions). Only apply math to the `source_asset` during the dedicated Export thread workflow.
 * **Zero-Cost Abstractions:** When an image passes through the `Pipeline`, mutate a single buffer in-place sequentially where mathematically possible, rather than allocating a new buffer for every `Effect` node in the chain.
 
-## 3. TUI & Rendering (Sixel)
+## 4. TUI & Rendering (Sixel)
 * **Sixel Protocol:** The live preview canvas must be rendered using `ratatui-image` configured strictly with the `ImageProtocol::Sixel` backend to ensure high-fidelity previews across macOS, Linux, and Windows (via Windows Terminal/WezTerm). Provide ANSI half-block rendering only as a graceful fallback.
 * **Terminal Restoration:** Never `unwrap()` or `panic!()` blindly. Always implement a custom panic hook that calls `crossterm::terminal::disable_raw_mode()` and leaves the alternate screen before printing the panic trace. Failure to do so will break the user's terminal.
 
-## 4. Error Handling
+## 5. Error Handling
 * **Crates:** Use `anyhow` for application-level error bubbling and general context. Use `thiserror` for defining specific, recoverable library/engine errors (e.g., `ImageLoadError`, `UnsupportedFormat`, `PipelineParseError`).
 * **Silent Failures:** Do not silently fail on image I/O or rendering errors. Surface errors to the user via a dedicated error modal or status bar in the TUI.
 
-## 5. Code Style & Tooling
+## 6. Code Style & Tooling
 * **Formatting:** Ensure all code adheres to standard `rustfmt`.
 * **Linting:** Code must pass `cargo clippy` without warnings. Address clippy suggestions actively.
 * **Pre-commit Checks:** Always run `cargo fmt` and `cargo clippy` before committing code to ensure formatting and linting standards are met.
 * **Idiomatic Rust:** Use `match` statements over `if let` when handling complex enums (like the `Effect` enum). Derive standard traits (`Debug`, `Clone`, `Serialize`, `Deserialize`, `Default`) where appropriate.
 
-## 6. Project Structure Adherence
+## 7. Project Structure Adherence
 Respect the established directory structure:
 * `src/app/`: Application state, event loop, keyboard handlers, and pipeline utilities. Decomposed into focused sub-modules:
     * `state.rs`: Central `AppState` struct, image loading, undo/redo, worker dispatch, and preview management.
@@ -42,8 +64,19 @@ Respect the established directory structure:
 * `src/effects/`: Pure mathematical implementations of the image glitches/filters. Each sub-effect type (`ColorEffect`, `GlitchEffect`, `CrtEffect`, `CompositeEffect`) owns its own `param_descriptors()`, `apply_params()`, `variant_name()`, and `Display` impl — the `Effect` enum in `mod.rs` only delegates.
 * `src/config/`: Serde parsing for loading/saving custom `Pipeline` configurations.
 
-## 7. README Maintenance
+## 8. README Maintenance
 * **Keep README up to date.** Whenever you add, remove, or rename a keyboard shortcut in `src/app/handlers.rs`, update the **Keyboard Shortcuts** table in `README.md` in the same commit/change.
 * **Key binding source of truth:** `handle_normal()` in `src/app/handlers.rs` is the canonical source of all global key bindings. Cross-check the README table against it whenever key handling changes.
 * **Effects table:** If a new `Effect` variant is added to the pipeline (in `src/effects/`), add a corresponding row to the **Effects** table in `README.md`.
 * **Architecture section:** If new threads, channels, or major data-flow paths are introduced, update the Architecture diagram in `README.md`.
+
+## 9. Adding New Effects
+Follow this checklist whenever you add a new image effect:
+
+1. Define the effect variant in the appropriate `src/effects/` submodule (`color.rs`, `glitch.rs`, `crt.rs`, or `composite.rs`).
+2. Implement the processing logic (`apply_image` for whole-image effects, or `apply_pixel` / `apply_pixel_with_coords` for per-pixel effects).
+3. Implement `param_descriptors()`, `apply_params()`, `variant_name()`, and `Display` on the sub-effect type in the **same file**.
+4. Add the variant to the `Effect` enum in `src/effects/mod.rs` (delegation is automatic via the existing match arms).
+5. Register the effect in `AVAILABLE_EFFECTS` within `src/app/pipeline_utils.rs` so it appears in the "Add Effect" menu.
+6. Update `randomize_pipeline` in `src/app/pipeline_utils.rs` if the effect exposes configurable parameters.
+7. Add a row to the **Effects** table in `README.md`.
