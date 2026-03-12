@@ -81,7 +81,7 @@ pub fn export_image(
 }
 
 /// Return a path that does not yet exist by appending `_N` before the extension.
-fn safe_path(mut path: PathBuf) -> PathBuf {
+pub(crate) fn safe_path(mut path: PathBuf) -> PathBuf {
     if !path.exists() {
         return path;
     }

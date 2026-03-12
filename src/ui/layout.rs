@@ -1,8 +1,16 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
+/// Height in terminal lines of the animation panel strip (including border).
+pub const ANIMATION_PANEL_HEIGHT: u16 = 7;
+
 /// Build the main layout.
 ///
-/// Returns `[status_bar, canvas, effects_panel, controls]`.
+/// Returns `[status_bar, canvas, effects_panel, controls_or_animation]`.
+///
+/// When `animation_open` is `false` the last element is the 3-line controls
+/// hint (unchanged from the original layout).  When `animation_open` is `true`
+/// the animation panel replaces the controls hint and expands to
+/// [`ANIMATION_PANEL_HEIGHT`] lines; the canvas loses those extra lines.
 ///
 /// ```
 /// ┌─────────────────────────────────────┐
@@ -12,17 +20,23 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 /// │  Canvas                  │ Panel    │
 /// │                          │ (24 cols)│
 /// ├──────────────────────────┴──────────┤
-/// │ Controls (3 lines)                   │
+/// │ Animation panel or Controls hint     │
 /// └─────────────────────────────────────┘
 /// ```
-pub fn build_layout(area: Rect) -> Vec<Rect> {
-    // Outer vertical split: status | body | controls.
+pub fn build_layout(area: Rect, animation_open: bool) -> Vec<Rect> {
+    let bottom_height: u16 = if animation_open {
+        ANIMATION_PANEL_HEIGHT
+    } else {
+        3 // controls hint panel height
+    };
+
+    // Outer vertical split: status | body | bottom.
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // status bar
-            Constraint::Min(10),   // body
-            Constraint::Length(3), // controls
+            Constraint::Length(1),            // status bar
+            Constraint::Min(10),              // body
+            Constraint::Length(bottom_height), // controls / animation
         ])
         .split(area);
 

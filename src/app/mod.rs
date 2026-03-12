@@ -8,7 +8,9 @@
 //! * [`dialogs`] — Dialog and modal state types (`ExportDialogState`, etc.).
 //! * [`file_browser`] — `FileBrowserState` with filesystem navigation.
 //! * [`pipeline_utils`] — Effect catalogue, randomisation, and formatting.
+//! * [`animation`] — Animation data model (frames, timeline, playback).
 
+pub mod animation;
 pub mod dialogs;
 pub mod file_browser;
 pub mod handlers;
@@ -82,6 +84,34 @@ where
                     state.set_preview(img);
                     state.status_message = format!("Ready | {label}");
                 }
+                WorkerResponse::AnimationFrameReady { frame_idx, image } => {
+                    log::debug!("Received animation frame {frame_idx} from worker");
+                    state.receive_animation_frame(frame_idx, image);
+                    // If this is the currently selected frame, update the canvas.
+                    if state.animation_panel_open
+                        && frame_idx == state.animation.selected
+                        && !state.animation_playback.is_playing()
+                    {
+                        if let Some(Some(img)) = state.animation_rendered_frames.get(frame_idx) {
+                            let img = img.clone();
+                            state.set_preview(img);
+                        }
+                    }
+                    let pending = state.animation_pending_renders;
+                    let total = state.animation.frames.len();
+                    if pending == 0 {
+                        state.status_message = format!("Animation: {total} frame{} ready.", if total == 1 { "" } else { "s" });
+                    } else {
+                        state.status_message = format!("Rendering animation frames… {}/{total}", total - pending);
+                    }
+                }
+                WorkerResponse::SweepBatchReady { pipelines, images } => {
+                    log::info!("Received sweep batch ({} frames)", images.len());
+                    let count = images.len();
+                    state.apply_sweep_results(pipelines, images);
+                    state.status_message =
+                        format!("Sweep complete: {count} frame{} generated.", if count == 1 { "" } else { "s" });
+                }
                 WorkerResponse::Exported(path) => {
                     log::info!("Export complete: {}", path.display());
                     state.status_message = format!("Exported → {}", path.display());
@@ -93,6 +123,36 @@ where
             }
             // Any worker response means visible state changed.
             ui_needs_redraw = true;
+        }
+
+        // ── Animation playback tick ──────────────────────────────────────────
+        if let animation::AnimationPlaybackState::Playing { current_frame, frame_started } =
+            &state.animation_playback
+        {
+            let current_frame = *current_frame;
+            let frame_started = *frame_started;
+            let elapsed_ms = frame_started.elapsed().as_millis() as u32;
+            let duration_ms = state.animation.frame_duration_ms(current_frame);
+            if elapsed_ms >= duration_ms {
+                // Advance to the next frame.
+                if let Some(next) = state.animation.next_frame(current_frame) {
+                    state.animation_playback = animation::AnimationPlaybackState::Playing {
+                        current_frame: next,
+                        frame_started: std::time::Instant::now(),
+                    };
+                    // Show the next frame in the canvas.
+                    if let Some(Some(img)) = state.animation_rendered_frames.get(next) {
+                        let img = img.clone();
+                        state.set_preview(img);
+                    }
+                    state.animation.selected = next;
+                } else {
+                    // End of animation, not looping.
+                    state.animation_playback = animation::AnimationPlaybackState::Stopped;
+                    state.status_message = "Animation playback finished.".to_string();
+                }
+                ui_needs_redraw = true;
+            }
         }
 
         if event::poll(Duration::from_millis(16))? {
