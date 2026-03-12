@@ -40,6 +40,8 @@ Before installing SpixelaTUIr, ensure you have the following dependencies instal
 
 - **Rust (stable)**: Install from [rustup.rs](https://rustup.rs/)
 
+If you are building on Windows, make sure to satisfy the requirements as described here: [Set up your dev environment on Windows for Rust](https://learn.microsoft.com/en-us/windows/dev-environment/rust/setup)
+
 #### Installing with Cargo
 
 To install SpixelaTUIr locally using Cargo, navigate to the project directory and run:
