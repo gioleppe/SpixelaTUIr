@@ -25,21 +25,14 @@ jobs:
             target: aarch64-apple-darwin
             binary: spixelatuir
             artifact: spixelatuir-macos-aarch64
-
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary: spixelatuir.exe
+            artifact: spixelatuir-windows-x86_64.exe
+            
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libchafa-dev libglib2.0-dev pkg-config
-
-      - name: Install system dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install chafa pkg-config
+        uses: actions/checkout@v6
 
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -47,7 +40,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -65,7 +58,7 @@ jobs:
           cp target/${{ matrix.target }}/release/${{ matrix.binary }} ${{ matrix.artifact }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
@@ -81,7 +74,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Fetch full history so we can push a tag
           fetch-depth: 0
@@ -113,7 +106,7 @@ jobs:
           fi
 
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts/
           merge-multiple: true

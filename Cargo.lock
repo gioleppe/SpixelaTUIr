@@ -1658,12 +1658,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pkg-config"
-version = "0.3.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
-
-[[package]]
 name = "png"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1945,7 +1939,6 @@ dependencies = [
  "base64-simd",
  "icy_sixel",
  "image",
- "pkg-config",
  "rand 0.8.5",
  "ratatui",
  "rustix 0.38.44",

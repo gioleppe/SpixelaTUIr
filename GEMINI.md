@@ -34,11 +34,6 @@
 
 ## Building and Running
 
-### System Dependencies
-The project requires `libchafa` for high-quality image rendering in the terminal.
-- **Ubuntu/Debian:** `sudo apt-get install libchafa-dev libglib2.0-dev`
-- **macOS:** `brew install chafa`
-
 ### Commands
 - **Run:** `cargo run --release`
 - **Build:** `cargo build --release`

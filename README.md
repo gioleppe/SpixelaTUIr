@@ -33,17 +33,17 @@ PNG, JPEG, GIF, BMP
 
 ## Installation
 
-### Prerequisites
+### Pre-built binaries
+
+
+### Installing from source
+#### Prerequisites
 
 Before installing SpixelaTUIr, ensure you have the following dependencies installed:
 
 - **Rust (stable)**: Install from [rustup.rs](https://rustup.rs/)
-- **libchafa-dev** (for image rendering support):
-  - Ubuntu/Debian: `sudo apt-get install libchafa-dev libglib2.0-dev`
-  - Fedora: `sudo dnf install chafa-devel`
-  - macOS (Homebrew): `brew install chafa`
 
-### Installing with Cargo
+#### Installing with Cargo
 
 To install SpixelaTUIr locally using Cargo, navigate to the project directory and run:
 
@@ -102,39 +102,69 @@ This will build the project in release mode and install the `spixelatuir` binary
 
 ## Building
 
-Requires Rust (stable) and `libchafa-dev` (for the Chafa-backed image renderer):
+Requires Rust (stable):
 
 ```bash
-# Ubuntu / Debian
-sudo apt-get install libchafa-dev libglib2.0-dev
-
-# macOS (Homebrew)
-brew install chafa
-
 cargo build --release
 cargo run --release
 ```
 
-The `.cargo/config.toml` in this repository sets `PKG_CONFIG_PATH` for Linux so that `libchafa` is found automatically after the packages above are installed.
-
 ## Architecture
 
-```
-Main Thread (UI)          Engine Thread (Worker)
-─────────────────         ──────────────────────
-ratatui + crossterm  ──WorkerCommand──▶  pipeline.apply_image()
-                                         image::open()
-Sixel / half-block  ◀─WorkerResponse─   pipeline.apply_image()
-canvas rendering         ProcessedFrame
-                         Exported
-                         Error
+SpixelaTUIr uses a two-thread architecture:
+
+- **Main/UI thread**: terminal lifecycle, event loop, input handling, app state, and rendering (`ratatui` + `ratatui-image`).
+- **Worker thread**: CPU-heavy image processing and export operations.
+
+The UI and worker communicate through `std::sync::mpsc` channels using typed messages:
+
+- **UI → Worker**: `WorkerCommand::{Process, Export, Quit}`
+- **Worker → UI**: `WorkerResponse::{ProcessedFrame, Exported, Error}`
+
+```mermaid
+flowchart LR
+  subgraph UI[Main Thread: UI]
+    A[main.rs\nterminal setup + panic hook]
+    B[app/mod.rs::run\nevent loop at ~16ms poll]
+    C[AppState\nsource_asset + proxy_asset + preview_buffer\npipeline + dialogs + selection]
+    D[handlers.rs\nkey handling by InputMode]
+    E[ui/*\nrender canvas/panels/modals\nSixel with half-block fallback]
+  end
+
+  subgraph W[Worker Thread]
+    F[engine/worker.rs::run]
+    G[pipeline.apply_image\nprocess proxy image]
+    H[engine/export.rs\nwrite output file]
+  end
+
+  A --> B
+  B --> C
+  B --> D
+  B --> E
+
+  C -- WorkerCommand::Process{image, pipeline} --> F
+  C -- WorkerCommand::Export{image, path, format} --> F
+  C -- WorkerCommand::Quit --> F
+
+  F --> G
+  F --> H
+  G -- WorkerResponse::ProcessedFrame --> C
+  H -- WorkerResponse::Exported / Error --> C
+
+  C --> E
 ```
 
-- `src/app.rs` — `AppState`, event loop, key handling, randomisation engine  
-- `src/ui/` — layout, canvas (Sixel), effects sidebar, widget overlays  
-- `src/effects/` — per-effect math (`color`, `glitch`, `crt`, `composite`)  
-- `src/engine/` — worker thread, PNG export  
-- `src/config/` — YAML / JSON pipeline serialisation  
+Module ownership:
+
+- `src/main.rs` — terminal setup/restore, panic hook, starts app run loop
+- `src/app/mod.rs` — event loop, worker channel wiring, redraw scheduling
+- `src/app/state.rs` — central `AppState`, image loading, proxy reload, dispatch to worker, undo/redo
+- `src/app/handlers.rs` — keyboard behavior for all modes
+- `src/ui/` — pure rendering/layout/widgets (no heavy image math)
+- `src/engine/worker.rs` — command handling, stale process draining, process/export dispatch
+- `src/engine/export.rs` — format-specific export path
+- `src/effects/` — effect math and pipeline execution
+- `src/config/` — pipeline load/save (JSON/YAML)
 
 ## Image Formats
 
