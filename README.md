@@ -22,7 +22,7 @@ Once you've crafted the perfect aesthetic, you can export the full-resolution gl
 - **Live preview canvas** — renders processed images directly in the terminal using the Sixel graphics protocol (with ANSI half-block fallback for terminals that don't support Sixel); the status bar always shows the active proxy resolution (e.g. `[512px]`)
 - **Interactive effects pipeline** — build a chain of effects that are applied in real-time to a downscaled proxy of your image; the Effects panel title always shows the current effect count (e.g. `Effects (3)`)
 - **Multi-threaded** — image processing runs on a dedicated worker thread, keeping the UI responsive. Re-rendering is only triggered when needed. Per-pixel loops are auto-vectorised by the compiler
-PNG, JPEG, GIF, BMP
+- **Animation creation & export** — build multi-frame animations by manually capturing pipeline snapshots (`c`) or using the automatic parameter sweep (`s`) to smoothly interpolate effect values (e.g., HueShift 0→360). Preview animations in-app (`Space`) and export them as animated GIFs or WebP files (`Ctrl+E`)
 - **Pipeline randomisation** — instantly randomise all effect parameters with a single keypress
 - **Pipeline save / load** — export your favourite pipeline to a JSON file and re-import it in any future session
 - **Undo / redo** — up to 20 levels of pipeline undo (`Ctrl+Z`) and redo (`Ctrl+Y`)
@@ -168,13 +168,13 @@ flowchart LR
   B --> D
   B --> E
 
-  C -- WorkerCommand::Process{image, pipeline} --> F
-  C -- WorkerCommand::Export{image, path, format} --> F
+  C -- WorkerCommand::Process / RenderAnimationFrame / RenderSweepBatch --> F
+  C -- WorkerCommand::Export / ExportAnimation --> F
   C -- WorkerCommand::Quit --> F
 
   F --> G
   F --> H
-  G -- WorkerResponse::ProcessedFrame --> C
+  G -- WorkerResponse::ProcessedFrame / AnimationFrameReady / SweepBatchReady --> C
   H -- WorkerResponse::Exported / Error --> C
 
   C --> E
