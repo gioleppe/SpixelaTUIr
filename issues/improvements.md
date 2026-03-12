@@ -51,7 +51,7 @@ Add a `presets/` directory to the user's config folder (`~/.config/spixelatuir/p
 and expose a quick-pick menu (similar to `AddEffect`) for loading common
 pipeline combinations with a single keypress.
 
-### 10. Animation / GIF export
+### 10. Animation / GIF export ✅ Done
 Extend the export pipeline to iterate over a range of a single parameter
 (e.g. hue rotation 0°→360°) and assemble frames into an animated GIF or
 WebP.  The `image` crate supports multi-frame encoding out of the box.
@@ -91,3 +91,21 @@ perceived quality while staying within terminal limits.
 Load user-written WebAssembly modules as custom effect nodes.  The module
 exports a single `apply(width, height, pixels: &mut [u8])` function.  This
 keeps the core binary small while allowing unlimited extensibility.
+
+### 18. Real-time Webcam Input
+Use a crate like `nokhwa` or `v4l` to capture live video frames from a webcam and feed them into the effect pipeline in real-time. Render the live, glitched output directly to the terminal using Sixel.
+
+### 19. Advanced Blend Modes for Composite Effects
+Expand the `Blend` composite effect to support industry-standard blend modes (Multiply, Screen, Overlay, Soft Light, Hard Light, Difference) rather than just simple alpha compositing, enabling more complex visual layering.
+
+### 20. Keyframe Animation for Effects
+Build upon the Animation/GIF export by allowing users to define keyframes for effect parameters (e.g., Frame 0: Blur 0.0, Frame 30: Blur 5.0). Interpolate these values linearly or via easing functions to generate complex, multi-parameter animations.
+
+### 21. ASCII / Braille Art Filter Effect
+Add a stylization effect that converts the image (or regions of it) into coloured ASCII or Braille characters. This could be used creatively within the glitch pipeline before further processing.
+
+### 22. Custom UI Themes
+Allow users to customise the TUI colours (borders, text, active elements, highlighted rows) via a TOML/JSON configuration file to match their terminal's colour scheme or personal preference.
+
+### 23. Image Masking Support
+Introduce a way to apply effects only to specific regions of an image. This could be achieved by loading a secondary grayscale mask image, where the intensity of the mask dictates the strength of the applied effect in that area.
