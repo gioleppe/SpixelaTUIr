@@ -94,6 +94,14 @@ pub enum InputMode {
     ConfirmClearPipeline,
     /// Waiting for the user to confirm quitting with unsaved changes.
     ConfirmQuit,
+    /// Animation panel has keyboard focus (frame capture, navigation, playback).
+    AnimationPanel,
+    /// User is filling in the parameter-sweep dialog.
+    AnimationSweepDialog,
+    /// User is configuring animation export (GIF/WebP) via the export dialog.
+    AnimationExportDialog,
+    /// User is typing a new duration value for the selected frame (inline `f` edit).
+    AnimationFrameDurationInput,
 }
 
 /// Which panel currently has keyboard focus.
@@ -101,4 +109,6 @@ pub enum InputMode {
 pub enum FocusedPanel {
     Canvas,
     EffectsList,
+    /// The animation panel at the bottom of the screen.
+    AnimationPanel,
 }

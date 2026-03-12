@@ -81,7 +81,7 @@ Keep in mind that these might not be tested, and are not signed; it is recommend
 | Key | Action |
 |-----|--------|
 | `o` | Open an image (file browser) |
-| `Tab` | Toggle keyboard focus between Canvas and Effects panel |
+| `Tab` | Cycle keyboard focus: Canvas → Effects panel → Animation panel (when open) → Canvas |
 | `↑` / `k` | Navigate effect list up (requires Effects panel focus) |
 | `↓` / `j` | Navigate effect list down (requires Effects panel focus) |
 | `a` | Add an effect from the preset menu (requires Effects panel focus) |
@@ -101,8 +101,28 @@ Keep in mind that these might not be tested, and are not signed; it is recommend
 | `Ctrl+D` | Clear all effects at once (shows a confirmation prompt) |
 | `Ctrl+Z` | Undo the last pipeline change (up to 20 levels) |
 | `Ctrl+Y` | Redo the last undone pipeline change |
+| `Ctrl+N` | Toggle the Animation panel open / closed |
 | `h` | Open the full keyboard-shortcut help overlay |
 | `q` / `Esc` | Quit (shows a confirmation modal if there are unsaved pipeline changes: `y`/Enter to quit, `n`/Esc to cancel, `s` to save pipeline) |
+
+### Animation Panel shortcuts (Tab to focus the animation panel)
+
+| Key | Action |
+|-----|--------|
+| `←` / `→` | Navigate frames in the timeline |
+| `c` | Capture the current pipeline state as a new animation frame |
+| `d` / `Delete` | Delete the selected animation frame |
+| `Enter` | Load the selected frame's pipeline back into the Effects panel for editing |
+| `Space` | Play / pause animation preview |
+| `f` | Edit the selected frame's display duration (ms) |
+| `F` | Set ALL frames to the same duration (ms) |
+| `L` | Toggle loop mode on / off |
+| `+` / `-` | Increase / decrease global frame rate (fps) |
+| `K` / `Shift+↑` | Move selected frame one position up in the timeline |
+| `J` / `Shift+↓` | Move selected frame one position down in the timeline |
+| `s` | Open the parameter sweep dialog (auto-generate interpolated frames) |
+| `Ctrl+E` | Open the animation export dialog (GIF / WebP) |
+| `Esc` | Return focus to the Effects panel |
 
 ## Building
 
@@ -122,8 +142,8 @@ SpixelaTUIr uses a two-thread architecture:
 
 The UI and worker communicate through `std::sync::mpsc` channels using typed messages:
 
-- **UI → Worker**: `WorkerCommand::{Process, Export, Quit}`
-- **Worker → UI**: `WorkerResponse::{ProcessedFrame, Exported, Error}`
+- **UI → Worker**: `WorkerCommand::{Process, Export, RenderAnimationFrame, RenderSweepBatch, ExportAnimation, Quit}`
+- **Worker → UI**: `WorkerResponse::{ProcessedFrame, AnimationFrameReady, SweepBatchReady, Exported, Error}`
 
 ```mermaid
 flowchart LR

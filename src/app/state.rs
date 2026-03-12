@@ -9,6 +9,10 @@ use crate::engine::export::ExportFormat;
 use crate::engine::worker::{WorkerCommand, WorkerResponse};
 
 use super::PROXY_RESOLUTIONS;
+use super::animation::{
+    AnimationExportDialogState, AnimationFrame, AnimationPlaybackState, AnimationTimeline,
+    SweepDialogState,
+};
 use super::dialogs::{ExportDialogState, FocusedPanel, InputMode, SavePipelineDialogState};
 use super::file_browser::FileBrowserState;
 
@@ -79,6 +83,31 @@ pub struct AppState {
     /// protocol with the same area, preventing the Sixel clear+redraw blink that
     /// would otherwise occur on the first render after the protocol is replaced.
     pub image_protocol_last_area: Option<Rect>,
+
+    // ── Animation ───────────────────────────────────────────────────────────
+    /// The full animation timeline (frames + global settings).
+    pub animation: AnimationTimeline,
+    /// Whether the animation panel strip is visible at the bottom.
+    pub animation_panel_open: bool,
+    /// Current playback state (stopped / playing / paused).
+    pub animation_playback: AnimationPlaybackState,
+    /// Pre-rendered proxy images for each animation frame.
+    ///
+    /// Indexed by frame position; `None` means not yet rendered or dirty.
+    /// Populated by the worker in response to `RenderAnimationFrame` /
+    /// `RenderSweepBatch` commands.
+    pub animation_rendered_frames: Vec<Option<image::DynamicImage>>,
+    /// How many frames are still waiting for the worker to render (sweep batch).
+    pub animation_pending_renders: usize,
+    /// State for the animation export dialog.
+    pub animation_export_dialog: AnimationExportDialogState,
+    /// State for the parameter sweep dialog.
+    pub sweep_dialog: SweepDialogState,
+    /// Inline text buffer for per-frame duration editing (`f` key).
+    pub frame_duration_input: String,
+    /// When `true`, the pending duration input (`f` edit) applies to all frames.
+    /// When `false`, it applies only to `animation.selected`.
+    pub frame_duration_input_all: bool,
 }
 
 impl AppState {
@@ -120,6 +149,15 @@ impl AppState {
             split_view: false,
             original_image_protocol: None,
             image_protocol_last_area: None,
+            animation: AnimationTimeline::default(),
+            animation_panel_open: false,
+            animation_playback: AnimationPlaybackState::Stopped,
+            animation_rendered_frames: Vec::new(),
+            animation_pending_renders: 0,
+            animation_export_dialog: AnimationExportDialogState::default(),
+            sweep_dialog: SweepDialogState::default(),
+            frame_duration_input: String::new(),
+            frame_duration_input_all: false,
         }
     }
 
@@ -267,5 +305,138 @@ impl AppState {
         self.pipeline_dirty = true;
         self.image_protocol = None;
         self.dispatch_process();
+    }
+
+    // ── Animation helpers ────────────────────────────────────────────────────
+
+    /// Capture the current pipeline as a new animation frame.
+    ///
+    /// Inserts after the currently selected frame (or appends if empty).
+    /// Returns the index of the newly inserted frame.
+    pub fn capture_animation_frame(&mut self) -> usize {
+        let frame = AnimationFrame {
+            pipeline: self.pipeline.clone(),
+            duration_ms: 0, // use global fps
+            label: None,
+        };
+        let insert_at = if self.animation.frames.is_empty() {
+            0
+        } else {
+            self.animation.selected + 1
+        };
+        let insert_at = insert_at.min(self.animation.frames.len());
+        self.animation.frames.insert(insert_at, frame);
+        // Grow the rendered-frames cache to match.
+        self.animation_rendered_frames.insert(insert_at, None);
+        self.animation.selected = insert_at;
+
+        // Dispatch render for the new frame.
+        self.dispatch_render_animation_frame(insert_at);
+        insert_at
+    }
+
+    /// Dispatch a single-frame render for animation frame `idx`.
+    pub fn dispatch_render_animation_frame(&self, idx: usize) {
+        if let Some(proxy) = &self.proxy_asset {
+            if let Some(frame) = self.animation.frames.get(idx) {
+                let _ = self.worker_tx.send(WorkerCommand::RenderAnimationFrame {
+                    image: proxy.clone(),
+                    pipeline: frame.pipeline.clone(),
+                    frame_idx: idx,
+                    response_tx: self.worker_resp_tx.clone(),
+                });
+            }
+        }
+    }
+
+    /// Dispatch rendering for all animation frames that are not yet rendered
+    /// (i.e. `animation_rendered_frames[i]` is `None`).
+    pub fn dispatch_render_dirty_frames(&mut self) {
+        let count = self
+            .animation_rendered_frames
+            .iter()
+            .filter(|f| f.is_none())
+            .count();
+        if count > 0 {
+            self.animation_pending_renders += count;
+            let total = self.animation.frames.len();
+            for i in 0..total {
+                if matches!(self.animation_rendered_frames.get(i), None | Some(None)) {
+                    self.dispatch_render_animation_frame(i);
+                }
+            }
+        }
+    }
+
+    /// Dispatch a sweep batch: interpolated pipelines for each frame.
+    pub fn dispatch_sweep_batch(&self, pipelines: Vec<Pipeline>) {
+        if let Some(proxy) = &self.proxy_asset {
+            let _ = self.worker_tx.send(WorkerCommand::RenderSweepBatch {
+                image: proxy.clone(),
+                pipelines,
+                response_tx: self.worker_resp_tx.clone(),
+            });
+        }
+    }
+
+    /// Receive a rendered animation frame from the worker and store it.
+    pub fn receive_animation_frame(&mut self, frame_idx: usize, img: image::DynamicImage) {
+        if frame_idx < self.animation_rendered_frames.len() {
+            self.animation_rendered_frames[frame_idx] = Some(img);
+        }
+        if self.animation_pending_renders > 0 {
+            self.animation_pending_renders -= 1;
+        }
+    }
+
+    /// Replace all animation frames with sweep results.
+    ///
+    /// `pipelines` contains one pipeline per frame; `images` contains the
+    /// pre-rendered preview for each pipeline (same length).
+    pub fn apply_sweep_results(
+        &mut self,
+        pipelines: Vec<Pipeline>,
+        images: Vec<image::DynamicImage>,
+    ) {
+        self.animation.frames = pipelines
+            .into_iter()
+            .map(|pipeline| AnimationFrame {
+                pipeline,
+                duration_ms: 0,
+                label: None,
+            })
+            .collect();
+        self.animation_rendered_frames = images.into_iter().map(Some).collect();
+        self.animation.selected = 0;
+        self.animation_pending_renders = 0;
+        // Show the first frame in the canvas.
+        if let Some(Some(img)) = self.animation_rendered_frames.first() {
+            let img = img.clone();
+            self.set_preview(img);
+        }
+    }
+
+    /// Clamp `animation.selected` to valid bounds.
+    pub fn clamp_animation_selection(&mut self) {
+        let len = self.animation.frames.len();
+        if len == 0 {
+            self.animation.selected = 0;
+        } else {
+            self.animation.selected = self.animation.selected.min(len - 1);
+        }
+    }
+
+    /// Load the pipeline from the selected animation frame back into the live
+    /// effects pipeline so the user can edit it.
+    pub fn load_animation_frame_pipeline(&mut self) {
+        let idx = self.animation.selected;
+        if let Some(pipeline) = self.animation.frames.get(idx).map(|f| f.pipeline.clone()) {
+            self.push_undo();
+            self.pipeline = pipeline;
+            self.pipeline_dirty = true;
+            self.clamp_selection();
+            self.image_protocol = None;
+            self.dispatch_process();
+        }
     }
 }

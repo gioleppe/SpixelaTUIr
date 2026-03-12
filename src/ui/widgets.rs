@@ -16,7 +16,23 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
     } else {
         String::new()
     };
-    let status = format!("SpixelaTUIr | {}{}", state.status_message, res_label);
+
+    // Animation indicator on the right side when the panel is open.
+    let anim_label = if state.animation_panel_open {
+        use crate::app::animation::AnimationPlaybackState;
+        let n = state.animation.frames.len();
+        let fps = state.animation.fps;
+        let icon = match &state.animation_playback {
+            AnimationPlaybackState::Playing { .. } => "▶",
+            AnimationPlaybackState::Paused { .. } => "⏸",
+            AnimationPlaybackState::Stopped => "■",
+        };
+        format!("   ANIM {n}F {fps}fps {icon}")
+    } else {
+        String::new()
+    };
+
+    let status = format!("SpixelaTUIr | {}{}{}", state.status_message, res_label, anim_label);
     let paragraph =
         Paragraph::new(status).style(Style::default().fg(Color::White).bg(Color::DarkGray));
     frame.render_widget(paragraph, area);
@@ -43,8 +59,14 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         InputMode::ConfirmClearPipeline => "Enter: confirm clear  Esc: cancel",
         InputMode::ConfirmQuit => "y / Enter: quit  n / Esc: cancel  s: save & stay",
         InputMode::Normal => {
-            "q: Quit  o: Open  e: Export  Ctrl+S: Save  Ctrl+L: Load  Ctrl+Z/Y: Undo/Redo  Ctrl+D: Clear  r: Random  [/]: Preview  v: Split  H: Histogram  h: Help"
+            "q: Quit  o: Open  e: Export  Ctrl+S: Save  Ctrl+L: Load  Ctrl+Z/Y: Undo/Redo  Ctrl+D: Clear  Ctrl+N: Animation  r: Random  [/]: Preview  v: Split  H: Histogram  h: Help"
         }
+        InputMode::AnimationPanel => {
+            "c:capture  s:sweep  d:del  Space:play  Enter:edit-frame  f:dur  L:loop  +/-:fps  Ctrl+E:export  Esc:unfocus"
+        }
+        InputMode::AnimationSweepDialog => "↑↓: field  ←/→: cycle  Type: value  Enter: generate  Esc: cancel",
+        InputMode::AnimationExportDialog => "↑↓: field  ←/→: cycle  Type: value  Enter: export  Esc: cancel",
+        InputMode::AnimationFrameDurationInput => "Type duration in ms  Enter: confirm  Esc: cancel",
     };
     let block = Block::default().title("Controls").borders(Borders::ALL);
     let paragraph = Paragraph::new(help).block(block);
@@ -259,7 +281,8 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
     let total = frame.area();
 
     let popup_width = total.width.min(62);
-    let popup_height = total.height.min(28);
+    // 46 lines: 15 global + 10 effects + 16 animation + borders/blank lines.
+    let popup_height = total.height.min(46);
     let x = (total.width.saturating_sub(popup_width)) / 2;
     let y = (total.height.saturating_sub(popup_height)) / 2;
     let popup_area = Rect::new(x, y, popup_width, popup_height);
@@ -281,8 +304,9 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
   ]             Increase preview resolution\n\
   v             Toggle side-by-side split view\n\
   H             Toggle live histogram overlay\n\
-  Tab           Toggle focus: Canvas ↔ Effects\n\
+  Tab           Toggle focus: Canvas ↔ Effects ↔ Animation\n\
   h             Open / close this help\n\
+  Ctrl+N        Toggle Animation panel\n\
 \n\
  EFFECTS PANEL  (requires Effects panel focus)\n\
   ↑ / k         Navigate up\n\
@@ -293,6 +317,22 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
   Space         Toggle selected effect on/off\n\
   K / Shift+↑   Move effect up in pipeline\n\
   J / Shift+↓   Move effect down in pipeline\n\
+\n\
+ ANIMATION PANEL  (Tab to focus)\n\
+  ← / →         Navigate frames\n\
+  c             Capture current pipeline as frame\n\
+  d / Delete    Delete selected frame\n\
+  Enter         Load frame pipeline back for editing\n\
+  Space         Play / pause\n\
+  f             Set frame duration (ms)\n\
+  F             Set ALL frames duration (ms)\n\
+  L             Toggle loop mode\n\
+  + / -         Increase / decrease fps\n\
+  K / Shift+↑   Move frame up\n\
+  J / Shift+↓   Move frame down\n\
+  s             Parameter sweep dialog\n\
+  Ctrl+E        Export animation (GIF/WebP)\n\
+  Esc           Unfocus animation panel\n\
 \n\
   Press h or Esc to close";
 
