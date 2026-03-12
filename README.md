@@ -33,10 +33,7 @@ PNG, JPEG, GIF, BMP
 
 ## Installation
 
-### Pre-built binaries
-
-
-### Installing from source
+### Installing from source (recommended)
 #### Prerequisites
 
 Before installing SpixelaTUIr, ensure you have the following dependencies installed:
@@ -52,6 +49,11 @@ cargo install --path .
 ```
 
 This will build the project in release mode and install the `spixelatuir` binary to `~/.cargo/bin`, making it available in your PATH.
+
+### Pre-built binaries
+
+Pre-build binaries are offered in the [Releases page](https://github.com/gioleppe/SpixelaTUIr/releases).
+Keep in mind that these might not be tested, and are not signed; it is recommended to build the project yourself for now!
 
 ## Effects
 
