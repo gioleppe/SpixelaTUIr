@@ -3,7 +3,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::sync::Mutex;
 
-const LOG_FILE: &str = "spixelatuir-debug.log";
+const LOG_FILE: &str = "spix-debug.log";
 
 /// Simple file-based logger for TUI applications (stdout/stderr are owned by the terminal).
 struct FileLogger {
@@ -40,7 +40,7 @@ impl Log for FileLogger {
     }
 }
 
-/// Initialise the file logger. Writes to `spixelatuir-debug.log` in the current directory.
+/// Initialise the file logger. Writes to `spix-debug.log` in the current directory.
 /// Returns `Ok(())` on success, or an error if the log file cannot be opened.
 pub fn init() -> anyhow::Result<()> {
     let file = OpenOptions::new()

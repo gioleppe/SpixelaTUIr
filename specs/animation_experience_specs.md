@@ -3,7 +3,7 @@
 ## 1. Overview
 
 This document defines the user experience, TUI layout, interaction model, and
-data structures for the **Animation Panel** feature in SpixelaTUIr. The goal is
+data structures for the **Animation Panel** feature in Spix. The goal is
 to let users build multi-frame animations where each frame is a variation of
 one or more effect parameters, then preview and export the result as an
 animated GIF or WebP.

@@ -20,7 +20,7 @@ fn main() -> Result<()> {
 
     if debug_mode {
         debug::init()?;
-        log::info!("SpixelaTUIr starting (debug mode)");
+        log::info!("Spix starting (debug mode)");
     }
 
     // Install panic hook to restore terminal state before printing the trace
@@ -49,7 +49,7 @@ fn main() -> Result<()> {
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
-    log::info!("SpixelaTUIr exiting");
+    log::info!("Spix exiting");
     result
 }
 
@@ -92,7 +92,7 @@ mod snapshot_tests {
             .collect::<Vec<_>>()
             .join("\n");
 
-        assert!(snapshot.contains("SpixelaTUIr"), "Should show app name");
+        assert!(snapshot.contains("Spix"), "Should show app name");
         assert!(snapshot.contains("Canvas"), "Should show Canvas panel");
         assert!(snapshot.contains("Effects"), "Should show Effects panel");
         assert!(snapshot.contains("Controls"), "Should show Controls panel");

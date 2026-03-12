@@ -32,7 +32,7 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
         String::new()
     };
 
-    let status = format!("SpixelaTUIr | {}{}{}", state.status_message, res_label, anim_label);
+    let status = format!("Spix | {}{}{}", state.status_message, res_label, anim_label);
     let paragraph =
         Paragraph::new(status).style(Style::default().fg(state.theme.text_normal).bg(state.theme.inactive_border));
     frame.render_widget(paragraph, area);

@@ -1,7 +1,7 @@
-# GEMINI.md - SpixelaTUIr
+# GEMINI.md - Spix
 
 ## Project Overview
-**SpixelaTUIr** is a high-performance, terminal-based image glitching and processing tool written in Rust. It allows users to apply a real-time chain of effects to images, with a live preview rendered directly in the terminal using the Sixel graphics protocol or ANSI half-block fallback.
+**Spix** is a high-performance, terminal-based image glitching and processing tool written in Rust. It allows users to apply a real-time chain of effects to images, with a live preview rendered directly in the terminal using the Sixel graphics protocol or ANSI half-block fallback.
 
 ### Key Technologies
 - **Language:** Rust (Edition 2024)

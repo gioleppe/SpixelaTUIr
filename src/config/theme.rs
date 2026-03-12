@@ -107,10 +107,10 @@ impl Theme {
     }
 
     /// Tries to load the theme from the default user configuration directory
-    /// (e.g. `~/.config/spixelatuir/theme.json`). Returns `Self::default()` if not found.
+    /// (e.g. `~/.config/spix/theme.json`). Returns `Self::default()` if not found.
     pub fn load_default() -> Self {
         if let Some(mut path) = dirs::config_dir() {
-            path.push("spixelatuir");
+            path.push("spix");
             path.push("theme.json");
             Self::load_from_path(&path)
         } else {

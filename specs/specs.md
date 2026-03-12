@@ -1,4 +1,4 @@
-# Image Glitch & Processing Tool (SpixelaTUIr) - Functional Specification
+# Image Glitch & Processing Tool (Spix) - Functional Specification
 
 ## 1. Core Architecture & I/O 
 The application acts as a real-time (or near real-time) node-based or iterative image processing pipeline, built in Rust to leverage memory safety and data parallelism.

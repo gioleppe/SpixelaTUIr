@@ -1,6 +1,6 @@
 # Suggested Improvements
 
-A collection of easy wins and cool feature ideas for SpixelaTUIr.
+A collection of easy wins and cool feature ideas for Spix.
 
 ---
 
@@ -47,7 +47,7 @@ corner of the canvas area.  Uses the already-available `preview_buffer`
 pixel data – no extra processing thread needed.
 
 ### 9. Named pipeline presets / bookmarks
-Add a `presets/` directory to the user's config folder (`~/.config/spixelatuir/presets/`)
+Add a `presets/` directory to the user's config folder (`~/.config/spix/presets/`)
 and expose a quick-pick menu (similar to `AddEffect`) for loading common
 pipeline combinations with a single keypress.
 

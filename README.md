@@ -1,26 +1,28 @@
-# ⚡ SpixelaTUIr
+# ⚡ Spix
 
-![SpixelaTUIr](./readme_assets/pc_on_fire_out.png)
+Spix, short for SpixelaTUIr *(pronounced "speex-eh-lah-tweer")*.
+
+![Spix](./readme_assets/pc_on_fire_out.png)
 
 **Unleash your inner glitch artist directly in your terminal!** 🎨✨
 
-SpixelaTUIr is a high-performance, terminal-based image glitching and processing powerhouse. Built with Rust for maximum speed, it lets you craft stunning digital hallucinations through a real-time, interactive TUI. 
+Spix is a high-performance, terminal-based image glitching and processing powerhouse. Built with Rust for maximum speed, it lets you craft stunning digital hallucinations through a real-time, interactive TUI. 
 
-Whether you're looking to create retro CRT aesthetics, mind-bending pixel sorts, or smooth parameter-swept animations, SpixelaTUIr puts the power of creative destruction right at your fingertips.
+Whether you're looking to create retro CRT aesthetics, mind-bending pixel sorts, or smooth parameter-swept animations, Spix puts the power of creative destruction right at your fingertips.
 
 ---
 
-## 🔥 Why SpixelaTUIr?
+## 🔥 Why Spix?
 
-- **🚀 Blazing Fast Live Preview:** Witness your changes in real-time! Leveraging the Sixel graphics protocol, SpixelaTUIr renders high-fidelity previews directly in your terminal.
+- **🚀 Blazing Fast Live Preview:** Witness your changes in real-time! Leveraging the Sixel graphics protocol, Spix renders high-fidelity previews directly in your terminal.
 - **🛠️ Powerful Effect Stacking:** Build complex, multi-layered visual pipelines. Mix and match color manipulation, spatial glitches, and retro overlays to find your perfect aesthetic.
 - **✨ Instant Inspiration:** Hit `r` to randomize your entire pipeline and discover unexpected visual magic.
 - **🎞️ Animation Engine:** Go beyond static images! Capture frames or use the **Automatic Parameter Sweep** to generate hypnotic GIFs and WebP animations.
-- **🎨 Custom UI Themes:** Essential for **Linux Ricers**! Fully customize the application's color palette via `~/.config/spixelatuir/theme.json` to seamlessly integrate with your meticulously crafted Catppuccin, Nord, or Gruvbox desktop environments.
+- **🎨 Custom UI Themes:** Essential for **Linux Ricers**! Fully customize the application's color palette via `~/.config/spix/theme.json` to seamlessly integrate with your meticulously crafted Catppuccin, Nord, or Gruvbox desktop environments.
 - **⌨️ Keyboard-Centric Workflow:** Designed for speed. Everything is a keypress away—no mouse required.
-- **🧩 TWM Ready:** **Looks and feels incredible in Tiling Window Managers!** Whether you use `i3`, `sway`, `hyprland`, or `tmux`, SpixelaTUIr's responsive layout and keyboard-driven interface make it the ultimate aesthetic companion for your terminal setup.
+- **🧩 TWM Ready:** **Looks and feels incredible in Tiling Window Managers!** Whether you use `i3`, `sway`, `hyprland`, or `tmux`, Spix's responsive layout and keyboard-driven interface make it the ultimate aesthetic companion for your terminal setup.
 
-![SpixelaTUIr Example](./readme_assets/spixelatuir_example.png)
+![Spix Example](./readme_assets/spixelatuir_example.png)
 
 ---
 
@@ -73,7 +75,7 @@ cargo install --path .
 
 ## 🏗️ Architecture
 
-SpixelaTUIr is built for responsiveness. It uses a **multi-threaded architecture** where the UI remains buttery smooth while a dedicated worker thread handles the heavy image processing math.
+Spix is built for responsiveness. It uses a **multi-threaded architecture** where the UI remains buttery smooth while a dedicated worker thread handles the heavy image processing math.
 
 - **Main Thread:** Handles input, state management, and Sixel rendering.
 - **Worker Thread:** Executes the effect pipeline and exports high-res assets.
@@ -88,7 +90,7 @@ flowchart LR
 
 ## 🤝 Contributing & Community
 
-SpixelaTUIr is an open-source labor of love. We cherish every contribution! 
+Spix is an open-source labor of love. We cherish every contribution! 
 - Found a bug? Open an **Issue**.
 - Want a new effect? Send a **Pull Request**.
 - Just want to chat? Visit **[gioleppe.github.io](https://gioleppe.github.io/)**.
@@ -97,6 +99,6 @@ SpixelaTUIr is an open-source labor of love. We cherish every contribution!
 
 ## ⚠️ Disclaimer & License
 
-*SpixelaTUIr is a GenAI-driven project built to explore agent-handling skills and creative coding. Don't take it too seriously—just have fun glitching!*
+*Spix is a GenAI-driven project built to explore agent-handling skills and creative coding. Don't take it too seriously—just have fun glitching!*
 
 Licensed under the [MIT License](LICENSE).
