@@ -112,6 +112,10 @@ where
                     state.status_message =
                         format!("Sweep complete: {count} frame{} generated.", if count == 1 { "" } else { "s" });
                 }
+                WorkerResponse::FileBrowserPreview(img) => {
+                    log::debug!("Received file-browser preview ({}x{})", img.width(), img.height());
+                    state.file_browser_preview = Some(state.picker.new_resize_protocol(img));
+                }
                 WorkerResponse::Exported(path) => {
                     log::info!("Export complete: {}", path.display());
                     state.status_message = format!("Exported → {}", path.display());

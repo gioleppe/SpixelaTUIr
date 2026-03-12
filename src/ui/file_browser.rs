@@ -1,10 +1,11 @@
 use ratatui::{
     Frame,
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
 };
+use ratatui_image::{Resize, StatefulImage};
 
 use crate::app::{
     AppState, FILE_BROWSER_HINT, FileBrowserEntry, FileBrowserPurpose, InputMode,
@@ -12,7 +13,7 @@ use crate::app::{
 };
 
 /// Render the floating file-browser modal over the whole terminal area.
-pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
+pub fn render_file_browser_modal(frame: &mut Frame, state: &mut AppState) {
     if state.input_mode != InputMode::FileBrowser {
         return;
     }
@@ -24,8 +25,15 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
 
     let total = frame.area();
 
-    // Centre a popup that is 70% wide and 70% tall, with minimum dimensions.
-    let popup_width = (total.width * 7 / 10).max(50).min(total.width);
+    // For the OpenImage browser we widen the popup to accommodate the preview
+    // pane; for pipeline loading we keep the compact layout.
+    let is_open_image = fb.purpose == FileBrowserPurpose::OpenImage;
+
+    let popup_width = if is_open_image {
+        (total.width * 85 / 100).max(70).min(total.width)
+    } else {
+        (total.width * 7 / 10).max(50).min(total.width)
+    };
     let popup_height = (total.height * 7 / 10).max(10).min(total.height);
     let x = (total.width.saturating_sub(popup_width)) / 2;
     let y = (total.height.saturating_sub(popup_height)) / 2;
@@ -54,6 +62,115 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
         return;
     }
 
+    if is_open_image {
+        render_open_image_layout(frame, state, inner_x, inner_y, inner_width, inner_height);
+    } else {
+        render_pipeline_layout(frame, state, inner_x, inner_y, inner_width, inner_height);
+    }
+}
+
+/// Layout for the "Open Image" browser: file list on the left, image preview
+/// on the right.
+fn render_open_image_layout(
+    frame: &mut Frame,
+    state: &mut AppState,
+    inner_x: u16,
+    inner_y: u16,
+    inner_width: u16,
+    inner_height: u16,
+) {
+    let fb = match state.file_browser.as_ref() {
+        Some(fb) => fb,
+        None => return,
+    };
+
+    // Split the inner area into list (left 60%) and preview (right 40%).
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .split(Rect::new(inner_x, inner_y, inner_width, inner_height));
+
+    let list_area = columns[0];
+    let preview_area = columns[1];
+
+    // ── Left: path + file list + footer ─────────────────────────────────────
+    let list_x = list_area.x;
+    let list_y = list_area.y;
+    let list_width = list_area.width;
+    let list_height_total = list_area.height;
+
+    // Current directory path line.
+    let path_text = fb.cwd.display().to_string();
+    let path_area = Rect::new(list_x, list_y, list_width, 1);
+    let path_paragraph = Paragraph::new(path_text).style(
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    );
+    frame.render_widget(path_paragraph, path_area);
+
+    if list_height_total < 4 {
+        return;
+    }
+
+    // File list occupies: total minus 1 path row, 1 blank separator, 1 footer.
+    let file_list_height = list_height_total.saturating_sub(3);
+    let file_list_area = Rect::new(list_x, list_y + 2, list_width, file_list_height);
+
+    let offset = scroll_offset(fb.cursor, file_list_height as usize);
+    let items = build_list_items(fb, offset, file_list_height as usize, list_width);
+
+    let list = List::new(items);
+    frame.render_widget(list, file_list_area);
+
+    // Footer hint.
+    let footer_y = list_y + list_height_total - 1;
+    let footer_area = Rect::new(list_x, footer_y, list_width, 1);
+    let footer = Paragraph::new(FILE_BROWSER_HINT).style(Style::default().fg(Color::DarkGray));
+    frame.render_widget(footer, footer_area);
+
+    // ── Right: image preview pane ────────────────────────────────────────────
+    let preview_block = Block::default()
+        .title(" Preview ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray));
+    let preview_inner = preview_block.inner(preview_area);
+    frame.render_widget(preview_block, preview_area);
+
+    if let Some(ref mut protocol) = state.file_browser_preview {
+        let image_widget = StatefulImage::default().resize(Resize::Fit(None));
+        frame.render_stateful_widget(image_widget, preview_inner, protocol);
+    } else {
+        // Check whether the cursor is on a directory (no preview expected) or
+        // an image file that is still loading.
+        let is_image = state
+            .file_browser
+            .as_ref()
+            .and_then(|fb| fb.entries.get(fb.cursor))
+            .map(|e| matches!(e, FileBrowserEntry::ImageFile(..)))
+            .unwrap_or(false);
+
+        let msg = if is_image { "Loading preview…" } else { "No preview" };
+        let placeholder =
+            Paragraph::new(msg).style(Style::default().fg(Color::DarkGray));
+        frame.render_widget(placeholder, preview_inner);
+    }
+}
+
+/// Original compact layout used for pipeline loading (no preview pane).
+fn render_pipeline_layout(
+    frame: &mut Frame,
+    state: &AppState,
+    inner_x: u16,
+    inner_y: u16,
+    inner_width: u16,
+    inner_height: u16,
+) {
+    let fb = match state.file_browser.as_ref() {
+        Some(fb) => fb,
+        None => return,
+    };
+
     // Current directory path line.
     let path_text = fb.cwd.display().to_string();
     let path_area = Rect::new(inner_x, inner_y, inner_width, 1);
@@ -76,13 +193,33 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
     // Compute scroll offset so the cursor stays visible.
     let offset = scroll_offset(fb.cursor, list_height as usize);
 
-    // Build list items.
-    let items: Vec<ListItem> = fb
-        .entries
+    let items = build_list_items(fb, offset, list_height as usize, inner_width);
+    let list = List::new(items);
+    frame.render_widget(list, list_area);
+
+    // Footer hint.
+    let footer_y = inner_y + inner_height - 1;
+    let footer_area = Rect::new(inner_x, footer_y, inner_width, 1);
+    let hint = match fb.purpose {
+        FileBrowserPurpose::OpenImage => FILE_BROWSER_HINT,
+        FileBrowserPurpose::LoadPipeline => PIPELINE_BROWSER_HINT,
+    };
+    let footer = Paragraph::new(hint).style(Style::default().fg(Color::DarkGray));
+    frame.render_widget(footer, footer_area);
+}
+
+/// Build the list items for the visible window of the file browser.
+fn build_list_items<'a>(
+    fb: &crate::app::file_browser::FileBrowserState,
+    offset: usize,
+    visible: usize,
+    column_width: u16,
+) -> Vec<ListItem<'a>> {
+    fb.entries
         .iter()
         .enumerate()
         .skip(offset)
-        .take(list_height as usize)
+        .take(visible)
         .map(|(i, entry)| {
             let is_selected = i == fb.cursor;
             let (prefix, display_name, fg) = match entry {
@@ -103,7 +240,7 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
                         "{:<width$} {:>8}",
                         name,
                         size_str,
-                        width = (inner_width as usize).saturating_sub(12)
+                        width = (column_width as usize).saturating_sub(12)
                     );
                     ("▶ ", padded, Color::White)
                 }
@@ -124,20 +261,7 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &AppState) {
             ]);
             ListItem::new(line)
         })
-        .collect();
-
-    let list = List::new(items);
-    frame.render_widget(list, list_area);
-
-    // Footer hint.
-    let footer_y = inner_y + inner_height - 1;
-    let footer_area = Rect::new(inner_x, footer_y, inner_width, 1);
-    let hint = match fb.purpose {
-        FileBrowserPurpose::OpenImage => FILE_BROWSER_HINT,
-        FileBrowserPurpose::LoadPipeline => PIPELINE_BROWSER_HINT,
-    };
-    let footer = Paragraph::new(hint).style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(footer, footer_area);
+        .collect()
 }
 
 /// Compute scroll offset so cursor remains in the visible window.

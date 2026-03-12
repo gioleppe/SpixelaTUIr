@@ -30,6 +30,7 @@ PNG, JPEG, GIF, BMP
 - **Per-effect enable/disable** — toggle individual effects on/off with `Space` in the Effects panel without removing them, for quick A/B comparisons; disabled effects are shown in grey with a `✗` indicator
 - **Side-by-side split view** — press `v` to divide the canvas horizontally, showing the original (before) on the left and the processed preview (after) on the right
 - **Live histogram overlay** — press `H` to display a compact luminance histogram in the top-right corner of the canvas, computed from the current preview buffer with no extra processing thread
+- **File-browser image preview** — when the "Open Image" file picker is open, a live thumbnail preview of the highlighted image is shown in a right-side panel; the thumbnail loads asynchronously via the worker thread so the UI stays responsive
 
 ## Installation
 

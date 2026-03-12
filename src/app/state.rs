@@ -77,6 +77,9 @@ pub struct AppState {
     /// ratatui-image stateful protocol for displaying the original (pre-effects) proxy.
     /// Only populated when `split_view` is active and an image is loaded.
     pub original_image_protocol: Option<StatefulProtocol>,
+    /// ratatui-image stateful protocol for the file-browser thumbnail preview.
+    /// Populated while the file-browser modal is open and an image entry is highlighted.
+    pub file_browser_preview: Option<StatefulProtocol>,
     /// The screen area that `image_protocol` was last rendered into.
     ///
     /// Stored so that `set_preview` can immediately pre-encode the replacement
@@ -148,6 +151,7 @@ impl AppState {
             show_histogram: false,
             split_view: false,
             original_image_protocol: None,
+            file_browser_preview: None,
             image_protocol_last_area: None,
             animation: AnimationTimeline::default(),
             animation_panel_open: false,
@@ -207,6 +211,19 @@ impl AppState {
                 response_tx: self.worker_resp_tx.clone(),
             });
         }
+    }
+
+    /// Request a thumbnail for `path` from the worker thread, to populate
+    /// the file-browser preview pane.  Any previous preview is cleared
+    /// immediately so stale images are never shown while the new one loads.
+    pub fn dispatch_file_browser_preview(&mut self, path: std::path::PathBuf) {
+        self.file_browser_preview = None;
+        let _ = self.worker_tx.send(
+            crate::engine::worker::WorkerCommand::LoadFileBrowserPreview {
+                path,
+                response_tx: self.worker_resp_tx.clone(),
+            },
+        );
     }
 
     /// Re-scale the proxy from `source_asset` at the current resolution tier and
