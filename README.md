@@ -36,7 +36,7 @@ PNG, JPEG, GIF, BMP
 ### Installing from source (recommended)
 #### Prerequisites
 
-Before installing SpixelaTUIr, ensure you have the following dependencies installed:
+Before building SpixelaTUIr from source, ensure you have the following dependencies installed:
 
 - **Rust (stable)**: Install from [rustup.rs](https://rustup.rs/)
 
@@ -55,7 +55,9 @@ This will build the project in release mode and install the `spixelatuir` binary
 ### Pre-built binaries
 
 Pre-build binaries are offered in the [Releases page](https://github.com/gioleppe/SpixelaTUIr/releases).
-Keep in mind that these might not be tested, and are not signed; it is recommended to build the project yourself for now!
+Keep in mind that these might not be tested.
+
+You need a [sixel](https://rioterm.com/docs/features/sixel-protocol)-compatible terminal emulator to run SpixelaTUIr correctly. Windows Terminal (Win) and [Ghostty](https://ghostty.org/) (macOS, Linux) are both good choices. 
 
 ## Effects
 
