@@ -91,7 +91,7 @@ fn render_open_image_layout(
     // Split the inner area into list (left 35%) and preview (right 65%).
     let columns = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
+        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
         .split(Rect::new(inner_x, inner_y, inner_width, inner_height));
 
     let list_area = columns[0];
@@ -141,16 +141,20 @@ fn render_open_image_layout(
     let preview_inner = preview_block.inner(preview_area);
     frame.render_widget(preview_block, preview_area);
 
+    // Compute the padded render rect and cache it so the next dispatch knows
+    // which thumbnail resolution to request.
+    let padded = Rect::new(
+        preview_inner.x + 1,
+        preview_inner.y + 1,
+        preview_inner.width.saturating_sub(2),
+        preview_inner.height.saturating_sub(2),
+    );
+    state.file_browser_padded_area = Some(padded);
+
     if let Some(ref mut protocol) = state.file_browser_preview {
-        // Add a 1-cell margin on all sides so the image is centered with
-        // breathing room inside the preview block.
-        let padded = Rect::new(
-            preview_inner.x + 1,
-            preview_inner.y + 1,
-            preview_inner.width.saturating_sub(2),
-            preview_inner.height.saturating_sub(2),
-        );
-        let image_widget = StatefulImage::default().resize(Resize::Fit(None));
+        // Scale the thumbnail to fill the padded area (Scale upscales if the
+        // thumbnail is smaller than the pane, unlike Fit which only downscales).
+        let image_widget = StatefulImage::default().resize(Resize::Scale(None));
         frame.render_stateful_widget(image_widget, padded, protocol);
     } else {
         // Check whether the cursor is on a directory (no preview expected) or

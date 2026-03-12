@@ -80,6 +80,9 @@ pub struct AppState {
     /// ratatui-image stateful protocol for the file-browser thumbnail preview.
     /// Populated while the file-browser modal is open and an image entry is highlighted.
     pub file_browser_preview: Option<StatefulProtocol>,
+    /// The padded cell area used to render the file-browser preview image on the last frame.
+    /// Stored so `dispatch_file_browser_preview` can pick the right thumbnail resolution.
+    pub file_browser_padded_area: Option<Rect>,
     /// The screen area that `image_protocol` was last rendered into.
     ///
     /// Stored so that `set_preview` can immediately pre-encode the replacement
@@ -152,6 +155,7 @@ impl AppState {
             split_view: false,
             original_image_protocol: None,
             file_browser_preview: None,
+            file_browser_padded_area: None,
             image_protocol_last_area: None,
             animation: AnimationTimeline::default(),
             animation_panel_open: false,
@@ -218,9 +222,25 @@ impl AppState {
     /// immediately so stale images are never shown while the new one loads.
     pub fn dispatch_file_browser_preview(&mut self, path: std::path::PathBuf) {
         self.file_browser_preview = None;
+        // Pick the smallest PROXY_RESOLUTION that is >= the preview pane's pixel
+        // dimensions so the thumbnail fills the box without unnecessary overhead.
+        let target_size = self
+            .file_browser_padded_area
+            .map(|area| {
+                let (cw, ch) = self.picker.font_size();
+                let px_w = (area.width as u32) * (cw as u32);
+                let px_h = (area.height as u32) * (ch as u32);
+                let need = px_w.max(px_h);
+                *PROXY_RESOLUTIONS
+                    .iter()
+                    .find(|&&r| r >= need)
+                    .unwrap_or(PROXY_RESOLUTIONS.last().unwrap())
+            })
+            .unwrap_or(512);
         let _ = self.worker_tx.send(
             crate::engine::worker::WorkerCommand::LoadFileBrowserPreview {
                 path,
+                target_size,
                 response_tx: self.worker_resp_tx.clone(),
             },
         );

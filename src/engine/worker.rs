@@ -46,6 +46,8 @@ pub enum WorkerCommand {
     /// Load a thumbnail of the file at `path` for the file-browser preview pane.
     LoadFileBrowserPreview {
         path: std::path::PathBuf,
+        /// Maximum edge length (px) for the thumbnail, chosen to fill the pane.
+        target_size: u32,
         response_tx: Sender<WorkerResponse>,
     },
     /// Shut down the worker thread.
@@ -206,12 +208,12 @@ pub fn run(rx: Receiver<WorkerCommand>) {
                     }
                 }
             }
-            WorkerCommand::LoadFileBrowserPreview { path, response_tx } => {
+            WorkerCommand::LoadFileBrowserPreview { path, target_size, response_tx } => {
                 log::debug!("Worker: loading file-browser preview for {}", path.display());
                 match image::open(&path) {
                     Ok(img) => {
-                        // Downscale to a compact thumbnail for the preview pane.
-                        let thumb = img.thumbnail(256, 256);
+                        // Downscale to the requested size so the thumbnail fills the pane.
+                        let thumb = img.thumbnail(target_size, target_size);
                         let _ = response_tx.send(WorkerResponse::FileBrowserPreview(thumb));
                     }
                     Err(e) => {
