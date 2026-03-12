@@ -56,6 +56,7 @@ pub fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifier
             let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
             state.file_browser = Some(FileBrowserState::new(cwd, FileBrowserPurpose::OpenImage));
             state.input_mode = InputMode::FileBrowser;
+            dispatch_file_browser_preview_for_cursor(state);
         }
         KeyCode::Tab => {
             state.focused_panel = match state.focused_panel {
@@ -267,6 +268,7 @@ pub fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifier
             let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
             state.file_browser = Some(FileBrowserState::new(cwd, FileBrowserPurpose::LoadPipeline));
             state.input_mode = InputMode::FileBrowser;
+            dispatch_file_browser_preview_for_cursor(state);
         }
         // Clear all effects with a confirmation prompt (Ctrl+D).
         KeyCode::Char('d') if modifiers.contains(KeyModifiers::CONTROL) => {
@@ -437,22 +439,27 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
         KeyCode::Esc => {
             state.input_mode = InputMode::Normal;
             state.file_browser = None;
+            state.file_browser_preview = None;
             state.status_message = "Cancelled.".to_string();
         }
         KeyCode::Up | KeyCode::Char('k') => {
             if let Some(ref mut fb) = state.file_browser {
                 fb.move_up();
             }
+            dispatch_file_browser_preview_for_cursor(state);
         }
         KeyCode::Down | KeyCode::Char('j') => {
             if let Some(ref mut fb) = state.file_browser {
                 fb.move_down();
             }
+            dispatch_file_browser_preview_for_cursor(state);
         }
         KeyCode::Backspace | KeyCode::Char('-') => {
             if let Some(ref mut fb) = state.file_browser {
                 fb.go_up();
             }
+            // After navigating up, reset preview for new cursor position.
+            dispatch_file_browser_preview_for_cursor(state);
         }
         KeyCode::Enter => {
             // Clone what we need first to avoid the borrow-checker conflict.
@@ -466,10 +473,13 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
                     if let Some(ref mut fb) = state.file_browser {
                         fb.enter_dir();
                     }
+                    // After descending into a directory, update the preview.
+                    dispatch_file_browser_preview_for_cursor(state);
                 }
                 Some(FileBrowserEntry::ImageFile(path, _)) => {
                     state.input_mode = InputMode::Normal;
                     state.file_browser = None;
+                    state.file_browser_preview = None;
                     match purpose {
                         Some(FileBrowserPurpose::LoadPipeline) => {
                             match crate::config::parser::load_pipeline(&path) {
@@ -505,6 +515,37 @@ fn handle_file_browser(state: &mut AppState, code: KeyCode) {
             }
         }
         _ => {}
+    }
+}
+
+/// If the file browser cursor currently points at an image file **and the
+/// browser was opened for image selection**, dispatch a thumbnail-load request
+/// to the worker thread.  Otherwise clear any stale preview so the panel shows
+/// the "no preview" placeholder instead.
+fn dispatch_file_browser_preview_for_cursor(state: &mut AppState) {
+    // Only load thumbnails when the browser is in OpenImage mode; the pipeline
+    // browser does not show a preview pane so there is no need to dispatch.
+    let is_open_image = state
+        .file_browser
+        .as_ref()
+        .map(|fb| fb.purpose == FileBrowserPurpose::OpenImage)
+        .unwrap_or(false);
+
+    if !is_open_image {
+        return;
+    }
+
+    let entry = state
+        .file_browser
+        .as_ref()
+        .and_then(|fb| fb.entries.get(fb.cursor).cloned());
+    match entry {
+        Some(FileBrowserEntry::ImageFile(path, _)) => {
+            state.dispatch_file_browser_preview(path);
+        }
+        _ => {
+            state.file_browser_preview = None;
+        }
     }
 }
 

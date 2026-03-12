@@ -43,6 +43,11 @@ pub enum WorkerCommand {
         loop_anim: bool,
         response_tx: Sender<WorkerResponse>,
     },
+    /// Load a thumbnail of the file at `path` for the file-browser preview pane.
+    LoadFileBrowserPreview {
+        path: std::path::PathBuf,
+        response_tx: Sender<WorkerResponse>,
+    },
     /// Shut down the worker thread.
     Quit,
 }
@@ -51,6 +56,8 @@ pub enum WorkerCommand {
 pub enum WorkerResponse {
     /// A processed frame ready for display.
     ProcessedFrame(image::DynamicImage),
+    /// A thumbnail ready for the file-browser preview pane.
+    FileBrowserPreview(image::DynamicImage),
     /// A single animation frame has been rendered.
     AnimationFrameReady {
         frame_idx: usize,
@@ -196,6 +203,20 @@ pub fn run(rx: Receiver<WorkerCommand>) {
                     Err(e) => {
                         log::error!("Worker: animation export failed: {e}");
                         let _ = response_tx.send(WorkerResponse::Error(e.to_string()));
+                    }
+                }
+            }
+            WorkerCommand::LoadFileBrowserPreview { path, response_tx } => {
+                log::debug!("Worker: loading file-browser preview for {}", path.display());
+                match image::open(&path) {
+                    Ok(img) => {
+                        // Downscale to a compact thumbnail for the preview pane.
+                        let thumb = img.thumbnail(256, 256);
+                        let _ = response_tx.send(WorkerResponse::FileBrowserPreview(thumb));
+                    }
+                    Err(e) => {
+                        log::debug!("Worker: could not load preview for {}: {e}", path.display());
+                        // Silently ignore -- the UI will keep any existing placeholder.
                     }
                 }
             }
