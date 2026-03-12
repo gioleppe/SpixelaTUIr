@@ -114,6 +114,8 @@ pub struct AppState {
     /// When `true`, the pending duration input (`f` edit) applies to all frames.
     /// When `false`, it applies only to `animation.selected`.
     pub frame_duration_input_all: bool,
+    /// The custom UI theme configuration.
+    pub theme: crate::config::theme::Theme,
 }
 
 impl AppState {
@@ -166,6 +168,7 @@ impl AppState {
             sweep_dialog: SweepDialogState::default(),
             frame_duration_input: String::new(),
             frame_duration_input_all: false,
+            theme: crate::config::theme::Theme::load_default(),
         }
     }
 

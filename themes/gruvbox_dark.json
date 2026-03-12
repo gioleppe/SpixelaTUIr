@@ -1,0 +1,15 @@
+{
+  "active_border": "#d79921",
+  "inactive_border": "#928374",
+  "text_normal": "#ebdbb2",
+  "text_dimmed": "#a89984",
+  "selection_bg": "#d79921",
+  "selection_fg": "#282828",
+  "selection_inactive_bg": "#fabd2f",
+  "directory": "#458588",
+  "error_border": "#cc241d",
+  "success_border": "#98971a",
+  "warning_border": "#d79921",
+  "accent_1": "#b16286",
+  "accent_2": "#689d6a"
+}

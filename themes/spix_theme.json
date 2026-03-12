@@ -1,0 +1,15 @@
+{
+  "active_border": "Cyan",
+  "inactive_border": "DarkGray",
+  "text_normal": "White",
+  "text_dimmed": "DarkGray",
+  "selection_bg": "Cyan",
+  "selection_fg": "Black",
+  "selection_inactive_bg": "Yellow",
+  "directory": "Blue",
+  "error_border": "Red",
+  "success_border": "Green",
+  "warning_border": "Yellow",
+  "accent_1": "Magenta",
+  "accent_2": "Cyan"
+}

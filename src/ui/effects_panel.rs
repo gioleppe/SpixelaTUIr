@@ -1,7 +1,7 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
 };
@@ -13,9 +13,9 @@ use crate::effects::color;
 pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
     let is_focused = state.focused_panel == FocusedPanel::EffectsList;
     let border_style = if is_focused {
-        Style::default().fg(Color::Yellow)
+        Style::default().fg(state.theme.active_border)
     } else {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(state.theme.inactive_border)
     };
 
     let effect_count = state.pipeline.effects.len();
@@ -35,7 +35,7 @@ pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
         } else {
             "No effects.\nTab to focus."
         };
-        let p = Paragraph::new(hint).style(Style::default().fg(Color::DarkGray));
+        let p = Paragraph::new(hint).style(Style::default().fg(state.theme.text_dimmed));
         frame.render_widget(p, inner);
         return;
     }
@@ -52,20 +52,20 @@ pub fn render_effects_panel(frame: &mut Frame, area: Rect, state: &AppState) {
             let style = if selected && state.dragging_effect {
                 // Distinct "dragging" highlight: cyan background.
                 Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
+                    .fg(state.theme.selection_fg)
+                    .bg(state.theme.selection_bg)
                     .add_modifier(Modifier::BOLD)
             } else if selected {
                 Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Yellow)
+                    .fg(state.theme.selection_fg)
+                    .bg(state.theme.selection_inactive_bg)
                     .add_modifier(Modifier::BOLD)
             } else if !enabled {
                 Style::default()
-                    .fg(Color::DarkGray)
+                    .fg(state.theme.text_dimmed)
                     .add_modifier(Modifier::DIM)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(state.theme.text_normal)
             };
             let prefix = if selected { "▶ " } else { "  " };
             let suffix = if selected && is_focused && state.pipeline.effects.len() > 1 {
@@ -110,7 +110,7 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
     let block = Block::default()
         .title("Add Effect (Enter / Esc)")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(Style::default().fg(state.theme.active_border));
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
@@ -121,11 +121,11 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
             let selected = i == state.add_effect_cursor;
             let style = if selected {
                 Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
+                    .fg(state.theme.selection_fg)
+                    .bg(state.theme.selection_bg)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(state.theme.text_normal)
             };
             let prefix = if selected { "▶ " } else { "  " };
             ListItem::new(Line::from(vec![
@@ -174,7 +174,7 @@ pub fn render_edit_effect_modal(frame: &mut Frame, state: &AppState) {
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Magenta));
+        .border_style(Style::default().fg(state.theme.accent_1));
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
@@ -189,11 +189,11 @@ pub fn render_edit_effect_modal(frame: &mut Frame, state: &AppState) {
             let value_str = state.edit_params.get(i).cloned().unwrap_or_default();
             let style = if focused {
                 Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Magenta)
+                    .fg(state.theme.selection_fg)
+                    .bg(state.theme.accent_1)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(state.theme.text_normal)
             };
             let mut value_display = if focused {
                 format!("[ {value_str}_ ]")
@@ -223,6 +223,6 @@ pub fn render_edit_effect_modal(frame: &mut Frame, state: &AppState) {
     frame.render_widget(list, chunks[0]);
 
     let footer =
-        Paragraph::new("  Enter: apply   Esc: cancel").style(Style::default().fg(Color::DarkGray));
+        Paragraph::new("  Enter: apply   Esc: cancel").style(Style::default().fg(state.theme.text_dimmed));
     frame.render_widget(footer, chunks[1]);
 }

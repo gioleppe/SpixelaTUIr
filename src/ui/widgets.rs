@@ -1,7 +1,7 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     widgets::{Block, Borders, Clear, Paragraph},
 };
 
@@ -34,7 +34,7 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
 
     let status = format!("SpixelaTUIr | {}{}{}", state.status_message, res_label, anim_label);
     let paragraph =
-        Paragraph::new(status).style(Style::default().fg(Color::White).bg(Color::DarkGray));
+        Paragraph::new(status).style(Style::default().fg(state.theme.text_normal).bg(state.theme.inactive_border));
     frame.render_widget(paragraph, area);
 }
 
@@ -94,10 +94,10 @@ pub fn render_path_input(frame: &mut Frame, state: &AppState) {
     let block = Block::default()
         .title("Open image (Enter to load, Esc to cancel)")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(state.theme.warning_border));
     let paragraph = Paragraph::new(display_text).block(block).style(
         Style::default()
-            .fg(Color::White)
+            .fg(state.theme.text_normal)
             .add_modifier(Modifier::BOLD),
     );
     frame.render_widget(paragraph, popup_area);
@@ -123,7 +123,7 @@ pub fn render_export_dialog(frame: &mut Frame, state: &AppState) {
     let outer_block = Block::default()
         .title(" Export Image ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(Style::default().fg(state.theme.active_border));
     frame.render_widget(outer_block, popup_area);
 
     // Inner area (inside the border).
@@ -153,11 +153,11 @@ pub fn render_export_dialog(frame: &mut Frame, state: &AppState) {
     let field_style = |idx: usize| {
         if dialog.focused_field == idx {
             Style::default()
-                .fg(Color::Black)
-                .bg(Color::Cyan)
+                .fg(state.theme.selection_fg)
+                .bg(state.theme.selection_bg)
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(state.theme.text_normal)
         }
     };
 
@@ -185,7 +185,7 @@ pub fn render_export_dialog(frame: &mut Frame, state: &AppState) {
         .to_string();
     let preview = format!("  Output:    {preview_path}");
     frame.render_widget(
-        Paragraph::new(preview).style(Style::default().fg(Color::DarkGray)),
+        Paragraph::new(preview).style(Style::default().fg(state.theme.text_dimmed)),
         rows[4],
     );
 }
@@ -213,7 +213,7 @@ pub fn render_save_pipeline_dialog(frame: &mut Frame, state: &AppState) {
     let outer_block = Block::default()
         .title(" Save Pipeline (JSON) ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Green));
+        .border_style(Style::default().fg(state.theme.success_border));
     frame.render_widget(outer_block, popup_area);
 
     // Inner area (inside the border).
@@ -241,11 +241,11 @@ pub fn render_save_pipeline_dialog(frame: &mut Frame, state: &AppState) {
     let field_style = |idx: usize| {
         if dialog.focused_field == idx {
             Style::default()
-                .fg(Color::Black)
-                .bg(Color::Green)
+                .fg(state.theme.selection_fg)
+                .bg(state.theme.success_border)
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(state.theme.text_normal)
         }
     };
 
@@ -267,7 +267,7 @@ pub fn render_save_pipeline_dialog(frame: &mut Frame, state: &AppState) {
         .to_string();
     let preview = format!("  Output:    {preview_path}");
     frame.render_widget(
-        Paragraph::new(preview).style(Style::default().fg(Color::DarkGray)),
+        Paragraph::new(preview).style(Style::default().fg(state.theme.text_dimmed)),
         rows[3],
     );
 }
@@ -339,7 +339,7 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
     let block = Block::default()
         .title(" Help – Keyboard Shortcuts ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(state.theme.warning_border));
     let paragraph = Paragraph::new(help_text).block(block);
     frame.render_widget(paragraph, popup_area);
 }
@@ -363,7 +363,7 @@ pub fn render_quit_confirm_modal(frame: &mut Frame, state: &AppState) {
     let outer_block = Block::default()
         .title("  ⚠  Unsaved Changes  ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
+        .border_style(Style::default().fg(state.theme.error_border).add_modifier(Modifier::BOLD));
     frame.render_widget(outer_block, popup_area);
 
     let inner = Rect::new(
@@ -386,12 +386,12 @@ pub fn render_quit_confirm_modal(frame: &mut Frame, state: &AppState) {
 
     let warning = Paragraph::new("  You have unsaved pipeline changes.").style(
         Style::default()
-            .fg(Color::Yellow)
+            .fg(state.theme.warning_border)
             .add_modifier(Modifier::BOLD),
     );
     frame.render_widget(warning, rows[1]);
 
     let hints = Paragraph::new("  [y] Quit  [n] Cancel  [s] Save & stay")
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(state.theme.text_normal));
     frame.render_widget(hints, rows[3]);
 }

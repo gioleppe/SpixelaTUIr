@@ -16,6 +16,7 @@ Whether you're looking to create retro CRT aesthetics, mind-bending pixel sorts,
 - **🛠️ Powerful Effect Stacking:** Build complex, multi-layered visual pipelines. Mix and match color manipulation, spatial glitches, and retro overlays to find your perfect aesthetic.
 - **✨ Instant Inspiration:** Hit `r` to randomize your entire pipeline and discover unexpected visual magic.
 - **🎞️ Animation Engine:** Go beyond static images! Capture frames or use the **Automatic Parameter Sweep** to generate hypnotic GIFs and WebP animations.
+- **🎨 Custom UI Themes:** Essential for **Linux Ricers**! Fully customize the application's color palette via `~/.config/spixelatuir/theme.json` to seamlessly integrate with your meticulously crafted Catppuccin, Nord, or Gruvbox desktop environments.
 - **⌨️ Keyboard-Centric Workflow:** Designed for speed. Everything is a keypress away—no mouse required.
 - **🧩 TWM Ready:** **Looks and feels incredible in Tiling Window Managers!** Whether you use `i3`, `sway`, `hyprland`, or `tmux`, SpixelaTUIr's responsive layout and keyboard-driven interface make it the ultimate aesthetic companion for your terminal setup.
 

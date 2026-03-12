@@ -3,7 +3,7 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     widgets::{Block, Borders, Clear, Paragraph},
 };
 
@@ -17,9 +17,9 @@ pub fn render_animation_panel(frame: &mut Frame, area: Rect, state: &AppState) {
     let focused = matches!(state.input_mode, InputMode::AnimationPanel)
         || matches!(state.input_mode, InputMode::AnimationFrameDurationInput);
     let border_color = if focused {
-        Color::Magenta
+        state.theme.accent_1
     } else {
-        Color::DarkGray
+        state.theme.inactive_border
     };
 
     let n = state.animation.frames.len();
@@ -55,7 +55,7 @@ fn render_frame_strip(frame: &mut Frame, area: Rect, state: &AppState) {
     let n = state.animation.frames.len();
     if n == 0 {
         let hint = Paragraph::new("  No frames yet — focus this panel (Tab) and press 'c' to capture")
-            .style(Style::default().fg(Color::DarkGray));
+            .style(Style::default().fg(state.theme.text_dimmed));
         frame.render_widget(hint, area);
         return;
     }
@@ -103,7 +103,7 @@ fn render_frame_strip(frame: &mut Frame, area: Rect, state: &AppState) {
 
     strip.push_str(right_arrow);
 
-    let strip_style = Style::default().fg(Color::White);
+    let strip_style = Style::default().fg(state.theme.text_normal);
     frame.render_widget(Paragraph::new(strip).style(strip_style), area);
 }
 
@@ -137,7 +137,7 @@ fn render_duration_row(frame: &mut Frame, area: Rect, state: &AppState) {
     }
 
     frame.render_widget(
-        Paragraph::new(row).style(Style::default().fg(Color::DarkGray)),
+        Paragraph::new(row).style(Style::default().fg(state.theme.text_dimmed)),
         area,
     );
 }
@@ -176,7 +176,7 @@ fn render_global_controls(frame: &mut Frame, area: Rect, state: &AppState) {
     // Show controls on the left, hint on the right if space allows.
     let combined = format!("{controls}   {hint}");
     frame.render_widget(
-        Paragraph::new(combined).style(Style::default().fg(Color::White)),
+        Paragraph::new(combined).style(Style::default().fg(state.theme.text_normal)),
         area,
     );
 }
@@ -200,7 +200,7 @@ pub fn render_sweep_dialog(frame: &mut Frame, state: &AppState) {
     let block = Block::default()
         .title(" Parameter Sweep ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Magenta));
+        .border_style(Style::default().fg(state.theme.accent_1));
     frame.render_widget(block, popup_area);
 
     let inner = Rect::new(
@@ -229,11 +229,11 @@ pub fn render_sweep_dialog(frame: &mut Frame, state: &AppState) {
     let field_style = |idx: usize| {
         if sw.focused_field == idx {
             Style::default()
-                .fg(Color::Black)
-                .bg(Color::Magenta)
+                .fg(state.theme.selection_fg)
+                .bg(state.theme.accent_1)
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(state.theme.text_normal)
         }
     };
 
@@ -283,7 +283,7 @@ pub fn render_sweep_dialog(frame: &mut Frame, state: &AppState) {
 
     // Hint.
     let hint = Paragraph::new("  ↑↓: navigate  Enter: generate  Esc: cancel")
-        .style(Style::default().fg(Color::DarkGray));
+        .style(Style::default().fg(state.theme.text_dimmed));
     frame.render_widget(hint, rows[7]);
 }
 
@@ -306,7 +306,7 @@ pub fn render_animation_export_dialog(frame: &mut Frame, state: &AppState) {
     let block = Block::default()
         .title(" Export Animation ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Magenta));
+        .border_style(Style::default().fg(state.theme.accent_1));
     frame.render_widget(block, popup_area);
 
     let inner = Rect::new(
@@ -334,11 +334,11 @@ pub fn render_animation_export_dialog(frame: &mut Frame, state: &AppState) {
     let field_style = |idx: usize| {
         if dialog.focused_field == idx {
             Style::default()
-                .fg(Color::Black)
-                .bg(Color::Magenta)
+                .fg(state.theme.selection_fg)
+                .bg(state.theme.accent_1)
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(state.theme.text_normal)
         }
     };
 
@@ -385,7 +385,7 @@ pub fn render_animation_export_dialog(frame: &mut Frame, state: &AppState) {
         .to_string();
     frame.render_widget(
         Paragraph::new(format!("  Output:    {preview_path}"))
-            .style(Style::default().fg(Color::DarkGray)),
+            .style(Style::default().fg(state.theme.text_dimmed)),
         rows[5],
     );
 }

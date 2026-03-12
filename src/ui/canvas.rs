@@ -1,7 +1,7 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
+    style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
 };
@@ -31,14 +31,14 @@ pub fn render_canvas(frame: &mut Frame, area: Rect, state: &mut AppState) {
                 .split(area);
             if let Some(ref img) = state.preview_buffer {
                 let img_clone = img.clone();
-                render_histogram_overlay(frame, halves[1], &img_clone);
+                render_histogram_overlay(frame, halves[1], &img_clone, state);
             }
         }
     } else {
         let block = Block::default()
             .title("Canvas")
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan));
+            .border_style(Style::default().fg(state.theme.active_border));
 
         // Inner area available for the image (inside the block borders).
         let inner = block.inner(area);
@@ -52,7 +52,7 @@ pub fn render_canvas(frame: &mut Frame, area: Rect, state: &mut AppState) {
             && let Some(ref img) = state.preview_buffer
         {
             let img_clone = img.clone();
-            render_histogram_overlay(frame, inner, &img_clone);
+            render_histogram_overlay(frame, inner, &img_clone, state);
         }
     }
 }
@@ -72,7 +72,7 @@ fn render_single_canvas(frame: &mut Frame, inner: Rect, state: &mut AppState) {
         } else {
             "No image loaded. Press 'o' to open a file."
         };
-        let placeholder = Paragraph::new(msg).style(Style::default().fg(Color::DarkGray));
+        let placeholder = Paragraph::new(msg).style(Style::default().fg(state.theme.text_dimmed));
         frame.render_widget(placeholder, inner);
     }
 }
@@ -88,7 +88,7 @@ fn render_split_canvas(frame: &mut Frame, inner: Rect, state: &mut AppState) {
     let before_block = Block::default()
         .title("Before")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+        .border_style(Style::default().fg(state.theme.text_dimmed));
     let before_inner = before_block.inner(halves[0]);
     frame.render_widget(before_block, halves[0]);
 
@@ -102,7 +102,7 @@ fn render_split_canvas(frame: &mut Frame, inner: Rect, state: &mut AppState) {
             "No image loaded."
         };
         frame.render_widget(
-            Paragraph::new(msg).style(Style::default().fg(Color::DarkGray)),
+            Paragraph::new(msg).style(Style::default().fg(state.theme.text_dimmed)),
             before_inner,
         );
     }
@@ -111,7 +111,7 @@ fn render_split_canvas(frame: &mut Frame, inner: Rect, state: &mut AppState) {
     let after_block = Block::default()
         .title("After")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(Style::default().fg(state.theme.active_border));
     let after_inner = after_block.inner(halves[1]);
     frame.render_widget(after_block, halves[1]);
 
@@ -128,7 +128,7 @@ fn render_split_canvas(frame: &mut Frame, inner: Rect, state: &mut AppState) {
             "No image loaded."
         };
         frame.render_widget(
-            Paragraph::new(msg).style(Style::default().fg(Color::DarkGray)),
+            Paragraph::new(msg).style(Style::default().fg(state.theme.text_dimmed)),
             after_inner,
         );
     }
@@ -147,7 +147,7 @@ const HIST_WIDTH: u16 = (HIST_BINS as u16) + 2;
 ///
 /// The overlay is placed in the top-right corner of `canvas_inner`.
 /// Uses only `preview_buffer` pixel data — no additional processing.
-fn render_histogram_overlay(frame: &mut Frame, canvas_inner: Rect, img: &image::DynamicImage) {
+fn render_histogram_overlay(frame: &mut Frame, canvas_inner: Rect, img: &image::DynamicImage, state: &AppState) {
     // Compute the overlay rect (top-right corner).
     let overlay_h = HIST_HEIGHT + 2; // +2 for borders
     let overlay_w = HIST_WIDTH;
@@ -186,7 +186,7 @@ fn render_histogram_overlay(frame: &mut Frame, canvas_inner: Rect, img: &image::
                     // A bar of height `h` fills rows 0..h from the bottom.
                     // `row` is the current row index from bottom (0 = bottom-most).
                     let ch = if h > row as u8 { '█' } else { ' ' };
-                    Span::styled(ch.to_string(), Style::default().fg(Color::Green))
+                    Span::styled(ch.to_string(), Style::default().fg(state.theme.success_border))
                 })
                 .collect();
             Line::from(spans)
@@ -201,7 +201,7 @@ fn render_histogram_overlay(frame: &mut Frame, canvas_inner: Rect, img: &image::
                 } else {
                     ' '
                 };
-                Span::styled(ch.to_string(), Style::default().fg(Color::DarkGray))
+                Span::styled(ch.to_string(), Style::default().fg(state.theme.text_dimmed))
             })
             .collect::<Vec<_>>(),
     ));
@@ -209,7 +209,7 @@ fn render_histogram_overlay(frame: &mut Frame, canvas_inner: Rect, img: &image::
     let block = Block::default()
         .title("Luma")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Green));
+        .border_style(Style::default().fg(state.theme.success_border));
     let paragraph = Paragraph::new(lines).block(block);
     frame.render_widget(paragraph, overlay_area);
 }

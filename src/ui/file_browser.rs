@@ -1,7 +1,7 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
 };
@@ -54,7 +54,7 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &mut AppState) {
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(Style::default().fg(state.theme.active_border));
     frame.render_widget(block, popup_area);
 
     let inner_x = popup_area.x + 1;
@@ -108,7 +108,7 @@ fn render_open_image_layout(
     let path_area = Rect::new(list_x, list_y, list_width, 1);
     let path_paragraph = Paragraph::new(path_text).style(
         Style::default()
-            .fg(Color::Yellow)
+            .fg(state.theme.warning_border)
             .add_modifier(Modifier::BOLD),
     );
     frame.render_widget(path_paragraph, path_area);
@@ -122,7 +122,7 @@ fn render_open_image_layout(
     let file_list_area = Rect::new(list_x, list_y + 2, list_width, file_list_height);
 
     let offset = scroll_offset(fb.cursor, file_list_height as usize);
-    let items = build_list_items(fb, offset, file_list_height as usize, list_width);
+    let items = build_list_items(fb, offset, file_list_height as usize, list_width, state);
 
     let list = List::new(items);
     frame.render_widget(list, file_list_area);
@@ -130,14 +130,14 @@ fn render_open_image_layout(
     // Footer hint.
     let footer_y = list_y + list_height_total - 1;
     let footer_area = Rect::new(list_x, footer_y, list_width, 1);
-    let footer = Paragraph::new(FILE_BROWSER_HINT).style(Style::default().fg(Color::DarkGray));
+    let footer = Paragraph::new(FILE_BROWSER_HINT).style(Style::default().fg(state.theme.text_dimmed));
     frame.render_widget(footer, footer_area);
 
     // ── Right: image preview pane ────────────────────────────────────────────
     let preview_block = Block::default()
         .title(" Preview ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+        .border_style(Style::default().fg(state.theme.inactive_border));
     let preview_inner = preview_block.inner(preview_area);
     frame.render_widget(preview_block, preview_area);
 
@@ -168,7 +168,7 @@ fn render_open_image_layout(
 
         let msg = if is_image { "Loading preview…" } else { "No preview" };
         let placeholder =
-            Paragraph::new(msg).style(Style::default().fg(Color::DarkGray));
+            Paragraph::new(msg).style(Style::default().fg(state.theme.text_dimmed));
         frame.render_widget(placeholder, preview_inner);
     }
 }
@@ -192,7 +192,7 @@ fn render_pipeline_layout(
     let path_area = Rect::new(inner_x, inner_y, inner_width, 1);
     let path_paragraph = Paragraph::new(path_text).style(
         Style::default()
-            .fg(Color::Yellow)
+            .fg(state.theme.warning_border)
             .add_modifier(Modifier::BOLD),
     );
     frame.render_widget(path_paragraph, path_area);
@@ -209,7 +209,7 @@ fn render_pipeline_layout(
     // Compute scroll offset so the cursor stays visible.
     let offset = scroll_offset(fb.cursor, list_height as usize);
 
-    let items = build_list_items(fb, offset, list_height as usize, inner_width);
+    let items = build_list_items(fb, offset, list_height as usize, inner_width, state);
     let list = List::new(items);
     frame.render_widget(list, list_area);
 
@@ -220,16 +220,17 @@ fn render_pipeline_layout(
         FileBrowserPurpose::OpenImage => FILE_BROWSER_HINT,
         FileBrowserPurpose::LoadPipeline => PIPELINE_BROWSER_HINT,
     };
-    let footer = Paragraph::new(hint).style(Style::default().fg(Color::DarkGray));
+    let footer = Paragraph::new(hint).style(Style::default().fg(state.theme.text_dimmed));
     frame.render_widget(footer, footer_area);
 }
 
 /// Build the list items for the visible window of the file browser.
 fn build_list_items<'a>(
-    fb: &crate::app::file_browser::FileBrowserState,
+    fb: &'a crate::app::file_browser::FileBrowserState,
     offset: usize,
     visible: usize,
     column_width: u16,
+    state: &'a AppState,
 ) -> Vec<ListItem<'a>> {
     fb.entries
         .iter()
@@ -244,7 +245,7 @@ fn build_list_items<'a>(
                         .file_name()
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_else(|| path.display().to_string());
-                    ("  ", format!("{name}/"), Color::Blue)
+                    ("  ", format!("{name}/"), state.theme.directory)
                 }
                 FileBrowserEntry::ImageFile(path, size) => {
                     let name = path
@@ -258,14 +259,14 @@ fn build_list_items<'a>(
                         size_str,
                         width = (column_width as usize).saturating_sub(12)
                     );
-                    ("▶ ", padded, Color::White)
+                    ("▶ ", padded, state.theme.text_normal)
                 }
             };
 
             let style = if is_selected {
                 Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
+                    .fg(state.theme.selection_fg)
+                    .bg(state.theme.selection_bg)
                     .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(fg)
