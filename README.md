@@ -174,6 +174,16 @@ Module ownership:
 
 Supported via the [`image`](https://github.com/image-rs/image) crate: **PNG, JPEG, GIF, BMP**.
 
+## Contributing
+
+This project is developed in the spirit of open collaboration, any meaningful contribution is cherished upon.
+Feel free to open PRs and Issues if you want to support new effects.
+You can contact me for suggestions, or just to have a chat: you can find some of my handles at https://gioleppe.github.io/
+
+## Disclaimer
+
+SpixelaTUIr is a GenAI driven project. I mainly built it to sharpen my agent-handling skills and to have fun, don't take it too seriously.
+
 ## License
 
 See [LICENSE](LICENSE).
