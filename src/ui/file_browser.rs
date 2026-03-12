@@ -30,11 +30,15 @@ pub fn render_file_browser_modal(frame: &mut Frame, state: &mut AppState) {
     let is_open_image = fb.purpose == FileBrowserPurpose::OpenImage;
 
     let popup_width = if is_open_image {
-        (total.width * 85 / 100).max(70).min(total.width)
+        (total.width * 95 / 100).max(70).min(total.width)
     } else {
         (total.width * 7 / 10).max(50).min(total.width)
     };
-    let popup_height = (total.height * 7 / 10).max(10).min(total.height);
+    let popup_height = if is_open_image {
+        (total.height * 90 / 100).max(10).min(total.height)
+    } else {
+        (total.height * 7 / 10).max(10).min(total.height)
+    };
     let x = (total.width.saturating_sub(popup_width)) / 2;
     let y = (total.height.saturating_sub(popup_height)) / 2;
     let popup_area = Rect::new(x, y, popup_width, popup_height);
@@ -84,10 +88,10 @@ fn render_open_image_layout(
         None => return,
     };
 
-    // Split the inner area into list (left 60%) and preview (right 40%).
+    // Split the inner area into list (left 35%) and preview (right 65%).
     let columns = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
         .split(Rect::new(inner_x, inner_y, inner_width, inner_height));
 
     let list_area = columns[0];
@@ -138,8 +142,16 @@ fn render_open_image_layout(
     frame.render_widget(preview_block, preview_area);
 
     if let Some(ref mut protocol) = state.file_browser_preview {
+        // Add a 1-cell margin on all sides so the image is centered with
+        // breathing room inside the preview block.
+        let padded = Rect::new(
+            preview_inner.x + 1,
+            preview_inner.y + 1,
+            preview_inner.width.saturating_sub(2),
+            preview_inner.height.saturating_sub(2),
+        );
         let image_widget = StatefulImage::default().resize(Resize::Fit(None));
-        frame.render_stateful_widget(image_widget, preview_inner, protocol);
+        frame.render_stateful_widget(image_widget, padded, protocol);
     } else {
         // Check whether the cursor is on a directory (no preview expected) or
         // an image file that is still loading.
