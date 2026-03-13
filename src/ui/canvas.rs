@@ -147,7 +147,12 @@ const HIST_WIDTH: u16 = (HIST_BINS as u16) + 2;
 ///
 /// The overlay is placed in the top-right corner of `canvas_inner`.
 /// Uses only `preview_buffer` pixel data — no additional processing.
-fn render_histogram_overlay(frame: &mut Frame, canvas_inner: Rect, img: &image::DynamicImage, state: &AppState) {
+fn render_histogram_overlay(
+    frame: &mut Frame,
+    canvas_inner: Rect,
+    img: &image::DynamicImage,
+    state: &AppState,
+) {
     // Compute the overlay rect (top-right corner).
     let overlay_h = HIST_HEIGHT + 2; // +2 for borders
     let overlay_w = HIST_WIDTH;
@@ -186,7 +191,10 @@ fn render_histogram_overlay(frame: &mut Frame, canvas_inner: Rect, img: &image::
                     // A bar of height `h` fills rows 0..h from the bottom.
                     // `row` is the current row index from bottom (0 = bottom-most).
                     let ch = if h > row as u8 { '█' } else { ' ' };
-                    Span::styled(ch.to_string(), Style::default().fg(state.theme.success_border))
+                    Span::styled(
+                        ch.to_string(),
+                        Style::default().fg(state.theme.success_border),
+                    )
                 })
                 .collect();
             Line::from(spans)

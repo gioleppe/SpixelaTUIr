@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
@@ -7,6 +7,7 @@ use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 
 mod app;
+mod batch;
 mod config;
 mod debug;
 mod effects;
@@ -22,6 +23,33 @@ fn main() -> Result<()> {
         debug::init()?;
         log::info!("Spix starting (debug mode)");
     }
+
+    // ── Batch mode ──────────────────────────────────────────────────────────
+    // Activated when any of --batch / --pipeline / --outdir is present.
+    // All three flags are required together.
+    let batch_glob = flag_value(&args, "--batch");
+    let pipeline_arg = flag_value(&args, "--pipeline");
+    let outdir_arg = flag_value(&args, "--outdir");
+
+    if batch_glob.is_some() || pipeline_arg.is_some() || outdir_arg.is_some() {
+        let glob_pattern = batch_glob
+            .context("--batch <glob> is required for batch mode")?
+            .to_owned();
+        let pipeline_path = pipeline_arg
+            .context("--pipeline <file> is required for batch mode")?
+            .into();
+        let output_dir = outdir_arg
+            .context("--outdir <dir> is required for batch mode")?
+            .into();
+
+        return batch::run_batch(&batch::BatchArgs {
+            glob_pattern,
+            pipeline_path,
+            output_dir,
+        });
+    }
+
+    // ── Interactive TUI mode ─────────────────────────────────────────────────
 
     // Install panic hook to restore terminal state before printing the trace
     std::panic::set_hook(Box::new(|info| {
@@ -51,6 +79,13 @@ fn main() -> Result<()> {
 
     log::info!("Spix exiting");
     result
+}
+
+/// Return the value that follows `flag` in `args`, if present.
+fn flag_value<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
+    args.windows(2)
+        .find(|w| w[0] == flag)
+        .map(|w| w[1].as_str())
 }
 
 #[cfg(test)]

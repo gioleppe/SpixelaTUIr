@@ -199,7 +199,10 @@ pub fn run(rx: Receiver<WorkerCommand>) {
                     loop_anim,
                 ) {
                     Ok(saved_path) => {
-                        log::info!("Worker: animation export succeeded → {}", saved_path.display());
+                        log::info!(
+                            "Worker: animation export succeeded → {}",
+                            saved_path.display()
+                        );
                         let _ = response_tx.send(WorkerResponse::Exported(saved_path));
                     }
                     Err(e) => {
@@ -208,8 +211,15 @@ pub fn run(rx: Receiver<WorkerCommand>) {
                     }
                 }
             }
-            WorkerCommand::LoadFileBrowserPreview { path, target_size, response_tx } => {
-                log::debug!("Worker: loading file-browser preview for {}", path.display());
+            WorkerCommand::LoadFileBrowserPreview {
+                path,
+                target_size,
+                response_tx,
+            } => {
+                log::debug!(
+                    "Worker: loading file-browser preview for {}",
+                    path.display()
+                );
                 match image::open(&path) {
                     Ok(img) => {
                         // Downscale to the requested size so the thumbnail fills the pane.

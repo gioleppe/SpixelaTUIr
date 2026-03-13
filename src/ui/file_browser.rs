@@ -130,7 +130,8 @@ fn render_open_image_layout(
     // Footer hint.
     let footer_y = list_y + list_height_total - 1;
     let footer_area = Rect::new(list_x, footer_y, list_width, 1);
-    let footer = Paragraph::new(FILE_BROWSER_HINT).style(Style::default().fg(state.theme.text_dimmed));
+    let footer =
+        Paragraph::new(FILE_BROWSER_HINT).style(Style::default().fg(state.theme.text_dimmed));
     frame.render_widget(footer, footer_area);
 
     // ── Right: image preview pane ────────────────────────────────────────────
@@ -166,9 +167,12 @@ fn render_open_image_layout(
             .map(|e| matches!(e, FileBrowserEntry::ImageFile(..)))
             .unwrap_or(false);
 
-        let msg = if is_image { "Loading preview…" } else { "No preview" };
-        let placeholder =
-            Paragraph::new(msg).style(Style::default().fg(state.theme.text_dimmed));
+        let msg = if is_image {
+            "Loading preview…"
+        } else {
+            "No preview"
+        };
+        let placeholder = Paragraph::new(msg).style(Style::default().fg(state.theme.text_dimmed));
         frame.render_widget(placeholder, preview_inner);
     }
 }

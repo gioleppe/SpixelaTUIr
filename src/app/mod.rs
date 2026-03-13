@@ -100,20 +100,30 @@ where
                     let pending = state.animation_pending_renders;
                     let total = state.animation.frames.len();
                     if pending == 0 {
-                        state.status_message = format!("Animation: {total} frame{} ready.", if total == 1 { "" } else { "s" });
+                        state.status_message = format!(
+                            "Animation: {total} frame{} ready.",
+                            if total == 1 { "" } else { "s" }
+                        );
                     } else {
-                        state.status_message = format!("Rendering animation frames… {}/{total}", total - pending);
+                        state.status_message =
+                            format!("Rendering animation frames… {}/{total}", total - pending);
                     }
                 }
                 WorkerResponse::SweepBatchReady { pipelines, images } => {
                     log::info!("Received sweep batch ({} frames)", images.len());
                     let count = images.len();
                     state.apply_sweep_results(pipelines, images);
-                    state.status_message =
-                        format!("Sweep complete: {count} frame{} generated.", if count == 1 { "" } else { "s" });
+                    state.status_message = format!(
+                        "Sweep complete: {count} frame{} generated.",
+                        if count == 1 { "" } else { "s" }
+                    );
                 }
                 WorkerResponse::FileBrowserPreview(img) => {
-                    log::debug!("Received file-browser preview ({}x{})", img.width(), img.height());
+                    log::debug!(
+                        "Received file-browser preview ({}x{})",
+                        img.width(),
+                        img.height()
+                    );
                     state.file_browser_preview = Some(state.picker.new_resize_protocol(img));
                 }
                 WorkerResponse::Exported(path) => {
@@ -130,8 +140,10 @@ where
         }
 
         // ── Animation playback tick ──────────────────────────────────────────
-        if let animation::AnimationPlaybackState::Playing { current_frame, frame_started } =
-            &state.animation_playback
+        if let animation::AnimationPlaybackState::Playing {
+            current_frame,
+            frame_started,
+        } = &state.animation_playback
         {
             let current_frame = *current_frame;
             let frame_started = *frame_started;

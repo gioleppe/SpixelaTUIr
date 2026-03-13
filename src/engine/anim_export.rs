@@ -32,8 +32,8 @@ fn export_gif(
     loop_anim: bool,
 ) -> Result<PathBuf> {
     let path = super::export::safe_path(output_path);
-    let file =
-        std::fs::File::create(&path).with_context(|| format!("Cannot create {}", path.display()))?;
+    let file = std::fs::File::create(&path)
+        .with_context(|| format!("Cannot create {}", path.display()))?;
     let writer = std::io::BufWriter::new(file);
 
     let mut encoder = GifEncoder::new_with_speed(writer, 10);

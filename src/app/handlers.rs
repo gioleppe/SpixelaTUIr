@@ -5,8 +5,7 @@ use crate::engine::export::EXPORT_FORMATS;
 
 use super::PROXY_RESOLUTIONS;
 use super::animation::{
-    AnimationPlaybackState, ANIM_EXPORT_FORMATS, SWEEP_EASINGS,
-    SweepDialogState, apply_easing,
+    ANIM_EXPORT_FORMATS, AnimationPlaybackState, SWEEP_EASINGS, SweepDialogState, apply_easing,
 };
 use super::dialogs::{FocusedPanel, InputMode};
 use super::file_browser::{FileBrowserEntry, FileBrowserPurpose, FileBrowserState};
@@ -306,8 +305,7 @@ pub fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifier
         KeyCode::Char('n') if modifiers.contains(KeyModifiers::CONTROL) => {
             state.animation_panel_open = !state.animation_panel_open;
             if state.animation_panel_open {
-                state.status_message =
-                    "Animation panel opened. Tab to focus it.".to_string();
+                state.status_message = "Animation panel opened. Tab to focus it.".to_string();
             } else {
                 // Make sure we leave animation-panel focus when closing.
                 if matches!(state.focused_panel, FocusedPanel::AnimationPanel) {
@@ -908,16 +906,12 @@ fn handle_animation_panel(state: &mut AppState, code: KeyCode, modifiers: KeyMod
         // ── Capture current pipeline as a new frame ──────────────────────────
         KeyCode::Char('c') => {
             if state.source_asset.is_none() {
-                state.status_message =
-                    "No image loaded — open an image first.".to_string();
+                state.status_message = "No image loaded — open an image first.".to_string();
                 return;
             }
             let idx = state.capture_animation_frame();
             let total = state.animation.frames.len();
-            state.status_message = format!(
-                "Captured frame {}/{total}. Worker rendering…",
-                idx + 1
-            );
+            state.status_message = format!("Captured frame {}/{total}. Worker rendering…", idx + 1);
         }
 
         // ── Delete selected frame ─────────────────────────────────────────────
@@ -932,7 +926,10 @@ fn handle_animation_panel(state: &mut AppState, code: KeyCode, modifiers: KeyMod
                 let sel = state.animation.selected;
                 show_animation_frame(state, sel);
                 let total = state.animation.frames.len();
-                state.status_message = format!("Frame deleted. {total} frame{} remain.", if total == 1 { "" } else { "s" });
+                state.status_message = format!(
+                    "Frame deleted. {total} frame{} remain.",
+                    if total == 1 { "" } else { "s" }
+                );
             } else {
                 state.status_message = "No frames to delete.".to_string();
             }
@@ -954,9 +951,7 @@ fn handle_animation_panel(state: &mut AppState, code: KeyCode, modifiers: KeyMod
             match &state.animation_playback {
                 AnimationPlaybackState::Playing { current_frame, .. } => {
                     let cf = *current_frame;
-                    state.animation_playback = AnimationPlaybackState::Paused {
-                        current_frame: cf,
-                    };
+                    state.animation_playback = AnimationPlaybackState::Paused { current_frame: cf };
                     state.status_message = "Playback paused.".to_string();
                 }
                 AnimationPlaybackState::Paused { current_frame } => {
@@ -969,8 +964,7 @@ fn handle_animation_panel(state: &mut AppState, code: KeyCode, modifiers: KeyMod
                 }
                 AnimationPlaybackState::Stopped => {
                     if state.animation.frames.len() < 2 {
-                        state.status_message =
-                            "Add at least 2 frames before playing.".to_string();
+                        state.status_message = "Add at least 2 frames before playing.".to_string();
                         return;
                     }
                     // Render any dirty frames before starting.
@@ -1005,8 +999,7 @@ fn handle_animation_panel(state: &mut AppState, code: KeyCode, modifiers: KeyMod
         // ── Set all frames to same duration ───────────────────────────────────
         KeyCode::Char('F') => {
             if !state.animation.frames.is_empty() {
-                state.frame_duration_input =
-                    state.animation.frame_duration_ms(0).to_string();
+                state.frame_duration_input = state.animation.frame_duration_ms(0).to_string();
                 state.frame_duration_input_all = true;
                 state.input_mode = InputMode::AnimationFrameDurationInput;
                 state.status_message =
@@ -1036,8 +1029,8 @@ fn handle_animation_panel(state: &mut AppState, code: KeyCode, modifiers: KeyMod
         }
 
         // ── Frame reordering (mirrors effect reorder UX) ──────────────────────
-        KeyCode::Char('K') | KeyCode::Up if modifiers.contains(KeyModifiers::SHIFT)
-            || matches!(code, KeyCode::Char('K')) =>
+        KeyCode::Char('K') | KeyCode::Up
+            if modifiers.contains(KeyModifiers::SHIFT) || matches!(code, KeyCode::Char('K')) =>
         {
             let idx = state.animation.selected;
             if idx > 0 {
@@ -1047,8 +1040,8 @@ fn handle_animation_panel(state: &mut AppState, code: KeyCode, modifiers: KeyMod
                 state.status_message = "Frame moved up.".to_string();
             }
         }
-        KeyCode::Char('J') | KeyCode::Down if modifiers.contains(KeyModifiers::SHIFT)
-            || matches!(code, KeyCode::Char('J')) =>
+        KeyCode::Char('J') | KeyCode::Down
+            if modifiers.contains(KeyModifiers::SHIFT) || matches!(code, KeyCode::Char('J')) =>
         {
             let idx = state.animation.selected;
             let last = state.animation.frames.len().saturating_sub(1);
@@ -1068,8 +1061,7 @@ fn handle_animation_panel(state: &mut AppState, code: KeyCode, modifiers: KeyMod
                 return;
             }
             if state.source_asset.is_none() {
-                state.status_message =
-                    "No image loaded — open an image first.".to_string();
+                state.status_message = "No image loaded — open an image first.".to_string();
                 return;
             }
             // Pre-populate the sweep dialog with sensible defaults.
@@ -1111,8 +1103,7 @@ fn handle_animation_panel(state: &mut AppState, code: KeyCode, modifiers: KeyMod
 /// Open the animation export dialog pre-populated with defaults.
 fn open_animation_export_dialog(state: &mut AppState) {
     if state.animation.frames.len() < 2 {
-        state.status_message =
-            "Add at least 2 frames before exporting an animation.".to_string();
+        state.status_message = "Add at least 2 frames before exporting an animation.".to_string();
         return;
     }
     let default_filename = state
@@ -1211,7 +1202,11 @@ fn handle_animation_sweep_dialog(state: &mut AppState, code: KeyCode) {
                 FIELD_EFFECT if n_effects > 0 => {
                     let n = n_effects;
                     state.sweep_dialog.effect_idx = if matches!(code, KeyCode::Left) {
-                        if state.sweep_dialog.effect_idx == 0 { n - 1 } else { state.sweep_dialog.effect_idx - 1 }
+                        if state.sweep_dialog.effect_idx == 0 {
+                            n - 1
+                        } else {
+                            state.sweep_dialog.effect_idx - 1
+                        }
                     } else {
                         (state.sweep_dialog.effect_idx + 1) % n
                     };
@@ -1227,7 +1222,11 @@ fn handle_animation_sweep_dialog(state: &mut AppState, code: KeyCode) {
                         .len();
                     if n > 0 {
                         state.sweep_dialog.param_idx = if matches!(code, KeyCode::Left) {
-                            if state.sweep_dialog.param_idx == 0 { n - 1 } else { state.sweep_dialog.param_idx - 1 }
+                            if state.sweep_dialog.param_idx == 0 {
+                                n - 1
+                            } else {
+                                state.sweep_dialog.param_idx - 1
+                            }
                         } else {
                             (state.sweep_dialog.param_idx + 1) % n
                         };
@@ -1237,7 +1236,11 @@ fn handle_animation_sweep_dialog(state: &mut AppState, code: KeyCode) {
                 FIELD_EASING => {
                     let n = SWEEP_EASINGS.len();
                     state.sweep_dialog.easing_idx = if matches!(code, KeyCode::Left) {
-                        if state.sweep_dialog.easing_idx == 0 { n - 1 } else { state.sweep_dialog.easing_idx - 1 }
+                        if state.sweep_dialog.easing_idx == 0 {
+                            n - 1
+                        } else {
+                            state.sweep_dialog.easing_idx - 1
+                        }
                     } else {
                         (state.sweep_dialog.easing_idx + 1) % n
                     };
@@ -1245,18 +1248,22 @@ fn handle_animation_sweep_dialog(state: &mut AppState, code: KeyCode) {
                 _ => {}
             }
         }
-        KeyCode::Backspace => {
-            match state.sweep_dialog.focused_field {
-                FIELD_START => { state.sweep_dialog.start_value.pop(); }
-                FIELD_END   => { state.sweep_dialog.end_value.pop(); }
-                FIELD_FRAMES => { state.sweep_dialog.frame_count.pop(); }
-                _ => {}
+        KeyCode::Backspace => match state.sweep_dialog.focused_field {
+            FIELD_START => {
+                state.sweep_dialog.start_value.pop();
             }
-        }
+            FIELD_END => {
+                state.sweep_dialog.end_value.pop();
+            }
+            FIELD_FRAMES => {
+                state.sweep_dialog.frame_count.pop();
+            }
+            _ => {}
+        },
         KeyCode::Char(c) if c.is_ascii_digit() || c == '.' || c == '-' => {
             match state.sweep_dialog.focused_field {
                 FIELD_START => state.sweep_dialog.start_value.push(c),
-                FIELD_END   => state.sweep_dialog.end_value.push(c),
+                FIELD_END => state.sweep_dialog.end_value.push(c),
                 FIELD_FRAMES if c.is_ascii_digit() => state.sweep_dialog.frame_count.push(c),
                 _ => {}
             }
@@ -1274,10 +1281,8 @@ fn refresh_sweep_param_defaults(state: &mut AppState) {
     let param_idx = state.sweep_dialog.param_idx;
     let descriptors = state.pipeline.effects[eff_idx].effect.param_descriptors();
     if let Some(d) = descriptors.get(param_idx) {
-        state.sweep_dialog.start_value =
-            crate::app::pipeline_utils::format_param_value(d.min);
-        state.sweep_dialog.end_value =
-            crate::app::pipeline_utils::format_param_value(d.max);
+        state.sweep_dialog.start_value = crate::app::pipeline_utils::format_param_value(d.min);
+        state.sweep_dialog.end_value = crate::app::pipeline_utils::format_param_value(d.max);
     }
 }
 
@@ -1321,8 +1326,7 @@ fn generate_sweep(state: &mut AppState) {
     let count = pipelines.len();
     state.dispatch_sweep_batch(pipelines);
     state.input_mode = InputMode::AnimationPanel;
-    state.status_message =
-        format!("Generating sweep: {count} frames… Worker rendering.");
+    state.status_message = format!("Generating sweep: {count} frames… Worker rendering.");
 }
 
 // ── Animation export dialog ───────────────────────────────────────────────────
@@ -1370,17 +1374,20 @@ fn handle_animation_export_dialog(state: &mut AppState, code: KeyCode) {
         KeyCode::Left | KeyCode::Right | KeyCode::Char(' ')
             if state.animation_export_dialog.focused_field == FIELD_LOOP =>
         {
-            state.animation_export_dialog.loop_anim =
-                !state.animation_export_dialog.loop_anim;
+            state.animation_export_dialog.loop_anim = !state.animation_export_dialog.loop_anim;
         }
         KeyCode::Backspace => match state.animation_export_dialog.focused_field {
-            FIELD_DIRECTORY => { state.animation_export_dialog.directory.pop(); }
-            FIELD_FILENAME  => { state.animation_export_dialog.filename.pop(); }
+            FIELD_DIRECTORY => {
+                state.animation_export_dialog.directory.pop();
+            }
+            FIELD_FILENAME => {
+                state.animation_export_dialog.filename.pop();
+            }
             _ => {}
         },
         KeyCode::Char(c) => match state.animation_export_dialog.focused_field {
             FIELD_DIRECTORY => state.animation_export_dialog.directory.push(c),
-            FIELD_FILENAME  => state.animation_export_dialog.filename.push(c),
+            FIELD_FILENAME => state.animation_export_dialog.filename.push(c),
             _ => {}
         },
         _ => {}
@@ -1418,13 +1425,15 @@ fn dispatch_animation_export(state: &mut AppState) {
     let format_index = dialog.format_index;
     let loop_anim = dialog.loop_anim;
 
-    let _ = state.worker_tx.send(crate::engine::worker::WorkerCommand::ExportAnimation {
-        frames: frames_payload,
-        output_path,
-        format_index,
-        loop_anim,
-        response_tx: state.worker_resp_tx.clone(),
-    });
+    let _ = state
+        .worker_tx
+        .send(crate::engine::worker::WorkerCommand::ExportAnimation {
+            frames: frames_payload,
+            output_path,
+            format_index,
+            loop_anim,
+            response_tx: state.worker_resp_tx.clone(),
+        });
     state.input_mode = InputMode::AnimationPanel;
     state.status_message = "Exporting animation…".to_string();
 }

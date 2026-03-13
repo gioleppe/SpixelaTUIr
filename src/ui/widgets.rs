@@ -33,8 +33,11 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
     };
 
     let status = format!("Spix | {}{}{}", state.status_message, res_label, anim_label);
-    let paragraph =
-        Paragraph::new(status).style(Style::default().fg(state.theme.text_normal).bg(state.theme.inactive_border));
+    let paragraph = Paragraph::new(status).style(
+        Style::default()
+            .fg(state.theme.text_normal)
+            .bg(state.theme.inactive_border),
+    );
     frame.render_widget(paragraph, area);
 }
 
@@ -64,9 +67,15 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         InputMode::AnimationPanel => {
             "c:capture  s:sweep  d:del  Space:play  Enter:edit-frame  f:dur  L:loop  +/-:fps  Ctrl+E:export  Esc:unfocus"
         }
-        InputMode::AnimationSweepDialog => "↑↓: field  ←/→: cycle  Type: value  Enter: generate  Esc: cancel",
-        InputMode::AnimationExportDialog => "↑↓: field  ←/→: cycle  Type: value  Enter: export  Esc: cancel",
-        InputMode::AnimationFrameDurationInput => "Type duration in ms  Enter: confirm  Esc: cancel",
+        InputMode::AnimationSweepDialog => {
+            "↑↓: field  ←/→: cycle  Type: value  Enter: generate  Esc: cancel"
+        }
+        InputMode::AnimationExportDialog => {
+            "↑↓: field  ←/→: cycle  Type: value  Enter: export  Esc: cancel"
+        }
+        InputMode::AnimationFrameDurationInput => {
+            "Type duration in ms  Enter: confirm  Esc: cancel"
+        }
     };
     let block = Block::default().title("Controls").borders(Borders::ALL);
     let paragraph = Paragraph::new(help).block(block);
@@ -363,7 +372,11 @@ pub fn render_quit_confirm_modal(frame: &mut Frame, state: &AppState) {
     let outer_block = Block::default()
         .title("  ⚠  Unsaved Changes  ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(state.theme.error_border).add_modifier(Modifier::BOLD));
+        .border_style(
+            Style::default()
+                .fg(state.theme.error_border)
+                .add_modifier(Modifier::BOLD),
+        );
     frame.render_widget(outer_block, popup_area);
 
     let inner = Rect::new(
