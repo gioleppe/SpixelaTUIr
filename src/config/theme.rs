@@ -65,7 +65,10 @@ impl Theme {
                 if let Some(c) = config.active_border.and_then(|s| Color::from_str(&s).ok()) {
                     theme.active_border = c;
                 }
-                if let Some(c) = config.inactive_border.and_then(|s| Color::from_str(&s).ok()) {
+                if let Some(c) = config
+                    .inactive_border
+                    .and_then(|s| Color::from_str(&s).ok())
+                {
                     theme.inactive_border = c;
                 }
                 if let Some(c) = config.text_normal.and_then(|s| Color::from_str(&s).ok()) {
@@ -80,7 +83,10 @@ impl Theme {
                 if let Some(c) = config.selection_fg.and_then(|s| Color::from_str(&s).ok()) {
                     theme.selection_fg = c;
                 }
-                if let Some(c) = config.selection_inactive_bg.and_then(|s| Color::from_str(&s).ok()) {
+                if let Some(c) = config
+                    .selection_inactive_bg
+                    .and_then(|s| Color::from_str(&s).ok())
+                {
                     theme.selection_inactive_bg = c;
                 }
                 if let Some(c) = config.directory.and_then(|s| Color::from_str(&s).ok()) {

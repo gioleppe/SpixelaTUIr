@@ -222,7 +222,7 @@ pub fn render_edit_effect_modal(frame: &mut Frame, state: &AppState) {
     let list = List::new(items);
     frame.render_widget(list, chunks[0]);
 
-    let footer =
-        Paragraph::new("  Enter: apply   Esc: cancel").style(Style::default().fg(state.theme.text_dimmed));
+    let footer = Paragraph::new("  Enter: apply   Esc: cancel")
+        .style(Style::default().fg(state.theme.text_dimmed));
     frame.render_widget(footer, chunks[1]);
 }

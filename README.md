@@ -42,6 +42,31 @@ cargo install --path .
 
 ---
 
+## 🗂️ Batch Processing (CLI)
+
+Apply any saved pipeline to an entire folder of images **without opening the TUI**:
+
+```bash
+spixelatuir --batch "photos/*.jpg" --pipeline my_pipeline.json --outdir processed/
+```
+
+| Flag | Description |
+|------|-------------|
+| `--batch <glob>` | Glob pattern that selects the input images (quote it to prevent shell expansion) |
+| `--pipeline <file>` | Path to a JSON or YAML pipeline file saved from the TUI (`Ctrl+S`) |
+| `--outdir <dir>` | Output directory (created automatically if it does not exist) |
+
+**Output format** is inferred from the source file's extension (`.jpg` → JPEG at quality 90, `.webp` → WebP, `.bmp` → BMP, everything else → PNG).  If an output file already exists from a previous run, the filename is auto-incremented (`image_1.png`, `image_2.png`, …) to avoid overwriting it.
+
+### Example
+
+```bash
+# Save a pipeline in the TUI with Ctrl+S, then process a whole folder:
+spixelatuir --batch "raw_photos/**/*.png" --pipeline cyberpunk.json --outdir glitched/
+```
+
+---
+
 ## 🎨 Effects Catalog
 
 | Category | Effect | Description |

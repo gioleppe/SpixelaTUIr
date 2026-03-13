@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
 };
 
-use crate::app::animation::{ANIM_EXPORT_FORMATS, SWEEP_EASINGS, AnimationPlaybackState};
+use crate::app::animation::{ANIM_EXPORT_FORMATS, AnimationPlaybackState, SWEEP_EASINGS};
 use crate::app::{AppState, InputMode};
 
 /// Render the animation panel strip at the bottom of the screen.
@@ -54,8 +54,9 @@ pub fn render_animation_panel(frame: &mut Frame, area: Rect, state: &AppState) {
 fn render_frame_strip(frame: &mut Frame, area: Rect, state: &AppState) {
     let n = state.animation.frames.len();
     if n == 0 {
-        let hint = Paragraph::new("  No frames yet — focus this panel (Tab) and press 'c' to capture")
-            .style(Style::default().fg(state.theme.text_dimmed));
+        let hint =
+            Paragraph::new("  No frames yet — focus this panel (Tab) and press 'c' to capture")
+                .style(Style::default().fg(state.theme.text_dimmed));
         frame.render_widget(hint, area);
         return;
     }
@@ -155,7 +156,11 @@ fn render_global_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         AnimationPlaybackState::Stopped => "■ Stopped".to_string(),
     };
 
-    let loop_icon = if state.animation.loop_mode { "⟳" } else { "→" };
+    let loop_icon = if state.animation.loop_mode {
+        "⟳"
+    } else {
+        "→"
+    };
     let pending = if state.animation_pending_renders > 0 {
         format!("  [{} rendering…]", state.animation_pending_renders)
     } else {
@@ -353,8 +358,7 @@ pub fn render_animation_export_dialog(frame: &mut Frame, state: &AppState) {
     // Filename.
     let fn_cur = if dialog.focused_field == 1 { "_" } else { "" };
     frame.render_widget(
-        Paragraph::new(format!("  Filename   {}{}", dialog.filename, fn_cur))
-            .style(field_style(1)),
+        Paragraph::new(format!("  Filename   {}{}", dialog.filename, fn_cur)).style(field_style(1)),
         rows[1],
     );
 
@@ -363,8 +367,7 @@ pub fn render_animation_export_dialog(frame: &mut Frame, state: &AppState) {
         .get(dialog.format_index)
         .unwrap_or(&"GIF");
     frame.render_widget(
-        Paragraph::new(format!("  Format     [ {format_name} ]  (←/→)"))
-            .style(field_style(2)),
+        Paragraph::new(format!("  Format     [ {format_name} ]  (←/→)")).style(field_style(2)),
         rows[2],
     );
 

@@ -34,8 +34,8 @@ pub fn build_layout(area: Rect, animation_open: bool) -> Vec<Rect> {
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),            // status bar
-            Constraint::Min(10),              // body
+            Constraint::Length(1),             // status bar
+            Constraint::Min(10),               // body
             Constraint::Length(bottom_height), // controls / animation
         ])
         .split(area);
