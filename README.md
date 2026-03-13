@@ -44,7 +44,7 @@ cargo install --path .
 
 ## 🗂️ Batch Processing (CLI)
 
-Apply any saved pipeline to an entire folder of images **without opening the TUI**, using all CPU cores in parallel:
+Apply any saved pipeline to an entire folder of images **without opening the TUI**:
 
 ```bash
 spixelatuir --batch "photos/*.jpg" --pipeline my_pipeline.json --outdir processed/

@@ -12,7 +12,6 @@ ratatui-image = { version = "10.0", default-features = false, features = ["cross
 # Image Processing & Math
 image = "0.25"
 imageproc = "0.26"
-rayon = "1.11"
 glob = "0.3"
 
 

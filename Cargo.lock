@@ -2443,7 +2443,6 @@ dependencies = [
  "log",
  "ratatui",
  "ratatui-image",
- "rayon",
  "serde",
  "serde_json",
  "serde_yml",

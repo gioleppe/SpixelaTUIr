@@ -2,11 +2,9 @@
 //!
 //! Invoked when the user passes `--batch <glob> --pipeline <file> --outdir <dir>`
 //! on the command line.  The TUI is never started; images matching the glob
-//! pattern are processed in parallel using `rayon` and written to the output
-//! directory.
+//! pattern are processed sequentially and written to the output directory.
 
 use anyhow::{Context, Result, bail};
-use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
 use crate::config::parser::load_pipeline;
@@ -28,7 +26,7 @@ pub struct BatchArgs {
 /// 1. Loads the pipeline from `args.pipeline_path`.
 /// 2. Expands `args.glob_pattern` to a list of input image paths.
 /// 3. Creates `args.output_dir` if it does not exist.
-/// 4. Processes every input image in parallel via `rayon`.
+/// 4. Processes every input image sequentially.
 /// 5. Prints a summary and returns an error if any file failed.
 pub fn run_batch(args: &BatchArgs) -> Result<()> {
     let pipeline = load_pipeline(&args.pipeline_path)
@@ -51,16 +49,11 @@ pub fn run_batch(args: &BatchArgs) -> Result<()> {
     );
     println!("Output directory: {}", args.output_dir.display());
 
-    let results: Vec<(&PathBuf, Result<PathBuf>)> = paths
-        .par_iter()
-        .map(|src| (src, process_one(src, &pipeline, &args.output_dir)))
-        .collect();
-
     let mut succeeded = 0usize;
     let mut failed = 0usize;
 
-    for (src, result) in &results {
-        match result {
+    for src in &paths {
+        match process_one(src, &pipeline, &args.output_dir) {
             Ok(dst) => {
                 println!("  ✓  {}  →  {}", src.display(), dst.display());
                 succeeded += 1;
