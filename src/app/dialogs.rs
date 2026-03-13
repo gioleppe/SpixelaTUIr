@@ -104,6 +104,27 @@ pub enum InputMode {
     AnimationFrameDurationInput,
 }
 
+impl InputMode {
+    /// Returns true if the current input mode represents a floating modal or overlay.
+    pub fn is_modal(&self) -> bool {
+        matches!(
+            self,
+            InputMode::PathInput
+                | InputMode::AddEffect
+                | InputMode::FileBrowser
+                | InputMode::EditEffect { .. }
+                | InputMode::ExportDialog
+                | InputMode::SavePipelineDialog
+                | InputMode::HelpModal
+                | InputMode::ConfirmClearPipeline
+                | InputMode::ConfirmQuit
+                | InputMode::AnimationSweepDialog
+                | InputMode::AnimationExportDialog
+                | InputMode::AnimationFrameDurationInput
+        )
+    }
+}
+
 /// Which panel currently has keyboard focus.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FocusedPanel {

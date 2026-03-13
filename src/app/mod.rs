@@ -163,17 +163,20 @@ where
             match event::read()? {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
                     // Track whether we're in a modal before the key is handled.
-                    // When a modal closes (any non-Normal → Normal transition), the
-                    // Sixel image area will contain SKIP cells whose previous-buffer
-                    // counterparts held modal text/borders. ratatui's diff skips SKIP
-                    // cells in the new buffer, so those characters would never be
-                    // cleared and the modal would ghost on screen.
+                    // When a modal closes, the Sixel image area will contain SKIP
+                    // cells whose previous-buffer counterparts held modal text/borders.
+                    // ratatui's diff skips SKIP cells in the new buffer, so those
+                    // characters would never be cleared and the modal would ghost.
                     // Calling terminal.clear() resets ratatui's previous-buffer to
-                    // all-default cells, forcing a full re-diff on the next draw so
-                    // the Sixel DCS is re-emitted and the ghost is erased.
-                    let was_in_modal = !matches!(state.input_mode, InputMode::Normal);
+                    // all-default cells, forcing a full re-diff on the next draw.
+                    let was_in_modal = state.input_mode.is_modal();
                     handlers::handle_key(&mut state, key.code, key.modifiers);
-                    if was_in_modal && matches!(state.input_mode, InputMode::Normal) {
+                    let is_in_modal = state.input_mode.is_modal();
+                    
+                    // If we were in a modal and either exited to a non-modal state
+                    // OR transitioned to a different modal, we should clear the terminal
+                    // to prevent artifacts from the previous modal.
+                    if was_in_modal && !is_in_modal {
                         terminal.clear()?;
                     }
                     ui_needs_redraw = true;
