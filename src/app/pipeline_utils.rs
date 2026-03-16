@@ -95,6 +95,15 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
             seed: 42,
         })
     }),
+    ("Ghost Displace", || {
+        Effect::Glitch(GlitchEffect::GhostDisplace {
+            copies: 5,
+            offset_x: 8.0,
+            offset_y: 4.0,
+            hue_sweep: 60.0,
+            opacity: 0.4,
+        })
+    }),
 ];
 
 /// Randomize the numeric parameters of every effect in the pipeline.
@@ -174,6 +183,19 @@ pub fn randomize_pipeline(pipeline: &mut Pipeline) {
                 GlitchEffect::DelaunayTriangulation { num_points, seed } => {
                     *num_points = 50 + (next() * 500.0) as u32;
                     *seed = (next() * 9999.0) as u32;
+                }
+                GlitchEffect::GhostDisplace {
+                    copies,
+                    offset_x,
+                    offset_y,
+                    hue_sweep,
+                    opacity,
+                } => {
+                    *copies = 2 + (next() * 8.0) as u32;
+                    *offset_x = (next() - 0.5) * 40.0;
+                    *offset_y = (next() - 0.5) * 40.0;
+                    *hue_sweep = next() * 360.0;
+                    *opacity = 0.2 + next() * 0.6;
                 }
             },
             Effect::Crt(e) => match e {

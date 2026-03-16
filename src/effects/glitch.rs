@@ -26,6 +26,13 @@ pub enum GlitchEffect {
     },
     /// Create a low-poly look using Delaunay triangulation of random sample points.
     DelaunayTriangulation { num_points: u32, seed: u32 },
+    GhostDisplace {
+        copies: u32,
+        offset_x: f32,
+        offset_y: f32,
+        hue_sweep: f32,
+        opacity: f32,
+    },
 }
 
 impl GlitchEffect {
@@ -46,6 +53,13 @@ impl GlitchEffect {
             GlitchEffect::DelaunayTriangulation { num_points, seed } => {
                 delaunay_triangulation(img, *num_points, *seed)
             }
+            GlitchEffect::GhostDisplace {
+                copies,
+                offset_x,
+                offset_y,
+                hue_sweep,
+                opacity,
+            } => ghost_displace(img, *copies, *offset_x, *offset_y, *hue_sweep, *opacity),
         }
     }
 
@@ -152,6 +166,44 @@ impl GlitchEffect {
                     max: 9999.0,
                 },
             ],
+            GlitchEffect::GhostDisplace {
+                copies,
+                offset_x,
+                offset_y,
+                hue_sweep,
+                opacity,
+            } => vec![
+                ParamDescriptor {
+                    name: "copies",
+                    value: *copies as f32,
+                    min: 1.0,
+                    max: 12.0,
+                },
+                ParamDescriptor {
+                    name: "offset_x",
+                    value: *offset_x,
+                    min: -100.0,
+                    max: 100.0,
+                },
+                ParamDescriptor {
+                    name: "offset_y",
+                    value: *offset_y,
+                    min: -100.0,
+                    max: 100.0,
+                },
+                ParamDescriptor {
+                    name: "hue_sweep",
+                    value: *hue_sweep,
+                    min: 0.0,
+                    max: 360.0,
+                },
+                ParamDescriptor {
+                    name: "opacity",
+                    value: *opacity,
+                    min: 0.0,
+                    max: 1.0,
+                },
+            ],
         }
     }
 
@@ -193,6 +245,19 @@ impl GlitchEffect {
                     seed: get(1, *seed as f32) as u32,
                 }
             }
+            GlitchEffect::GhostDisplace {
+                copies,
+                offset_x,
+                offset_y,
+                hue_sweep,
+                opacity,
+            } => GlitchEffect::GhostDisplace {
+                copies: get(0, *copies as f32) as u32,
+                offset_x: get(1, *offset_x),
+                offset_y: get(2, *offset_y),
+                hue_sweep: get(3, *hue_sweep),
+                opacity: get(4, *opacity),
+            },
         }
     }
 
@@ -205,6 +270,7 @@ impl GlitchEffect {
             GlitchEffect::PixelSort { .. } => "PixelSort",
             GlitchEffect::FractalJulia { .. } => "FractalJulia",
             GlitchEffect::DelaunayTriangulation { .. } => "DelaunayTriangulation",
+            GlitchEffect::GhostDisplace { .. } => "GhostDisplace",
         }
     }
 }
@@ -235,6 +301,18 @@ impl fmt::Display for GlitchEffect {
             }
             GlitchEffect::DelaunayTriangulation { num_points, seed } => {
                 write!(f, "Delaunay pts={num_points} s={seed}")
+            }
+            GlitchEffect::GhostDisplace {
+                copies,
+                offset_x,
+                offset_y,
+                hue_sweep,
+                opacity,
+            } => {
+                write!(
+                    f,
+                    "Ghost ×{copies} ({offset_x:.0},{offset_y:.0}) hue={hue_sweep:.0}° op={opacity:.2}"
+                )
             }
         }
     }
@@ -647,6 +725,134 @@ fn triangle_has_edge(tri: (usize, usize, usize), edge: (usize, usize)) -> bool {
         .any(|e| (e.0 == edge.0 && e.1 == edge.1) || (e.0 == edge.1 && e.1 == edge.0))
 }
 
+fn ghost_displace(
+    img: DynamicImage,
+    copies: u32,
+    offset_x: f32,
+    offset_y: f32,
+    hue_sweep: f32,
+    opacity: f32,
+) -> DynamicImage {
+    if copies == 0 {
+        return img;
+    }
+
+    let rgba = img.to_rgba8();
+    let (w, h) = rgba.dimensions();
+    let src = rgba.into_raw();
+    let mut out = src.clone();
+    let op = opacity.clamp(0.0, 1.0);
+
+    for i in 0..copies {
+        let t = if copies <= 1 {
+            1.0
+        } else {
+            i as f32 / (copies - 1) as f32
+        };
+        let dx = (offset_x * t).round() as i32;
+        let dy = (offset_y * t).round() as i32;
+        let hue_shift = hue_sweep * t;
+
+        for y in 0..h {
+            for x in 0..w {
+                let sx = x as i32 - dx;
+                let sy = y as i32 - dy;
+                if sx < 0 || sy < 0 || sx >= w as i32 || sy >= h as i32 {
+                    continue;
+                }
+
+                let dst_idx = ((y * w + x) * 4) as usize;
+                let src_idx = (((sy as u32) * w + sx as u32) * 4) as usize;
+
+                let r = src[src_idx] as f32 / 255.0;
+                let g = src[src_idx + 1] as f32 / 255.0;
+                let b = src[src_idx + 2] as f32 / 255.0;
+                let a = src[src_idx + 3] as f32 / 255.0;
+
+                let (mut h_deg, s, l) = rgb_to_hsl(r, g, b);
+                h_deg = (h_deg + hue_shift).rem_euclid(360.0);
+                let (rr, gg, bb) = hsl_to_rgb(h_deg, s, l);
+
+                let blend = op * a;
+                out[dst_idx] = ((out[dst_idx] as f32) * (1.0 - blend) + rr * 255.0 * blend)
+                    .round()
+                    .clamp(0.0, 255.0) as u8;
+                out[dst_idx + 1] = ((out[dst_idx + 1] as f32) * (1.0 - blend) + gg * 255.0 * blend)
+                    .round()
+                    .clamp(0.0, 255.0) as u8;
+                out[dst_idx + 2] = ((out[dst_idx + 2] as f32) * (1.0 - blend) + bb * 255.0 * blend)
+                    .round()
+                    .clamp(0.0, 255.0) as u8;
+            }
+        }
+    }
+
+    let out_buf = ImageBuffer::<Rgba<u8>, _>::from_raw(w, h, out)
+        .expect("ghost_displace must preserve buffer dimensions");
+    DynamicImage::ImageRgba8(out_buf)
+}
+
+fn rgb_to_hsl(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+    let max = r.max(g.max(b));
+    let min = r.min(g.min(b));
+    let l = (max + min) * 0.5;
+
+    if (max - min).abs() < f32::EPSILON {
+        return (0.0, 0.0, l);
+    }
+
+    let d = max - min;
+    let s = d / (1.0 - (2.0 * l - 1.0).abs());
+    let h = if (max - r).abs() < f32::EPSILON {
+        60.0 * (((g - b) / d).rem_euclid(6.0))
+    } else if (max - g).abs() < f32::EPSILON {
+        60.0 * (((b - r) / d) + 2.0)
+    } else {
+        60.0 * (((r - g) / d) + 4.0)
+    };
+
+    (h, s, l)
+}
+
+fn hue_to_rgb(p: f32, q: f32, mut t: f32) -> f32 {
+    if t < 0.0 {
+        t += 1.0;
+    }
+    if t > 1.0 {
+        t -= 1.0;
+    }
+    if t < 1.0 / 6.0 {
+        return p + (q - p) * 6.0 * t;
+    }
+    if t < 1.0 / 2.0 {
+        return q;
+    }
+    if t < 2.0 / 3.0 {
+        return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+    }
+    p
+}
+
+fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
+    if s <= f32::EPSILON {
+        return (l, l, l);
+    }
+
+    let h_norm = h / 360.0;
+    let q = if l < 0.5 {
+        l * (1.0 + s)
+    } else {
+        l + s - l * s
+    };
+    let p = 2.0 * l - q;
+
+    (
+        hue_to_rgb(p, q, h_norm + 1.0 / 3.0),
+        hue_to_rgb(p, q, h_norm),
+        hue_to_rgb(p, q, h_norm - 1.0 / 3.0),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -748,5 +954,19 @@ mod tests {
         }
         .apply_image(img);
         assert_eq!(out.dimensions(), (50, 40));
+    }
+
+    #[test]
+    fn ghost_displace_preserves_dimensions() {
+        let img = solid_image(64, 48, Rgba([120, 80, 200, 255]));
+        let out = GlitchEffect::GhostDisplace {
+            copies: 5,
+            offset_x: 8.0,
+            offset_y: 4.0,
+            hue_sweep: 60.0,
+            opacity: 0.4,
+        }
+        .apply_image(img);
+        assert_eq!(out.dimensions(), (64, 48));
     }
 }
