@@ -72,8 +72,8 @@ spixelatuir --batch "raw_photos/**/*.png" --pipeline cyberpunk.json --outdir gli
 | Category | Effect | Description |
 |----------|--------|-------------|
 | **Color** | `HueShift`, `GradientMap`, `Saturation`, `Contrast`, `Invert`, `ColorQuantization` | Master the palette with everything from subtle shifts to aggressive posterization. |
-| **Glitch** | `Pixelate`, `RowJitter`, `PixelSort`, `BlockShift` | Warp reality with spatial manipulations and deterministic chaos. |
-| **CRT** | `Scanlines`, `Noise`, `Vignette` | Recreate the warm, fuzzy glow of 80s hardware. |
+| **Glitch** | `Pixelate`, `RowJitter`, `PixelSort`, `BlockShift`, `FractalJulia`, `DelaunayTriangulation`, `GhostDisplace` | Warp reality with spatial manipulations, fractal overlays, low-poly triangulation, and ghosted displacement echoes. |
+| **CRT** | `Scanlines`, `Noise`, `Vignette` | Recreate the warm, fuzzy glow of 80s hardware with colored scanline tint support. |
 | **Composite**| `CropRect` | Focus on what matters. |
 
 ---

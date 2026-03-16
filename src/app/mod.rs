@@ -184,7 +184,7 @@ where
                     let was_in_modal = state.input_mode.is_modal();
                     handlers::handle_key(&mut state, key.code, key.modifiers);
                     let is_in_modal = state.input_mode.is_modal();
-                    
+
                     // If we were in a modal and either exited to a non-modal state
                     // OR transitioned to a different modal, we should clear the terminal
                     // to prevent artifacts from the previous modal.

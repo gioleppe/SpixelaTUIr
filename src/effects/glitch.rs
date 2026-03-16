@@ -279,7 +279,9 @@ impl fmt::Display for GlitchEffect {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GlitchEffect::Pixelate { block_size } => write!(f, "Pixelate {block_size}px"),
-            GlitchEffect::RowJitter { magnitude, seed } => write!(f, "RowJitter {magnitude:.2} s={seed}"),
+            GlitchEffect::RowJitter { magnitude, seed } => {
+                write!(f, "RowJitter {magnitude:.2} s={seed}")
+            }
             GlitchEffect::BlockShift { shift_x, shift_y } => {
                 write!(f, "BlockShift ({shift_x},{shift_y})")
             }
@@ -599,7 +601,12 @@ fn delaunay_triangulation(img: DynamicImage, num_points: u32, seed: u32) -> Dyna
         // Rasterise: fill all pixels inside the triangle.
         for py in min_y..=max_y {
             for px in min_x..=max_x {
-                if point_in_triangle(px as f32 + 0.5, py as f32 + 0.5, ax, ay, bx, by, cx, cy) {
+                if point_in_triangle(
+                    (px as f32 + 0.5, py as f32 + 0.5),
+                    (ax, ay),
+                    (bx, by),
+                    (cx, cy),
+                ) {
                     let idx = (py as usize * w_usize + px as usize) * 4;
                     out_raw[idx..idx + 4].copy_from_slice(&col);
                 }
@@ -611,15 +618,15 @@ fn delaunay_triangulation(img: DynamicImage, num_points: u32, seed: u32) -> Dyna
     DynamicImage::ImageRgba8(out)
 }
 
-/// Test whether point (px, py) lies inside triangle (ax,ay)-(bx,by)-(cx,cy)
-/// using barycentric coordinates.
-fn point_in_triangle(px: f32, py: f32, ax: f32, ay: f32, bx: f32, by: f32, cx: f32, cy: f32) -> bool {
-    let v0x = cx - ax;
-    let v0y = cy - ay;
-    let v1x = bx - ax;
-    let v1y = by - ay;
-    let v2x = px - ax;
-    let v2y = py - ay;
+/// Test whether point `p` lies inside triangle `(a, b, c)` using barycentric
+/// coordinates.
+fn point_in_triangle(p: (f32, f32), a: (f32, f32), b: (f32, f32), c: (f32, f32)) -> bool {
+    let v0x = c.0 - a.0;
+    let v0y = c.1 - a.1;
+    let v1x = b.0 - a.0;
+    let v1y = b.1 - a.1;
+    let v2x = p.0 - a.0;
+    let v2y = p.1 - a.1;
 
     let dot00 = v0x * v0x + v0y * v0y;
     let dot01 = v0x * v1x + v0y * v1y;
@@ -627,7 +634,12 @@ fn point_in_triangle(px: f32, py: f32, ax: f32, ay: f32, bx: f32, by: f32, cx: f
     let dot11 = v1x * v1x + v1y * v1y;
     let dot12 = v1x * v2x + v1y * v2y;
 
-    let inv_denom = 1.0 / (dot00 * dot11 - dot01 * dot01);
+    let denom = dot00 * dot11 - dot01 * dot01;
+    if denom.abs() < f32::EPSILON {
+        return false; // degenerate triangle
+    }
+    let inv_denom = 1.0 / denom;
+    // u, v are barycentric coordinates; point is inside when both ≥ 0 and u+v ≤ 1.
     let u = (dot11 * dot02 - dot01 * dot12) * inv_denom;
     let v = (dot00 * dot12 - dot01 * dot02) * inv_denom;
 
@@ -636,7 +648,7 @@ fn point_in_triangle(px: f32, py: f32, ax: f32, ay: f32, bx: f32, by: f32, cx: f
 
 /// Bowyer-Watson incremental Delaunay triangulation.
 fn bowyer_watson(points: &[(f32, f32)], w: f32, h: f32) -> Vec<(usize, usize, usize)> {
-    // Super-triangle that contains all points.
+    // Large enough to fully contain all image-space points with safety margin.
     let margin = w.max(h) * 10.0;
     let sp0 = points.len();
     let sp1 = sp0 + 1;
@@ -674,11 +686,10 @@ fn bowyer_watson(points: &[(f32, f32)], w: f32, h: f32) -> Vec<(usize, usize, us
             }
         }
 
-        // Remove bad triangles (in reverse order to preserve indices).
-        let mut bad_sorted = bad_triangles.clone();
-        bad_sorted.sort_unstable_by(|a, b| b.cmp(a));
-        for ti in bad_sorted {
-            triangulation.swap_remove(ti);
+        // Remove bad triangles (in reverse index order to preserve lower indices).
+        bad_triangles.sort_unstable_by(|a, b| b.cmp(a));
+        for ti in &bad_triangles {
+            triangulation.swap_remove(*ti);
         }
 
         // Create new triangles from polygon edges to the new point.
