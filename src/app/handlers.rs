@@ -95,16 +95,25 @@ pub fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifier
         KeyCode::Char('J') if state.focused_panel == FocusedPanel::EffectsList => {
             move_effect_down(state);
         }
-        // Effects-list navigation (when effects panel is focused).
+        // Effects-list navigation (when effects panel is focused) — circular wrapping.
         KeyCode::Up | KeyCode::Char('k') if state.focused_panel == FocusedPanel::EffectsList => {
-            if state.selected_effect > 0 {
-                state.selected_effect -= 1;
+            let len = state.pipeline.effects.len();
+            if len > 0 {
+                state.selected_effect = if state.selected_effect == 0 {
+                    len - 1
+                } else {
+                    state.selected_effect - 1
+                };
             }
         }
         KeyCode::Down | KeyCode::Char('j') if state.focused_panel == FocusedPanel::EffectsList => {
-            let max = state.pipeline.effects.len().saturating_sub(1);
-            if state.selected_effect < max {
-                state.selected_effect += 1;
+            let len = state.pipeline.effects.len();
+            if len > 0 {
+                state.selected_effect = if state.selected_effect >= len - 1 {
+                    0
+                } else {
+                    state.selected_effect + 1
+                };
             }
         }
         // Add effect.
@@ -385,14 +394,18 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
             state.input_mode = InputMode::Normal;
         }
         KeyCode::Up | KeyCode::Char('k') => {
-            if state.add_effect_cursor > 0 {
-                state.add_effect_cursor -= 1;
-            }
+            state.add_effect_cursor = if state.add_effect_cursor == 0 {
+                n - 1
+            } else {
+                state.add_effect_cursor - 1
+            };
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if state.add_effect_cursor < n - 1 {
-                state.add_effect_cursor += 1;
-            }
+            state.add_effect_cursor = if state.add_effect_cursor >= n - 1 {
+                0
+            } else {
+                state.add_effect_cursor + 1
+            };
         }
         KeyCode::Enter => {
             let effect = AVAILABLE_EFFECTS[state.add_effect_cursor].1();
@@ -571,17 +584,23 @@ fn handle_edit_effect(state: &mut AppState, code: KeyCode) {
             state.status_message = "Edit cancelled.".to_string();
         }
         KeyCode::Up | KeyCode::Char('k') => {
-            if field_idx > 0 {
-                state.input_mode = InputMode::EditEffect {
-                    field_idx: field_idx - 1,
+            if num_fields > 0 {
+                let new_idx = if field_idx == 0 {
+                    num_fields - 1
+                } else {
+                    field_idx - 1
                 };
+                state.input_mode = InputMode::EditEffect { field_idx: new_idx };
             }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if field_idx + 1 < num_fields {
-                state.input_mode = InputMode::EditEffect {
-                    field_idx: field_idx + 1,
+            if num_fields > 0 {
+                let new_idx = if field_idx + 1 >= num_fields {
+                    0
+                } else {
+                    field_idx + 1
                 };
+                state.input_mode = InputMode::EditEffect { field_idx: new_idx };
             }
         }
         KeyCode::Backspace => {
