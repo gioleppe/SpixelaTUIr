@@ -11,11 +11,11 @@ pub enum GlitchEffect {
     /// Reduce effective resolution by grouping pixels into blocks.
     Pixelate { block_size: u32 },
     /// Randomly displace rows horizontally.
-    RowJitter { magnitude: f32 },
+    RowJitter { magnitude: f32, seed: u32 },
     /// Shift rectangular blocks of pixels.
     BlockShift { shift_x: i32, shift_y: i32 },
     /// Sort pixels within rows by luminance.
-    PixelSort { threshold: f32 },
+    PixelSort { threshold: f32, reverse: bool },
 }
 
 impl GlitchEffect {
@@ -23,9 +23,9 @@ impl GlitchEffect {
     pub fn apply_image(&self, img: DynamicImage) -> DynamicImage {
         match self {
             GlitchEffect::Pixelate { block_size } => pixelate(img, *block_size),
-            GlitchEffect::RowJitter { magnitude } => row_jitter(img, *magnitude),
+            GlitchEffect::RowJitter { magnitude, seed } => row_jitter(img, *magnitude, *seed),
             GlitchEffect::BlockShift { shift_x, shift_y } => block_shift(img, *shift_x, *shift_y),
-            GlitchEffect::PixelSort { threshold } => pixel_sort(img, *threshold),
+            GlitchEffect::PixelSort { threshold, reverse } => pixel_sort(img, *threshold, *reverse),
         }
     }
 
@@ -38,12 +38,20 @@ impl GlitchEffect {
                 min: 1.0,
                 max: 64.0,
             }],
-            GlitchEffect::RowJitter { magnitude } => vec![ParamDescriptor {
-                name: "magnitude",
-                value: *magnitude,
-                min: 0.0,
-                max: 1.0,
-            }],
+            GlitchEffect::RowJitter { magnitude, seed } => vec![
+                ParamDescriptor {
+                    name: "magnitude",
+                    value: *magnitude,
+                    min: 0.0,
+                    max: 1.0,
+                },
+                ParamDescriptor {
+                    name: "seed",
+                    value: *seed as f32,
+                    min: 0.0,
+                    max: 9999.0,
+                },
+            ],
             GlitchEffect::BlockShift { shift_x, shift_y } => vec![
                 ParamDescriptor {
                     name: "shift_x",
@@ -58,12 +66,20 @@ impl GlitchEffect {
                     max: 200.0,
                 },
             ],
-            GlitchEffect::PixelSort { threshold } => vec![ParamDescriptor {
-                name: "threshold",
-                value: *threshold,
-                min: 0.0,
-                max: 1.0,
-            }],
+            GlitchEffect::PixelSort { threshold, reverse } => vec![
+                ParamDescriptor {
+                    name: "threshold",
+                    value: *threshold,
+                    min: 0.0,
+                    max: 1.0,
+                },
+                ParamDescriptor {
+                    name: "reverse",
+                    value: if *reverse { 1.0 } else { 0.0 },
+                    min: 0.0,
+                    max: 1.0,
+                },
+            ],
         }
     }
 
@@ -74,15 +90,17 @@ impl GlitchEffect {
             GlitchEffect::Pixelate { block_size } => GlitchEffect::Pixelate {
                 block_size: get(0, *block_size as f32) as u32,
             },
-            GlitchEffect::RowJitter { magnitude } => GlitchEffect::RowJitter {
+            GlitchEffect::RowJitter { magnitude, seed } => GlitchEffect::RowJitter {
                 magnitude: get(0, *magnitude),
+                seed: get(1, *seed as f32) as u32,
             },
             GlitchEffect::BlockShift { shift_x, shift_y } => GlitchEffect::BlockShift {
                 shift_x: get(0, *shift_x as f32) as i32,
                 shift_y: get(1, *shift_y as f32) as i32,
             },
-            GlitchEffect::PixelSort { threshold } => GlitchEffect::PixelSort {
+            GlitchEffect::PixelSort { threshold, reverse } => GlitchEffect::PixelSort {
                 threshold: get(0, *threshold),
+                reverse: get(1, if *reverse { 1.0 } else { 0.0 }) >= 0.5,
             },
         }
     }
@@ -102,11 +120,14 @@ impl fmt::Display for GlitchEffect {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GlitchEffect::Pixelate { block_size } => write!(f, "Pixelate {block_size}px"),
-            GlitchEffect::RowJitter { magnitude } => write!(f, "RowJitter {magnitude:.2}"),
+            GlitchEffect::RowJitter { magnitude, seed } => write!(f, "RowJitter {magnitude:.2} s={seed}"),
             GlitchEffect::BlockShift { shift_x, shift_y } => {
                 write!(f, "BlockShift ({shift_x},{shift_y})")
             }
-            GlitchEffect::PixelSort { threshold } => write!(f, "PixelSort {threshold:.2}"),
+            GlitchEffect::PixelSort { threshold, reverse } => {
+                let dir = if *reverse { "desc" } else { "asc" };
+                write!(f, "PixelSort {threshold:.2} {dir}")
+            }
         }
     }
 }
@@ -175,7 +196,7 @@ fn pixelate(img: DynamicImage, block_size: u32) -> DynamicImage {
 
 // ── Row Jitter ────────────────────────────────────────────────────────────────
 
-fn row_jitter(img: DynamicImage, magnitude: f32) -> DynamicImage {
+fn row_jitter(img: DynamicImage, magnitude: f32, seed: u32) -> DynamicImage {
     let (w, h) = img.dimensions();
     let rgba = img.to_rgba8();
     let max_shift = (w as f32 * magnitude.abs()) as i32;
@@ -190,7 +211,8 @@ fn row_jitter(img: DynamicImage, magnitude: f32) -> DynamicImage {
         .iter()
         .enumerate()
         .map(|(y, row)| {
-            let hash = (y as u32).wrapping_mul(2654435761) ^ (y as u32).wrapping_mul(2246822519);
+            let hash = (y as u32).wrapping_mul(2654435761).wrapping_add(seed)
+                ^ (y as u32).wrapping_mul(2246822519).wrapping_add(seed);
             let n = ((hash as f32).sin() * 43_758.547).fract();
             let shift = ((n * 2.0 - 1.0) * max_shift as f32) as i32;
             (0..w)
@@ -244,7 +266,7 @@ fn luminance(p: &Rgba<u8>) -> f32 {
     0.2126 * p[0] as f32 + 0.7152 * p[1] as f32 + 0.0722 * p[2] as f32
 }
 
-fn pixel_sort(img: DynamicImage, threshold: f32) -> DynamicImage {
+fn pixel_sort(img: DynamicImage, threshold: f32, reverse: bool) -> DynamicImage {
     let (w, h) = img.dimensions();
     let rgba = img.to_rgba8();
     let thresh = threshold * 255.0;
@@ -266,7 +288,11 @@ fn pixel_sort(img: DynamicImage, threshold: f32) -> DynamicImage {
                     }
                 } else if let Some(start) = seg_start.take() {
                     let segment = &mut sorted[start..x];
-                    segment.sort_by(|a, b| luminance(a).partial_cmp(&luminance(b)).unwrap());
+                    if reverse {
+                        segment.sort_by(|a, b| luminance(b).partial_cmp(&luminance(a)).unwrap());
+                    } else {
+                        segment.sort_by(|a, b| luminance(a).partial_cmp(&luminance(b)).unwrap());
+                    }
                 }
             }
             sorted
@@ -302,14 +328,22 @@ mod tests {
     #[test]
     fn row_jitter_preserves_dimensions() {
         let img = solid_image(50, 40, Rgba([0, 255, 0, 255]));
-        let out = GlitchEffect::RowJitter { magnitude: 0.2 }.apply_image(img);
+        let out = GlitchEffect::RowJitter {
+            magnitude: 0.2,
+            seed: 0,
+        }
+        .apply_image(img);
         assert_eq!(out.dimensions(), (50, 40));
     }
 
     #[test]
     fn pixel_sort_preserves_dimensions() {
         let img = solid_image(30, 20, Rgba([128, 128, 128, 255]));
-        let out = GlitchEffect::PixelSort { threshold: 0.3 }.apply_image(img);
+        let out = GlitchEffect::PixelSort {
+            threshold: 0.3,
+            reverse: false,
+        }
+        .apply_image(img);
         assert_eq!(out.dimensions(), (30, 20));
     }
 
