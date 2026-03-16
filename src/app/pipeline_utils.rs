@@ -89,6 +89,12 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
             blend: 0.5,
         })
     }),
+    ("Delaunay Triangulation", || {
+        Effect::Glitch(GlitchEffect::DelaunayTriangulation {
+            num_points: 200,
+            seed: 42,
+        })
+    }),
 ];
 
 /// Randomize the numeric parameters of every effect in the pipeline.
@@ -164,6 +170,10 @@ pub fn randomize_pipeline(pipeline: &mut Pipeline) {
                     *cy = (next() - 0.5) * 3.0;
                     *max_iter = 20 + (next() * 180.0) as u32;
                     *blend = 0.2 + next() * 0.6;
+                }
+                GlitchEffect::DelaunayTriangulation { num_points, seed } => {
+                    *num_points = 50 + (next() * 500.0) as u32;
+                    *seed = (next() * 9999.0) as u32;
                 }
             },
             Effect::Crt(e) => match e {

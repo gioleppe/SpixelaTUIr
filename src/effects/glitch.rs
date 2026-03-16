@@ -24,6 +24,8 @@ pub enum GlitchEffect {
         max_iter: u32,
         blend: f32,
     },
+    /// Create a low-poly look using Delaunay triangulation of random sample points.
+    DelaunayTriangulation { num_points: u32, seed: u32 },
 }
 
 impl GlitchEffect {
@@ -41,6 +43,9 @@ impl GlitchEffect {
                 max_iter,
                 blend,
             } => fractal_julia(img, *scale, *cx, *cy, *max_iter, *blend),
+            GlitchEffect::DelaunayTriangulation { num_points, seed } => {
+                delaunay_triangulation(img, *num_points, *seed)
+            }
         }
     }
 
@@ -133,6 +138,20 @@ impl GlitchEffect {
                     max: 1.0,
                 },
             ],
+            GlitchEffect::DelaunayTriangulation { num_points, seed } => vec![
+                ParamDescriptor {
+                    name: "num_points",
+                    value: *num_points as f32,
+                    min: 10.0,
+                    max: 2000.0,
+                },
+                ParamDescriptor {
+                    name: "seed",
+                    value: *seed as f32,
+                    min: 0.0,
+                    max: 9999.0,
+                },
+            ],
         }
     }
 
@@ -168,6 +187,12 @@ impl GlitchEffect {
                 max_iter: get(3, *max_iter as f32) as u32,
                 blend: get(4, *blend),
             },
+            GlitchEffect::DelaunayTriangulation { num_points, seed } => {
+                GlitchEffect::DelaunayTriangulation {
+                    num_points: get(0, *num_points as f32) as u32,
+                    seed: get(1, *seed as f32) as u32,
+                }
+            }
         }
     }
 
@@ -179,6 +204,7 @@ impl GlitchEffect {
             GlitchEffect::BlockShift { .. } => "BlockShift",
             GlitchEffect::PixelSort { .. } => "PixelSort",
             GlitchEffect::FractalJulia { .. } => "FractalJulia",
+            GlitchEffect::DelaunayTriangulation { .. } => "DelaunayTriangulation",
         }
     }
 }
@@ -206,6 +232,9 @@ impl fmt::Display for GlitchEffect {
                     f,
                     "Julia s={scale:.1} c=({cx:.2},{cy:.2}) i={max_iter} b={blend:.2}"
                 )
+            }
+            GlitchEffect::DelaunayTriangulation { num_points, seed } => {
+                write!(f, "Delaunay pts={num_points} s={seed}")
             }
         }
     }
@@ -435,6 +464,189 @@ fn fractal_julia(
     DynamicImage::ImageRgba8(out)
 }
 
+// ── Delaunay Triangulation ───────────────────────────────────────────────────
+
+/// Simple LCG PRNG for deterministic point generation.
+fn lcg_next(state: &mut u64) -> f32 {
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    ((*state >> 33) as f32) / (u32::MAX as f32)
+}
+
+fn delaunay_triangulation(img: DynamicImage, num_points: u32, seed: u32) -> DynamicImage {
+    let (w, h) = img.dimensions();
+    let rgba = img.to_rgba8();
+    let raw = rgba.as_raw();
+
+    let num_points = num_points.max(4);
+    let mut rng_state = seed as u64 ^ 0xDEAD_BEEF;
+
+    // Generate random sample points + the 4 corners to cover the entire image.
+    let mut points: Vec<(f32, f32)> = Vec::with_capacity(num_points as usize + 4);
+    points.push((0.0, 0.0));
+    points.push((w as f32 - 1.0, 0.0));
+    points.push((0.0, h as f32 - 1.0));
+    points.push((w as f32 - 1.0, h as f32 - 1.0));
+    for _ in 0..num_points {
+        let px = lcg_next(&mut rng_state) * (w as f32 - 1.0);
+        let py = lcg_next(&mut rng_state) * (h as f32 - 1.0);
+        points.push((px, py));
+    }
+
+    // Build Delaunay triangulation using Bowyer-Watson algorithm.
+    let triangles = bowyer_watson(&points, w as f32, h as f32);
+
+    // For each triangle, compute average colour from source image then fill.
+    let mut out_raw = vec![0u8; raw.len()];
+    let w_usize = w as usize;
+
+    for tri in &triangles {
+        let (ax, ay) = points[tri.0];
+        let (bx, by) = points[tri.1];
+        let (cx, cy) = points[tri.2];
+
+        // Bounding box of the triangle.
+        let min_x = ax.min(bx).min(cx).max(0.0) as u32;
+        let max_x = (ax.max(bx).max(cx) as u32).min(w - 1);
+        let min_y = ay.min(by).min(cy).max(0.0) as u32;
+        let max_y = (ay.max(by).max(cy) as u32).min(h - 1);
+
+        // Sample the centroid colour.
+        let cent_x = ((ax + bx + cx) / 3.0).clamp(0.0, (w - 1) as f32) as u32;
+        let cent_y = ((ay + by + cy) / 3.0).clamp(0.0, (h - 1) as f32) as u32;
+        let ci = (cent_y as usize * w_usize + cent_x as usize) * 4;
+        let col = [raw[ci], raw[ci + 1], raw[ci + 2], raw[ci + 3]];
+
+        // Rasterise: fill all pixels inside the triangle.
+        for py in min_y..=max_y {
+            for px in min_x..=max_x {
+                if point_in_triangle(px as f32 + 0.5, py as f32 + 0.5, ax, ay, bx, by, cx, cy) {
+                    let idx = (py as usize * w_usize + px as usize) * 4;
+                    out_raw[idx..idx + 4].copy_from_slice(&col);
+                }
+            }
+        }
+    }
+
+    let out = ImageBuffer::from_raw(w, h, out_raw).expect("buffer size mismatch");
+    DynamicImage::ImageRgba8(out)
+}
+
+/// Test whether point (px, py) lies inside triangle (ax,ay)-(bx,by)-(cx,cy)
+/// using barycentric coordinates.
+fn point_in_triangle(px: f32, py: f32, ax: f32, ay: f32, bx: f32, by: f32, cx: f32, cy: f32) -> bool {
+    let v0x = cx - ax;
+    let v0y = cy - ay;
+    let v1x = bx - ax;
+    let v1y = by - ay;
+    let v2x = px - ax;
+    let v2y = py - ay;
+
+    let dot00 = v0x * v0x + v0y * v0y;
+    let dot01 = v0x * v1x + v0y * v1y;
+    let dot02 = v0x * v2x + v0y * v2y;
+    let dot11 = v1x * v1x + v1y * v1y;
+    let dot12 = v1x * v2x + v1y * v2y;
+
+    let inv_denom = 1.0 / (dot00 * dot11 - dot01 * dot01);
+    let u = (dot11 * dot02 - dot01 * dot12) * inv_denom;
+    let v = (dot00 * dot12 - dot01 * dot02) * inv_denom;
+
+    u >= 0.0 && v >= 0.0 && (u + v) <= 1.0
+}
+
+/// Bowyer-Watson incremental Delaunay triangulation.
+fn bowyer_watson(points: &[(f32, f32)], w: f32, h: f32) -> Vec<(usize, usize, usize)> {
+    // Super-triangle that contains all points.
+    let margin = w.max(h) * 10.0;
+    let sp0 = points.len();
+    let sp1 = sp0 + 1;
+    let sp2 = sp0 + 2;
+
+    let mut all_points = points.to_vec();
+    all_points.push((-margin, -margin));
+    all_points.push((2.0 * margin + w, -margin));
+    all_points.push((w / 2.0, 2.0 * margin + h));
+
+    let mut triangulation: Vec<(usize, usize, usize)> = vec![(sp0, sp1, sp2)];
+
+    for i in 0..points.len() {
+        let (px, py) = all_points[i];
+        let mut bad_triangles = Vec::new();
+
+        for (ti, tri) in triangulation.iter().enumerate() {
+            if in_circumcircle(px, py, &all_points, tri) {
+                bad_triangles.push(ti);
+            }
+        }
+
+        // Find the boundary polygon (edges that are not shared by two bad triangles).
+        let mut polygon: Vec<(usize, usize)> = Vec::new();
+        for &ti in &bad_triangles {
+            let tri = triangulation[ti];
+            let edges = [(tri.0, tri.1), (tri.1, tri.2), (tri.2, tri.0)];
+            for edge in &edges {
+                let shared = bad_triangles
+                    .iter()
+                    .any(|&oti| oti != ti && triangle_has_edge(triangulation[oti], *edge));
+                if !shared {
+                    polygon.push(*edge);
+                }
+            }
+        }
+
+        // Remove bad triangles (in reverse order to preserve indices).
+        let mut bad_sorted = bad_triangles.clone();
+        bad_sorted.sort_unstable_by(|a, b| b.cmp(a));
+        for ti in bad_sorted {
+            triangulation.swap_remove(ti);
+        }
+
+        // Create new triangles from polygon edges to the new point.
+        for edge in &polygon {
+            triangulation.push((edge.0, edge.1, i));
+        }
+    }
+
+    // Remove triangles that reference the super-triangle vertices.
+    triangulation
+        .retain(|tri| tri.0 < points.len() && tri.1 < points.len() && tri.2 < points.len());
+
+    triangulation
+}
+
+fn in_circumcircle(px: f32, py: f32, points: &[(f32, f32)], tri: &(usize, usize, usize)) -> bool {
+    let (ax, ay) = points[tri.0];
+    let (bx, by) = points[tri.1];
+    let (cx, cy) = points[tri.2];
+
+    let d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+    if d.abs() < f32::EPSILON {
+        return false;
+    }
+    let ux = ((ax * ax + ay * ay) * (by - cy)
+        + (bx * bx + by * by) * (cy - ay)
+        + (cx * cx + cy * cy) * (ay - by))
+        / d;
+    let uy = ((ax * ax + ay * ay) * (cx - bx)
+        + (bx * bx + by * by) * (ax - cx)
+        + (cx * cx + cy * cy) * (bx - ax))
+        / d;
+
+    let r2 = (ax - ux) * (ax - ux) + (ay - uy) * (ay - uy);
+    let dist2 = (px - ux) * (px - ux) + (py - uy) * (py - uy);
+
+    dist2 <= r2
+}
+
+fn triangle_has_edge(tri: (usize, usize, usize), edge: (usize, usize)) -> bool {
+    let edges = [(tri.0, tri.1), (tri.1, tri.2), (tri.2, tri.0)];
+    edges
+        .iter()
+        .any(|e| (e.0 == edge.0 && e.1 == edge.1) || (e.0 == edge.1 && e.1 == edge.0))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -525,5 +737,16 @@ mod tests {
         }
         .apply_image(img);
         assert_eq!(out.dimensions(), (40, 30));
+    }
+
+    #[test]
+    fn delaunay_triangulation_preserves_dimensions() {
+        let img = solid_image(50, 40, Rgba([80, 120, 200, 255]));
+        let out = GlitchEffect::DelaunayTriangulation {
+            num_points: 50,
+            seed: 42,
+        }
+        .apply_image(img);
+        assert_eq!(out.dimensions(), (50, 40));
     }
 }
