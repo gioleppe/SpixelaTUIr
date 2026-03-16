@@ -547,11 +547,13 @@ fn fractal_julia(
 // ── Delaunay Triangulation ───────────────────────────────────────────────────
 
 /// Simple LCG PRNG for deterministic point generation.
+/// Returns a value in [0.0, 1.0).
 fn lcg_next(state: &mut u64) -> f32 {
     *state = state
         .wrapping_mul(6364136223846793005)
         .wrapping_add(1442695040888963407);
-    ((*state >> 33) as f32) / (u32::MAX as f32)
+    // Shift right 33 gives a 31-bit value in [0, 2^31); divide by 2^31 to normalise.
+    ((*state >> 33) as f32) / ((1u64 << 31) as f32)
 }
 
 fn delaunay_triangulation(img: DynamicImage, num_points: u32, seed: u32) -> DynamicImage {
