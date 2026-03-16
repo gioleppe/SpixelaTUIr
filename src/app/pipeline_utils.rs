@@ -7,6 +7,7 @@ use crate::effects::{
 pub type EffectEntry = (&'static str, fn() -> Effect);
 
 pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
+    // ── Color ────────────────────────────────────────────────────────────
     ("Invert", || Effect::Color(ColorEffect::Invert)),
     ("Gradient Map", || {
         Effect::Color(ColorEffect::GradientMap {
@@ -29,6 +30,7 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
     ("Quantize (4 levels)", || {
         Effect::Color(ColorEffect::ColorQuantization { levels: 4 })
     }),
+    // ── Glitch ───────────────────────────────────────────────────────────
     ("Pixelate (8px)", || {
         Effect::Glitch(GlitchEffect::Pixelate { block_size: 8 })
     }),
@@ -48,36 +50,6 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
         Effect::Glitch(GlitchEffect::PixelSort {
             threshold: 0.5,
             reverse: false,
-        })
-    }),
-    ("Scanlines", || {
-        Effect::Crt(CrtEffect::Scanlines {
-            spacing: 2,
-            opacity: 0.5,
-            color_r: 0,
-            color_g: 0,
-            color_b: 0,
-        })
-    }),
-    ("Noise (RGB)", || {
-        Effect::Crt(CrtEffect::Noise {
-            intensity: 0.1,
-            monochromatic: false,
-            seed: 0,
-        })
-    }),
-    ("Vignette", || {
-        Effect::Crt(CrtEffect::Vignette {
-            radius: 0.7,
-            softness: 0.3,
-        })
-    }),
-    ("Crop 50%", || {
-        Effect::Composite(CompositeEffect::CropRect {
-            x: 50,
-            y: 50,
-            width: 200,
-            height: 200,
         })
     }),
     ("Fractal Julia", || {
@@ -102,6 +74,38 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
             offset_y: 4.0,
             hue_sweep: 60.0,
             opacity: 0.4,
+        })
+    }),
+    // ── CRT ──────────────────────────────────────────────────────────────
+    ("Scanlines", || {
+        Effect::Crt(CrtEffect::Scanlines {
+            spacing: 2,
+            opacity: 0.5,
+            color_r: 0,
+            color_g: 0,
+            color_b: 0,
+        })
+    }),
+    ("Noise (RGB)", || {
+        Effect::Crt(CrtEffect::Noise {
+            intensity: 0.1,
+            monochromatic: false,
+            seed: 0,
+        })
+    }),
+    ("Vignette", || {
+        Effect::Crt(CrtEffect::Vignette {
+            radius: 0.7,
+            softness: 0.3,
+        })
+    }),
+    // ── Composite ────────────────────────────────────────────────────────
+    ("Crop 50%", || {
+        Effect::Composite(CompositeEffect::CropRect {
+            x: 50,
+            y: 50,
+            width: 200,
+            height: 200,
         })
     }),
 ];
