@@ -80,6 +80,15 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
             height: 200,
         })
     }),
+    ("Fractal Julia", || {
+        Effect::Glitch(GlitchEffect::FractalJulia {
+            scale: 2.5,
+            cx: -0.7,
+            cy: 0.27015,
+            max_iter: 80,
+            blend: 0.5,
+        })
+    }),
 ];
 
 /// Randomize the numeric parameters of every effect in the pipeline.
@@ -142,6 +151,19 @@ pub fn randomize_pipeline(pipeline: &mut Pipeline) {
                 GlitchEffect::PixelSort { threshold, reverse } => {
                     *threshold = 0.2 + next() * 0.6;
                     *reverse = next() >= 0.5;
+                }
+                GlitchEffect::FractalJulia {
+                    scale,
+                    cx,
+                    cy,
+                    max_iter,
+                    blend,
+                } => {
+                    *scale = 0.5 + next() * 4.0;
+                    *cx = (next() - 0.5) * 3.0;
+                    *cy = (next() - 0.5) * 3.0;
+                    *max_iter = 20 + (next() * 180.0) as u32;
+                    *blend = 0.2 + next() * 0.6;
                 }
             },
             Effect::Crt(e) => match e {

@@ -16,6 +16,14 @@ pub enum GlitchEffect {
     BlockShift { shift_x: i32, shift_y: i32 },
     /// Sort pixels within rows by luminance.
     PixelSort { threshold: f32, reverse: bool },
+    /// Overlay a Julia set fractal pattern blended with the source image.
+    FractalJulia {
+        scale: f32,
+        cx: f32,
+        cy: f32,
+        max_iter: u32,
+        blend: f32,
+    },
 }
 
 impl GlitchEffect {
@@ -26,6 +34,13 @@ impl GlitchEffect {
             GlitchEffect::RowJitter { magnitude, seed } => row_jitter(img, *magnitude, *seed),
             GlitchEffect::BlockShift { shift_x, shift_y } => block_shift(img, *shift_x, *shift_y),
             GlitchEffect::PixelSort { threshold, reverse } => pixel_sort(img, *threshold, *reverse),
+            GlitchEffect::FractalJulia {
+                scale,
+                cx,
+                cy,
+                max_iter,
+                blend,
+            } => fractal_julia(img, *scale, *cx, *cy, *max_iter, *blend),
         }
     }
 
@@ -80,6 +95,44 @@ impl GlitchEffect {
                     max: 1.0,
                 },
             ],
+            GlitchEffect::FractalJulia {
+                scale,
+                cx,
+                cy,
+                max_iter,
+                blend,
+            } => vec![
+                ParamDescriptor {
+                    name: "scale",
+                    value: *scale,
+                    min: 0.1,
+                    max: 5.0,
+                },
+                ParamDescriptor {
+                    name: "cx",
+                    value: *cx,
+                    min: -2.0,
+                    max: 2.0,
+                },
+                ParamDescriptor {
+                    name: "cy",
+                    value: *cy,
+                    min: -2.0,
+                    max: 2.0,
+                },
+                ParamDescriptor {
+                    name: "max_iter",
+                    value: *max_iter as f32,
+                    min: 10.0,
+                    max: 200.0,
+                },
+                ParamDescriptor {
+                    name: "blend",
+                    value: *blend,
+                    min: 0.0,
+                    max: 1.0,
+                },
+            ],
         }
     }
 
@@ -102,6 +155,19 @@ impl GlitchEffect {
                 threshold: get(0, *threshold),
                 reverse: get(1, if *reverse { 1.0 } else { 0.0 }) >= 0.5,
             },
+            GlitchEffect::FractalJulia {
+                scale,
+                cx,
+                cy,
+                max_iter,
+                blend,
+            } => GlitchEffect::FractalJulia {
+                scale: get(0, *scale),
+                cx: get(1, *cx),
+                cy: get(2, *cy),
+                max_iter: get(3, *max_iter as f32) as u32,
+                blend: get(4, *blend),
+            },
         }
     }
 
@@ -112,6 +178,7 @@ impl GlitchEffect {
             GlitchEffect::RowJitter { .. } => "RowJitter",
             GlitchEffect::BlockShift { .. } => "BlockShift",
             GlitchEffect::PixelSort { .. } => "PixelSort",
+            GlitchEffect::FractalJulia { .. } => "FractalJulia",
         }
     }
 }
@@ -127,6 +194,18 @@ impl fmt::Display for GlitchEffect {
             GlitchEffect::PixelSort { threshold, reverse } => {
                 let dir = if *reverse { "desc" } else { "asc" };
                 write!(f, "PixelSort {threshold:.2} {dir}")
+            }
+            GlitchEffect::FractalJulia {
+                scale,
+                cx,
+                cy,
+                max_iter,
+                blend,
+            } => {
+                write!(
+                    f,
+                    "Julia s={scale:.1} c=({cx:.2},{cy:.2}) i={max_iter} b={blend:.2}"
+                )
             }
         }
     }
@@ -308,6 +387,54 @@ fn pixel_sort(img: DynamicImage, threshold: f32, reverse: bool) -> DynamicImage 
     DynamicImage::ImageRgba8(out)
 }
 
+// ── Fractal Julia ────────────────────────────────────────────────────────────
+
+fn fractal_julia(
+    img: DynamicImage,
+    scale: f32,
+    cx: f32,
+    cy: f32,
+    max_iter: u32,
+    blend: f32,
+) -> DynamicImage {
+    let (w, h) = img.dimensions();
+    let rgba = img.to_rgba8();
+    let mut out = ImageBuffer::new(w, h);
+    let aspect = w as f32 / h as f32;
+    let max_iter = max_iter.max(1);
+    let blend = blend.clamp(0.0, 1.0);
+
+    for y in 0..h {
+        for x in 0..w {
+            // Map pixel coordinates to complex plane centred at origin.
+            let mut zr = (x as f32 / w as f32 - 0.5) * scale * aspect;
+            let mut zi = (y as f32 / h as f32 - 0.5) * scale;
+
+            let mut iter = 0u32;
+            while zr * zr + zi * zi <= 4.0 && iter < max_iter {
+                let tmp = zr * zr - zi * zi + cx;
+                zi = 2.0 * zr * zi + cy;
+                zr = tmp;
+                iter += 1;
+            }
+
+            let t = iter as f32 / max_iter as f32;
+            // Map iteration count to a colour via simple HSV-style ramp.
+            let fr = ((t * 6.0).sin() * 0.5 + 0.5) * 255.0;
+            let fg = ((t * 6.0 + 2.0).sin() * 0.5 + 0.5) * 255.0;
+            let fb = ((t * 6.0 + 4.0).sin() * 0.5 + 0.5) * 255.0;
+
+            let src = rgba.get_pixel(x, y);
+            let r = (src[0] as f32 * (1.0 - blend) + fr * blend) as u8;
+            let g = (src[1] as f32 * (1.0 - blend) + fg * blend) as u8;
+            let b = (src[2] as f32 * (1.0 - blend) + fb * blend) as u8;
+            out.put_pixel(x, y, Rgba([r, g, b, src[3]]));
+        }
+    }
+
+    DynamicImage::ImageRgba8(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -384,5 +511,19 @@ mod tests {
         for p in rgba.pixels() {
             assert_eq!(*p, color);
         }
+    }
+
+    #[test]
+    fn fractal_julia_preserves_dimensions() {
+        let img = solid_image(40, 30, Rgba([100, 100, 100, 255]));
+        let out = GlitchEffect::FractalJulia {
+            scale: 2.0,
+            cx: -0.7,
+            cy: 0.27015,
+            max_iter: 50,
+            blend: 0.5,
+        }
+        .apply_image(img);
+        assert_eq!(out.dimensions(), (40, 30));
     }
 }
