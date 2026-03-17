@@ -408,7 +408,7 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
             };
         }
         KeyCode::Enter => {
-            let effect = AVAILABLE_EFFECTS[state.add_effect_cursor].1();
+            let effect = AVAILABLE_EFFECTS[state.add_effect_cursor].2();
             state.push_undo();
             state.pipeline.effects.push(EnabledEffect::new(effect));
 

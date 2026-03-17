@@ -117,7 +117,7 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
     let items: Vec<ListItem> = AVAILABLE_EFFECTS
         .iter()
         .enumerate()
-        .map(|(i, (name, _))| {
+        .map(|(i, (name, _cat, _))| {
             let selected = i == state.add_effect_cursor;
             let style = if selected {
                 Style::default()

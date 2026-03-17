@@ -40,13 +40,10 @@ impl Effect {
     /// full spatial context (row jitter, pixel sort, scanlines with coordinates, …).
     pub fn apply_image(&self, img: DynamicImage) -> DynamicImage {
         match self {
-            // Per-pixel colour effects – the tight inner loop is auto-vectorised by LLVM.
-            Effect::Color(e) => apply_per_pixel(img, |p, _, _| e.apply_pixel(p)),
+            // Color effects – most are per-pixel; Dither needs full-image context.
+            Effect::Color(e) => e.apply_image(img),
             // CRT effects that need coordinates.
-            Effect::Crt(e) => {
-                let (w, h) = (img.width(), img.height());
-                apply_per_pixel(img, move |p, x, y| e.apply_pixel_with_coords(p, x, y, w, h))
-            }
+            Effect::Crt(e) => e.apply_image(img),
             // Glitch effects need full-image context.
             Effect::Glitch(e) => e.apply_image(img),
             // Composite effects pass through here (blend needs secondary image).

@@ -3,56 +3,71 @@ use crate::effects::{
     crt::CrtEffect, glitch::GlitchEffect,
 };
 
-/// All effects available to add, with display names.
-pub type EffectEntry = (&'static str, fn() -> Effect);
+/// All effects available to add, with display name and category.
+pub type EffectEntry = (&'static str, &'static str, fn() -> Effect);
 
 pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
     // ── Color ────────────────────────────────────────────────────────────
-    ("Invert", || Effect::Color(ColorEffect::Invert)),
-    ("Gradient Map", || {
+    ("Invert", "Color", || Effect::Color(ColorEffect::Invert)),
+    ("Gradient Map", "Color", || {
         Effect::Color(ColorEffect::GradientMap {
             preset_idx: 0,
             stops: color::GRADIENT_PRESETS[0].1.to_vec(),
         })
     }),
-    ("HueShift +30°", || {
+    ("HueShift +30°", "Color", || {
         Effect::Color(ColorEffect::HueShift { degrees: 30.0 })
     }),
-    ("Contrast ×1.5", || {
+    ("Contrast ×1.5", "Color", || {
         Effect::Color(ColorEffect::Contrast { factor: 1.5 })
     }),
-    ("Saturation ×1.5", || {
+    ("Saturation ×1.5", "Color", || {
         Effect::Color(ColorEffect::Saturation { factor: 1.5 })
     }),
-    ("Desaturate", || {
+    ("Desaturate", "Color", || {
         Effect::Color(ColorEffect::Saturation { factor: 0.0 })
     }),
-    ("Quantize (4 levels)", || {
+    ("Quantize (4 levels)", "Color", || {
         Effect::Color(ColorEffect::ColorQuantization { levels: 4 })
     }),
+    ("Channel Swap BGR", "Color", || {
+        Effect::Color(ColorEffect::ChannelSwap { order: 5 })
+    }),
+    ("Dither Bayer", "Color", || {
+        Effect::Color(ColorEffect::Dither {
+            algorithm: 0,
+            levels: 4,
+        })
+    }),
+    ("Dither Floyd-Steinberg", "Color", || {
+        Effect::Color(ColorEffect::Dither {
+            algorithm: 1,
+            levels: 4,
+        })
+    }),
     // ── Glitch ───────────────────────────────────────────────────────────
-    ("Pixelate (8px)", || {
+    ("Pixelate (8px)", "Glitch", || {
         Effect::Glitch(GlitchEffect::Pixelate { block_size: 8 })
     }),
-    ("Row Jitter", || {
+    ("Row Jitter", "Glitch", || {
         Effect::Glitch(GlitchEffect::RowJitter {
             magnitude: 0.05,
             seed: 0,
         })
     }),
-    ("Block Shift", || {
+    ("Block Shift", "Glitch", || {
         Effect::Glitch(GlitchEffect::BlockShift {
             shift_x: 10,
             shift_y: 0,
         })
     }),
-    ("Pixel Sort", || {
+    ("Pixel Sort", "Glitch", || {
         Effect::Glitch(GlitchEffect::PixelSort {
             threshold: 0.5,
             reverse: false,
         })
     }),
-    ("Fractal Julia", || {
+    ("Fractal Julia", "Glitch", || {
         Effect::Glitch(GlitchEffect::FractalJulia {
             scale: 2.5,
             cx: -0.7,
@@ -61,13 +76,13 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
             blend: 0.5,
         })
     }),
-    ("Delaunay Triangulation", || {
+    ("Delaunay Triangulation", "Glitch", || {
         Effect::Glitch(GlitchEffect::DelaunayTriangulation {
             num_points: 200,
             seed: 42,
         })
     }),
-    ("Ghost Displace", || {
+    ("Ghost Displace", "Glitch", || {
         Effect::Glitch(GlitchEffect::GhostDisplace {
             copies: 5,
             offset_x: 8.0,
@@ -76,8 +91,41 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
             opacity: 0.4,
         })
     }),
+    ("RGB Shift", "Glitch", || {
+        Effect::Glitch(GlitchEffect::RGBShift {
+            x_r: 5,
+            y_r: 0,
+            x_g: 0,
+            y_g: 0,
+            x_b: -5,
+            y_b: 0,
+            wrap: true,
+        })
+    }),
+    ("Data Bend XOR", "Glitch", || {
+        Effect::Glitch(GlitchEffect::DataBend {
+            mode: 0,
+            value: 42,
+            seed: 0,
+        })
+    }),
+    ("Sine Warp", "Glitch", || {
+        Effect::Glitch(GlitchEffect::SineWarp {
+            amplitude: 10.0,
+            frequency: 2.0,
+            phase: 0.0,
+            axis: 0,
+        })
+    }),
+    ("Jpeg Smash", "Glitch", || {
+        Effect::Glitch(GlitchEffect::JpegSmash {
+            block_size: 8,
+            strength: 0.5,
+            bleed: true,
+        })
+    }),
     // ── CRT ──────────────────────────────────────────────────────────────
-    ("Scanlines", || {
+    ("Scanlines", "CRT", || {
         Effect::Crt(CrtEffect::Scanlines {
             spacing: 2,
             opacity: 0.5,
@@ -86,26 +134,57 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
             color_b: 0,
         })
     }),
-    ("Noise (RGB)", || {
+    ("Noise (RGB)", "CRT", || {
         Effect::Crt(CrtEffect::Noise {
             intensity: 0.1,
             monochromatic: false,
             seed: 0,
         })
     }),
-    ("Vignette", || {
+    ("Vignette", "CRT", || {
         Effect::Crt(CrtEffect::Vignette {
             radius: 0.7,
             softness: 0.3,
         })
     }),
+    ("Phosphor Trail", "CRT", || {
+        Effect::Crt(CrtEffect::PhosphorTrail {
+            length: 5,
+            decay: 0.5,
+            color_mode: 0,
+        })
+    }),
     // ── Composite ────────────────────────────────────────────────────────
-    ("Crop 50%", || {
+    ("Crop 50%", "Composite", || {
         Effect::Composite(CompositeEffect::CropRect {
             x: 50,
             y: 50,
             width: 200,
             height: 200,
+        })
+    }),
+    ("Mirror Slice H", "Composite", || {
+        Effect::Composite(CompositeEffect::MirrorSlice {
+            orientation: 0,
+            slice_width: 40,
+            pattern: 0,
+        })
+    }),
+    ("Mirror Slice V", "Composite", || {
+        Effect::Composite(CompositeEffect::MirrorSlice {
+            orientation: 1,
+            slice_width: 40,
+            pattern: 0,
+        })
+    }),
+    ("Edge Glow", "Composite", || {
+        Effect::Composite(CompositeEffect::EdgeGlow {
+            edge_thresh: 0.1,
+            glow_color_r: 0,
+            glow_color_g: 255,
+            glow_color_b: 255,
+            glow_strength: 0.8,
+            blur_radius: 1,
         })
     }),
 ];
@@ -140,7 +219,7 @@ pub fn randomize_pipeline(pipeline: &mut Pipeline) {
         let idx = (next() * AVAILABLE_EFFECTS.len() as f32) as usize % AVAILABLE_EFFECTS.len();
         pipeline
             .effects
-            .push(EnabledEffect::new(AVAILABLE_EFFECTS[idx].1()));
+            .push(EnabledEffect::new(AVAILABLE_EFFECTS[idx].2()));
     }
 
     for ee in &mut pipeline.effects {
@@ -155,6 +234,11 @@ pub fn randomize_pipeline(pipeline: &mut Pipeline) {
                     *preset_idx = (next() * color::GRADIENT_PRESETS.len() as f32) as usize
                         % color::GRADIENT_PRESETS.len();
                     *stops = color::GRADIENT_PRESETS[*preset_idx].1.to_vec();
+                }
+                ColorEffect::ChannelSwap { order } => *order = (next() * 6.0) as u8 % 6,
+                ColorEffect::Dither { algorithm, levels } => {
+                    *algorithm = if next() >= 0.5 { 1 } else { 0 };
+                    *levels = 2 + (next() * 6.0) as u8;
                 }
             },
             Effect::Glitch(e) => match e {
@@ -201,6 +285,48 @@ pub fn randomize_pipeline(pipeline: &mut Pipeline) {
                     *hue_sweep = next() * 360.0;
                     *opacity = 0.2 + next() * 0.6;
                 }
+                GlitchEffect::RGBShift {
+                    x_r,
+                    y_r,
+                    x_g,
+                    y_g,
+                    x_b,
+                    y_b,
+                    wrap,
+                } => {
+                    *x_r = ((next() - 0.5) * 20.0) as i32;
+                    *y_r = ((next() - 0.5) * 10.0) as i32;
+                    *x_g = ((next() - 0.5) * 20.0) as i32;
+                    *y_g = ((next() - 0.5) * 10.0) as i32;
+                    *x_b = ((next() - 0.5) * 20.0) as i32;
+                    *y_b = ((next() - 0.5) * 10.0) as i32;
+                    *wrap = next() >= 0.5;
+                }
+                GlitchEffect::DataBend { mode, value, seed } => {
+                    *mode = (next() * 3.0) as u8 % 3;
+                    *value = (next() * 255.0) as u8;
+                    *seed = (next() * 9999.0) as u32;
+                }
+                GlitchEffect::SineWarp {
+                    amplitude,
+                    frequency,
+                    phase,
+                    axis,
+                } => {
+                    *amplitude = next() * 20.0;
+                    *frequency = 0.5 + next() * 5.0;
+                    *phase = next() * 360.0;
+                    *axis = if next() >= 0.5 { 1 } else { 0 };
+                }
+                GlitchEffect::JpegSmash {
+                    block_size,
+                    strength,
+                    bleed,
+                } => {
+                    *block_size = 4 + (next() * 20.0) as u32;
+                    *strength = 0.2 + next() * 0.7;
+                    *bleed = next() >= 0.5;
+                }
             },
             Effect::Crt(e) => match e {
                 CrtEffect::Scanlines {
@@ -230,6 +356,15 @@ pub fn randomize_pipeline(pipeline: &mut Pipeline) {
                 CrtEffect::PhosphorGlow { radius, intensity } => {
                     *radius = 1 + (next() * 5.0) as u32;
                     *intensity = next();
+                }
+                CrtEffect::PhosphorTrail {
+                    length,
+                    decay,
+                    color_mode,
+                } => {
+                    *length = 1 + (next() * 30.0) as u32;
+                    *decay = next();
+                    *color_mode = (next() * 3.0) as u8;
                 }
             },
             Effect::Composite(_) => {}

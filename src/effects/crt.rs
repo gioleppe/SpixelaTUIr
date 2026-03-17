@@ -1,6 +1,6 @@
 use std::fmt;
 
-use image::Rgba;
+use image::{DynamicImage, Rgba};
 use serde::{Deserialize, Serialize};
 
 use super::ParamDescriptor;
@@ -20,6 +20,12 @@ pub enum CrtEffect {
     Curvature { strength: f32 },
     /// Blur and add a coloured halo to bright regions.
     PhosphorGlow { radius: u32, intensity: f32 },
+    /// Simulate a decaying phosphor trail scanning left-to-right.
+    PhosphorTrail {
+        length: u32,
+        decay: f32,
+        color_mode: u8,
+    },
     /// Add RGB or monochromatic noise.
     Noise {
         intensity: f32,
@@ -117,7 +123,24 @@ impl CrtEffect {
                 }
             }
             // Full-image ops fall back gracefully in per-pixel mode.
-            CrtEffect::Curvature { .. } | CrtEffect::PhosphorGlow { .. } => pixel,
+            CrtEffect::Curvature { .. }
+            | CrtEffect::PhosphorGlow { .. }
+            | CrtEffect::PhosphorTrail { .. } => pixel,
+        }
+    }
+
+    /// Apply this effect to a full image buffer.
+    pub fn apply_image(&self, img: DynamicImage) -> DynamicImage {
+        match self {
+            CrtEffect::PhosphorTrail {
+                length,
+                decay,
+                color_mode,
+            } => phosphor_trail(img, *length, *decay, *color_mode),
+            _ => {
+                let (w, h) = (img.width(), img.height());
+                super::apply_per_pixel(img, move |p, x, y| self.apply_pixel_with_coords(p, x, y, w, h))
+            }
         }
     }
 
@@ -180,6 +203,30 @@ impl CrtEffect {
                     value: *intensity,
                     min: 0.0,
                     max: 1.0,
+                },
+            ],
+            CrtEffect::PhosphorTrail {
+                length,
+                decay,
+                color_mode,
+            } => vec![
+                ParamDescriptor {
+                    name: "length",
+                    value: *length as f32,
+                    min: 1.0,
+                    max: 30.0,
+                },
+                ParamDescriptor {
+                    name: "decay",
+                    value: *decay,
+                    min: 0.0,
+                    max: 1.0,
+                },
+                ParamDescriptor {
+                    name: "color_mode",
+                    value: *color_mode as f32,
+                    min: 0.0,
+                    max: 2.0,
                 },
             ],
             CrtEffect::Noise {
@@ -247,6 +294,15 @@ impl CrtEffect {
                 radius: get(0, *radius as f32) as u32,
                 intensity: get(1, *intensity),
             },
+            CrtEffect::PhosphorTrail {
+                length,
+                decay,
+                color_mode,
+            } => CrtEffect::PhosphorTrail {
+                length: get(0, *length as f32) as u32,
+                decay: get(1, *decay),
+                color_mode: get(2, *color_mode as f32) as u8,
+            },
             CrtEffect::Noise {
                 intensity,
                 monochromatic,
@@ -269,6 +325,7 @@ impl CrtEffect {
             CrtEffect::Scanlines { .. } => "Scanlines",
             CrtEffect::Curvature { .. } => "Curvature",
             CrtEffect::PhosphorGlow { .. } => "PhosphorGlow",
+            CrtEffect::PhosphorTrail { .. } => "PhosphorTrail",
             CrtEffect::Noise { .. } => "Noise",
             CrtEffect::Vignette { .. } => "Vignette",
         }
@@ -298,6 +355,18 @@ impl fmt::Display for CrtEffect {
             CrtEffect::PhosphorGlow { radius, intensity } => {
                 write!(f, "PhosphorGlow r={radius} i={intensity:.2}")
             }
+            CrtEffect::PhosphorTrail {
+                length,
+                decay,
+                color_mode,
+            } => {
+                let suffix = match color_mode {
+                    0 => " [green]",
+                    1 => " [amber]",
+                    _ => "",
+                };
+                write!(f, "PhosphorTrail len={length} d={decay:.2}{suffix}")
+            }
             CrtEffect::Noise {
                 intensity,
                 monochromatic,
@@ -310,5 +379,63 @@ impl fmt::Display for CrtEffect {
                 write!(f, "Vignette r={radius:.2} s={softness:.2}")
             }
         }
+    }
+}
+
+fn phosphor_trail(img: DynamicImage, length: u32, decay: f32, color_mode: u8) -> DynamicImage {
+    let mut rgba = img.into_rgba8();
+    let (width, height) = rgba.dimensions();
+    let decay_factor = (1.0 - decay.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+    let max_steps = length.max(1);
+    let tint = match color_mode {
+        0 => [0.0_f32, 255.0_f32, 0.0_f32],     // green
+        1 => [255.0_f32, 180.0_f32, 0.0_f32],   // amber
+        _ => [255.0_f32, 255.0_f32, 255.0_f32], // white
+    };
+
+    for y in 0..height {
+        let mut trail = [0.0_f32; 3];
+        let mut remaining = 0_u32;
+        for x in 0..width {
+            let px = rgba.get_pixel_mut(x, y);
+            let lum =
+                (0.2126 * px[0] as f32 + 0.7152 * px[1] as f32 + 0.0722 * px[2] as f32) / 255.0;
+
+            if lum > 0.5 {
+                trail[0] = tint[0] * lum;
+                trail[1] = tint[1] * lum;
+                trail[2] = tint[2] * lum;
+                remaining = max_steps;
+            } else {
+                if remaining > 0 {
+                    trail[0] *= decay_factor;
+                    trail[1] *= decay_factor;
+                    trail[2] *= decay_factor;
+                    remaining -= 1;
+                } else {
+                    trail = [0.0, 0.0, 0.0];
+                }
+            }
+
+            px[0] = px[0].saturating_add((trail[0] * 0.5).clamp(0.0, 255.0) as u8);
+            px[1] = px[1].saturating_add((trail[1] * 0.5).clamp(0.0, 255.0) as u8);
+            px[2] = px[2].saturating_add((trail[2] * 0.5).clamp(0.0, 255.0) as u8);
+        }
+    }
+
+    DynamicImage::ImageRgba8(rgba)
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
+
+    use super::phosphor_trail;
+
+    #[test]
+    fn phosphor_trail_preserves_dimensions() {
+        let img = DynamicImage::ImageRgba8(RgbaImage::from_pixel(20, 20, Rgba([32, 64, 96, 255])));
+        let out = phosphor_trail(img, 5, 0.5, 0);
+        assert_eq!(out.dimensions(), (20, 20));
     }
 }

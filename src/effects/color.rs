@@ -1,6 +1,6 @@
 use std::fmt;
 
-use image::Rgba;
+use image::{DynamicImage, Rgba};
 use serde::{Deserialize, Serialize};
 
 use super::ParamDescriptor;
@@ -23,6 +23,15 @@ pub enum ColorEffect {
         preset_idx: usize,
         stops: Vec<(f32, [u8; 3])>,
     },
+    /// Swap the RGB channels into a different order for surreal colour palettes.
+    ///
+    /// `order`: 0=RGB (identity), 1=RBG, 2=GRB, 3=GBR, 4=BRG, 5=BGR.
+    ChannelSwap { order: u8 },
+    /// Apply Bayer-matrix or Floyd–Steinberg ordered dithering.
+    ///
+    /// `algorithm`: 0=Bayer 4×4, 1=Floyd–Steinberg.
+    /// `levels`: number of quantisation levels per channel (2–8).
+    Dither { algorithm: u8, levels: u8 },
 }
 
 /// A single gradient color stop: position (0.0–1.0) and RGB color.
@@ -168,6 +177,35 @@ impl ColorEffect {
                     pixel[3],
                 ])
             }
+            ColorEffect::ChannelSwap { order } => {
+                let (r, g, b, a) = (pixel[0], pixel[1], pixel[2], pixel[3]);
+                let (nr, ng, nb) = match order {
+                    0 => (r, g, b), // RGB (identity)
+                    1 => (r, b, g), // RBG
+                    2 => (g, r, b), // GRB
+                    3 => (g, b, r), // GBR
+                    4 => (b, r, g), // BRG
+                    _ => (b, g, r), // BGR (5)
+                };
+                Rgba([nr, ng, nb, a])
+            }
+            // Dither requires full-image context; apply_pixel is a no-op fallback.
+            ColorEffect::Dither { .. } => pixel,
+        }
+    }
+
+    /// Apply a full-image colour transformation.
+    ///
+    /// Dither variants require sequential per-pixel passes with access to the full
+    /// image buffer (Floyd–Steinberg error diffusion) or row/column coordinates
+    /// (Bayer ordered dithering).  All other colour effects delegate to
+    /// [`apply_pixel`][Self::apply_pixel] via [`apply_per_pixel`][super::apply_per_pixel].
+    pub fn apply_image(&self, img: DynamicImage) -> DynamicImage {
+        match self {
+            ColorEffect::Dither { algorithm, levels } => {
+                dither_image(img, *algorithm, *levels)
+            }
+            _ => super::apply_per_pixel(img, |p, _x, _y| self.apply_pixel(p)),
         }
     }
 
@@ -248,6 +286,26 @@ impl ColorEffect {
                 min: 2.0,
                 max: 16.0,
             }],
+            ColorEffect::ChannelSwap { order } => vec![ParamDescriptor {
+                name: "order",
+                value: *order as f32,
+                min: 0.0,
+                max: 5.0,
+            }],
+            ColorEffect::Dither { algorithm, levels } => vec![
+                ParamDescriptor {
+                    name: "algorithm",
+                    value: *algorithm as f32,
+                    min: 0.0,
+                    max: 1.0,
+                },
+                ParamDescriptor {
+                    name: "levels",
+                    value: *levels as f32,
+                    min: 2.0,
+                    max: 8.0,
+                },
+            ],
         }
     }
 
@@ -292,6 +350,13 @@ impl ColorEffect {
             ColorEffect::ColorQuantization { levels } => ColorEffect::ColorQuantization {
                 levels: get(0, *levels as f32) as u8,
             },
+            ColorEffect::ChannelSwap { order } => ColorEffect::ChannelSwap {
+                order: get(0, *order as f32).clamp(0.0, 5.0) as u8,
+            },
+            ColorEffect::Dither { algorithm, levels } => ColorEffect::Dither {
+                algorithm: get(0, *algorithm as f32).clamp(0.0, 1.0) as u8,
+                levels: get(1, *levels as f32).clamp(2.0, 8.0) as u8,
+            },
         }
     }
 
@@ -304,6 +369,8 @@ impl ColorEffect {
             ColorEffect::Contrast { .. } => "Contrast",
             ColorEffect::Saturation { .. } => "Saturation",
             ColorEffect::ColorQuantization { .. } => "ColorQuantization",
+            ColorEffect::ChannelSwap { .. } => "ChannelSwap",
+            ColorEffect::Dither { .. } => "Dither",
         }
     }
 }
@@ -323,6 +390,24 @@ impl fmt::Display for ColorEffect {
             ColorEffect::Contrast { factor } => write!(f, "Contrast ×{factor:.2}"),
             ColorEffect::Saturation { factor } => write!(f, "Saturation ×{factor:.2}"),
             ColorEffect::ColorQuantization { levels } => write!(f, "Quantize {levels}"),
+            ColorEffect::ChannelSwap { order } => {
+                let label = match order {
+                    0 => "RGB",
+                    1 => "RBG",
+                    2 => "GRB",
+                    3 => "GBR",
+                    4 => "BRG",
+                    _ => "BGR",
+                };
+                write!(f, "ChannelSwap {label}")
+            }
+            ColorEffect::Dither { algorithm, levels } => {
+                if *algorithm == 0 {
+                    write!(f, "Dither Bayer {levels}")
+                } else {
+                    write!(f, "Dither FS {levels}")
+                }
+            }
         }
     }
 }
@@ -394,6 +479,79 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
     )
 }
 
+// ── Dither helpers ───────────────────────────────────────────────────────────
+
+/// Apply Bayer-matrix ordered dithering or Floyd–Steinberg error diffusion.
+fn dither_image(img: DynamicImage, algorithm: u8, levels: u8) -> DynamicImage {
+    let levels = levels.max(2).min(8) as f32;
+    let step = 255.0 / (levels - 1.0);
+    let quantize = |c: f32| -> u8 {
+        let idx = (c / step).round();
+        (idx * step).clamp(0.0, 255.0) as u8
+    };
+
+    if algorithm == 0 {
+        // Bayer 4×4 ordered dithering.
+        #[rustfmt::skip]
+        let bayer: [[f32; 4]; 4] = [
+            [ 0.0, 8.0, 2.0, 10.0],
+            [12.0, 4.0, 14.0,  6.0],
+            [ 3.0, 11.0, 1.0,  9.0],
+            [15.0, 7.0, 13.0,  5.0],
+        ];
+        let width = img.width();
+        super::apply_per_pixel(img, move |p, x, y| {
+            let threshold = bayer[(y % 4) as usize][(x % 4) as usize] / 16.0 - 0.5;
+            let spread = threshold / levels;
+            let r = quantize(p[0] as f32 + spread * 255.0);
+            let g = quantize(p[1] as f32 + spread * 255.0);
+            let b = quantize(p[2] as f32 + spread * 255.0);
+            let _ = width; // suppress unused warning
+            Rgba([r, g, b, p[3]])
+        })
+    } else {
+        // Floyd–Steinberg error diffusion (sequential, row-major).
+        let width = img.width() as usize;
+        let height = img.height() as usize;
+        let mut rgba = img.into_rgba8();
+        // Work on f32 error buffer (R, G, B per pixel).
+        let mut errs: Vec<[f32; 3]> = vec![[0.0; 3]; width * height];
+
+        for y in 0..height {
+            for x in 0..width {
+                let idx = y * width + x;
+                let pix = rgba.get_pixel(x as u32, y as u32);
+                let r_in = pix[0] as f32 + errs[idx][0];
+                let g_in = pix[1] as f32 + errs[idx][1];
+                let b_in = pix[2] as f32 + errs[idx][2];
+                let r_out = quantize(r_in);
+                let g_out = quantize(g_in);
+                let b_out = quantize(b_in);
+                rgba.put_pixel(x as u32, y as u32, Rgba([r_out, g_out, b_out, pix[3]]));
+                let er = r_in - r_out as f32;
+                let eg = g_in - g_out as f32;
+                let eb = b_in - b_out as f32;
+                // Distribute error to right, below-left, below, below-right.
+                let distribute = |errs: &mut Vec<[f32; 3]>, nx: usize, ny: usize, w: f32| {
+                    if nx < width && ny < height {
+                        let ni = ny * width + nx;
+                        errs[ni][0] += er * w;
+                        errs[ni][1] += eg * w;
+                        errs[ni][2] += eb * w;
+                    }
+                };
+                distribute(&mut errs, x + 1, y,     7.0 / 16.0);
+                if x > 0 {
+                    distribute(&mut errs, x - 1, y + 1, 3.0 / 16.0);
+                }
+                distribute(&mut errs, x,     y + 1, 5.0 / 16.0);
+                distribute(&mut errs, x + 1, y + 1, 1.0 / 16.0);
+            }
+        }
+        DynamicImage::ImageRgba8(rgba)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -448,6 +606,56 @@ mod tests {
                 "Expected 0 or 255, got {}",
                 out[0]
             );
+        }
+    }
+
+    #[test]
+    fn channel_swap_identity() {
+        let p = px(100, 150, 200);
+        let out = ColorEffect::ChannelSwap { order: 0 }.apply_pixel(p);
+        assert_eq!(p, out);
+    }
+
+    #[test]
+    fn channel_swap_bgr() {
+        let p = px(100, 150, 200);
+        let out = ColorEffect::ChannelSwap { order: 5 }.apply_pixel(p);
+        assert_eq!(out[0], 200, "R should be original B");
+        assert_eq!(out[1], 150, "G unchanged");
+        assert_eq!(out[2], 100, "B should be original R");
+        assert_eq!(out[3], 255);
+    }
+
+    #[test]
+    fn dither_bayer_preserves_dimensions() {
+        use image::{DynamicImage, ImageBuffer};
+        let img: DynamicImage =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(16, 16, Rgba([128u8, 64, 200, 255])));
+        let out = ColorEffect::Dither {
+            algorithm: 0,
+            levels: 4,
+        }
+        .apply_image(img);
+        assert_eq!(out.width(), 16);
+        assert_eq!(out.height(), 16);
+    }
+
+    #[test]
+    fn dither_bayer_two_levels_binary() {
+        use image::{DynamicImage, ImageBuffer};
+        // With levels=2, each channel output must be 0 or 255.
+        let img: DynamicImage =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(8, 8, Rgba([128u8, 128, 128, 255])));
+        let out = ColorEffect::Dither {
+            algorithm: 0,
+            levels: 2,
+        }
+        .apply_image(img)
+        .into_rgba8();
+        for pixel in out.pixels() {
+            for &c in &pixel.0[..3] {
+                assert!(c == 0 || c == 255, "Expected 0 or 255, got {c}");
+            }
         }
     }
 }
