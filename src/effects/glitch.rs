@@ -33,6 +33,31 @@ pub enum GlitchEffect {
         hue_sweep: f32,
         opacity: f32,
     },
+    /// Chromatic aberration: independently shift R, G, B channels by (x, y) offsets.
+    RGBShift {
+        x_r: i32,
+        y_r: i32,
+        x_g: i32,
+        y_g: i32,
+        x_b: i32,
+        y_b: i32,
+        wrap: bool,
+    },
+    /// Corrupt pixel data by applying bitwise operations (XOR, AND) or byte-swapping.
+    DataBend { mode: u8, value: u8, seed: u32 },
+    /// Displace rows or columns by a sine wave for rolling, wavy distortions.
+    SineWarp {
+        amplitude: f32,
+        frequency: f32,
+        phase: f32,
+        axis: u8,
+    },
+    /// Simulate aggressive JPEG macroblocking by randomising and bleeding 8×8 blocks.
+    JpegSmash {
+        block_size: u32,
+        strength: f32,
+        bleed: bool,
+    },
 }
 
 impl GlitchEffect {
@@ -60,6 +85,27 @@ impl GlitchEffect {
                 hue_sweep,
                 opacity,
             } => ghost_displace(img, *copies, *offset_x, *offset_y, *hue_sweep, *opacity),
+            GlitchEffect::RGBShift {
+                x_r,
+                y_r,
+                x_g,
+                y_g,
+                x_b,
+                y_b,
+                wrap,
+            } => rgb_shift(img, *x_r, *y_r, *x_g, *y_g, *x_b, *y_b, *wrap),
+            GlitchEffect::DataBend { mode, value, seed } => data_bend(img, *mode, *value, *seed),
+            GlitchEffect::SineWarp {
+                amplitude,
+                frequency,
+                phase,
+                axis,
+            } => sine_warp(img, *amplitude, *frequency, *phase, *axis),
+            GlitchEffect::JpegSmash {
+                block_size,
+                strength,
+                bleed,
+            } => jpeg_smash(img, *block_size, *strength, *bleed),
         }
     }
 
@@ -204,6 +250,133 @@ impl GlitchEffect {
                     max: 1.0,
                 },
             ],
+            GlitchEffect::RGBShift {
+                x_r,
+                y_r,
+                x_g,
+                y_g,
+                x_b,
+                y_b,
+                wrap,
+            } => vec![
+                ParamDescriptor {
+                    name: "x_r",
+                    value: *x_r as f32,
+                    min: -50.0,
+                    max: 50.0,
+                },
+                ParamDescriptor {
+                    name: "y_r",
+                    value: *y_r as f32,
+                    min: -50.0,
+                    max: 50.0,
+                },
+                ParamDescriptor {
+                    name: "x_g",
+                    value: *x_g as f32,
+                    min: -50.0,
+                    max: 50.0,
+                },
+                ParamDescriptor {
+                    name: "y_g",
+                    value: *y_g as f32,
+                    min: -50.0,
+                    max: 50.0,
+                },
+                ParamDescriptor {
+                    name: "x_b",
+                    value: *x_b as f32,
+                    min: -50.0,
+                    max: 50.0,
+                },
+                ParamDescriptor {
+                    name: "y_b",
+                    value: *y_b as f32,
+                    min: -50.0,
+                    max: 50.0,
+                },
+                ParamDescriptor {
+                    name: "wrap",
+                    value: if *wrap { 1.0 } else { 0.0 },
+                    min: 0.0,
+                    max: 1.0,
+                },
+            ],
+            GlitchEffect::DataBend { mode, value, seed } => vec![
+                ParamDescriptor {
+                    name: "mode",
+                    value: *mode as f32,
+                    min: 0.0,
+                    max: 2.0,
+                },
+                ParamDescriptor {
+                    name: "value",
+                    value: *value as f32,
+                    min: 0.0,
+                    max: 255.0,
+                },
+                ParamDescriptor {
+                    name: "seed",
+                    value: *seed as f32,
+                    min: 0.0,
+                    max: 9999.0,
+                },
+            ],
+            GlitchEffect::SineWarp {
+                amplitude,
+                frequency,
+                phase,
+                axis,
+            } => vec![
+                ParamDescriptor {
+                    name: "amplitude",
+                    value: *amplitude,
+                    min: 0.0,
+                    max: 50.0,
+                },
+                ParamDescriptor {
+                    name: "frequency",
+                    value: *frequency,
+                    min: 0.1,
+                    max: 10.0,
+                },
+                ParamDescriptor {
+                    name: "phase",
+                    value: *phase,
+                    min: 0.0,
+                    max: 360.0,
+                },
+                ParamDescriptor {
+                    name: "axis",
+                    value: *axis as f32,
+                    min: 0.0,
+                    max: 1.0,
+                },
+            ],
+            GlitchEffect::JpegSmash {
+                block_size,
+                strength,
+                bleed,
+            } => vec![
+                ParamDescriptor {
+                    name: "block_size",
+                    value: *block_size as f32,
+                    min: 4.0,
+                    max: 32.0,
+                },
+                ParamDescriptor {
+                    name: "strength",
+                    value: *strength,
+                    min: 0.0,
+                    max: 1.0,
+                },
+                ParamDescriptor {
+                    name: "bleed",
+                    value: if *bleed { 1.0 } else { 0.0 },
+                    min: 0.0,
+                    max: 1.0,
+                },
+            ],
         }
     }
 
@@ -258,6 +431,48 @@ impl GlitchEffect {
                 hue_sweep: get(3, *hue_sweep),
                 opacity: get(4, *opacity),
             },
+            GlitchEffect::RGBShift {
+                x_r,
+                y_r,
+                x_g,
+                y_g,
+                x_b,
+                y_b,
+                wrap,
+            } => GlitchEffect::RGBShift {
+                x_r: get(0, *x_r as f32) as i32,
+                y_r: get(1, *y_r as f32) as i32,
+                x_g: get(2, *x_g as f32) as i32,
+                y_g: get(3, *y_g as f32) as i32,
+                x_b: get(4, *x_b as f32) as i32,
+                y_b: get(5, *y_b as f32) as i32,
+                wrap: get(6, if *wrap { 1.0 } else { 0.0 }) >= 0.5,
+            },
+            GlitchEffect::DataBend { mode, value, seed } => GlitchEffect::DataBend {
+                mode: get(0, *mode as f32).clamp(0.0, 2.0) as u8,
+                value: get(1, *value as f32) as u8,
+                seed: get(2, *seed as f32) as u32,
+            },
+            GlitchEffect::SineWarp {
+                amplitude,
+                frequency,
+                phase,
+                axis,
+            } => GlitchEffect::SineWarp {
+                amplitude: get(0, *amplitude),
+                frequency: get(1, *frequency),
+                phase: get(2, *phase),
+                axis: get(3, *axis as f32).clamp(0.0, 1.0) as u8,
+            },
+            GlitchEffect::JpegSmash {
+                block_size,
+                strength,
+                bleed,
+            } => GlitchEffect::JpegSmash {
+                block_size: get(0, *block_size as f32).clamp(4.0, 32.0) as u32,
+                strength: get(1, *strength),
+                bleed: get(2, if *bleed { 1.0 } else { 0.0 }) >= 0.5,
+            },
         }
     }
 
@@ -271,6 +486,10 @@ impl GlitchEffect {
             GlitchEffect::FractalJulia { .. } => "FractalJulia",
             GlitchEffect::DelaunayTriangulation { .. } => "DelaunayTriangulation",
             GlitchEffect::GhostDisplace { .. } => "GhostDisplace",
+            GlitchEffect::RGBShift { .. } => "RGBShift",
+            GlitchEffect::DataBend { .. } => "DataBend",
+            GlitchEffect::SineWarp { .. } => "SineWarp",
+            GlitchEffect::JpegSmash { .. } => "JpegSmash",
         }
     }
 }
@@ -316,6 +535,35 @@ impl fmt::Display for GlitchEffect {
                     "Ghost ×{copies} ({offset_x:.0},{offset_y:.0}) hue={hue_sweep:.0}° op={opacity:.2}"
                 )
             }
+            GlitchEffect::RGBShift { x_r, y_r, .. } => {
+                write!(f, "RGBShift R({x_r},{y_r})")
+            }
+            GlitchEffect::DataBend { mode, value, seed } => {
+                let m = match mode {
+                    0 => "XOR",
+                    1 => "AND",
+                    _ => "Swap",
+                };
+                if *mode == 2 {
+                    write!(f, "DataBend {m} s={seed}")
+                } else {
+                    write!(f, "DataBend {m} {value}")
+                }
+            }
+            GlitchEffect::SineWarp {
+                amplitude,
+                frequency,
+                axis,
+                ..
+            } => {
+                let ax = if *axis == 0 { "rows" } else { "cols" };
+                write!(f, "SineWarp A={amplitude:.1} F={frequency:.1} {ax}")
+            }
+            GlitchEffect::JpegSmash {
+                block_size,
+                strength,
+                ..
+            } => write!(f, "JpegSmash {block_size}px s={strength:.2}"),
         }
     }
 }
@@ -866,6 +1114,247 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
     )
 }
 
+// ── RGBShift ──────────────────────────────────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+fn rgb_shift(
+    img: DynamicImage,
+    x_r: i32,
+    y_r: i32,
+    x_g: i32,
+    y_g: i32,
+    x_b: i32,
+    y_b: i32,
+    wrap: bool,
+) -> DynamicImage {
+    let rgba = img.into_rgba8();
+    let (w, h) = rgba.dimensions();
+    let wi = w as i32;
+    let hi = h as i32;
+    let src = rgba.into_raw();
+
+    let sample = |px: i32, py: i32| -> (u8, u8, u8, u8) {
+        let (sx, sy) = if wrap {
+            (px.rem_euclid(wi) as u32, py.rem_euclid(hi) as u32)
+        } else {
+            (px.clamp(0, wi - 1) as u32, py.clamp(0, hi - 1) as u32)
+        };
+        let idx = ((sy * w + sx) * 4) as usize;
+        (src[idx], src[idx + 1], src[idx + 2], src[idx + 3])
+    };
+
+    let mut out = vec![0u8; (w * h * 4) as usize];
+    for y in 0..h {
+        for x in 0..w {
+            let xi = x as i32;
+            let yi = y as i32;
+            let (r, _, _, _) = sample(xi + x_r, yi + y_r);
+            let (_, g, _, _) = sample(xi + x_g, yi + y_g);
+            let (_, _, b, _) = sample(xi + x_b, yi + y_b);
+            let (_, _, _, a) = sample(xi, yi);
+            let idx = ((y * w + x) * 4) as usize;
+            out[idx] = r;
+            out[idx + 1] = g;
+            out[idx + 2] = b;
+            out[idx + 3] = a;
+        }
+    }
+
+    let buf = ImageBuffer::<Rgba<u8>, _>::from_raw(w, h, out)
+        .expect("rgb_shift must preserve buffer dimensions");
+    DynamicImage::ImageRgba8(buf)
+}
+
+// ── DataBend ──────────────────────────────────────────────────────────────────
+
+fn data_bend(img: DynamicImage, mode: u8, value: u8, seed: u32) -> DynamicImage {
+    let rgba = img.into_rgba8();
+    let (w, h) = rgba.dimensions();
+    let mut raw = rgba.into_raw();
+
+    for y in 0..h {
+        for x in 0..w {
+            // Deterministic per-pixel hash.
+            let hash = (x.wrapping_mul(2654435761).wrapping_add(seed))
+                ^ (y.wrapping_mul(2246822519).wrapping_add(seed));
+            // Affect ~30% of pixels.
+            if (hash & 0xFF) >= 77 {
+                continue;
+            }
+            let idx = ((y * w + x) * 4) as usize;
+            match mode {
+                0 => {
+                    // XOR each channel
+                    raw[idx] ^= value;
+                    raw[idx + 1] ^= value;
+                    raw[idx + 2] ^= value;
+                }
+                1 => {
+                    // AND each channel
+                    raw[idx] &= value;
+                    raw[idx + 1] &= value;
+                    raw[idx + 2] &= value;
+                }
+                _ => {
+                    // Swap bytes with a deterministically-offset neighbour
+                    let nx = ((x ^ (seed & 7)) % w) as usize;
+                    let ny = ((y ^ ((seed >> 3) & 7)) % h) as usize;
+                    let nidx = (ny * w as usize + nx) * 4;
+                    for c in 0..3usize {
+                        raw.swap(idx + c, nidx + c);
+                    }
+                }
+            }
+        }
+    }
+
+    let buf = ImageBuffer::<Rgba<u8>, _>::from_raw(w, h, raw)
+        .expect("data_bend must preserve buffer dimensions");
+    DynamicImage::ImageRgba8(buf)
+}
+
+// ── SineWarp ──────────────────────────────────────────────────────────────────
+
+fn sine_warp(
+    img: DynamicImage,
+    amplitude: f32,
+    frequency: f32,
+    phase: f32,
+    axis: u8,
+) -> DynamicImage {
+    use std::f32::consts::TAU;
+    let rgba = img.into_rgba8();
+    let (w, h) = rgba.dimensions();
+    let src = rgba.into_raw();
+    let mut out = vec![0u8; src.len()];
+    let phase_rad = phase * TAU / 360.0;
+
+    for y in 0..h {
+        for x in 0..w {
+            let (src_x, src_y) = if axis == 0 {
+                // Displace rows horizontally
+                let t = y as f32 / h as f32;
+                let offset = amplitude * (TAU * frequency * t + phase_rad).sin();
+                let sx = ((x as f32 + offset) as i32).rem_euclid(w as i32) as u32;
+                (sx, y)
+            } else {
+                // Displace columns vertically
+                let t = x as f32 / w as f32;
+                let offset = amplitude * (TAU * frequency * t + phase_rad).sin();
+                let sy = ((y as f32 + offset) as i32).rem_euclid(h as i32) as u32;
+                (x, sy)
+            };
+            let dst_idx = ((y * w + x) * 4) as usize;
+            let src_idx = ((src_y * w + src_x) * 4) as usize;
+            out[dst_idx..dst_idx + 4].copy_from_slice(&src[src_idx..src_idx + 4]);
+        }
+    }
+
+    let buf = ImageBuffer::<Rgba<u8>, _>::from_raw(w, h, out)
+        .expect("sine_warp must preserve buffer dimensions");
+    DynamicImage::ImageRgba8(buf)
+}
+
+// ── JpegSmash ─────────────────────────────────────────────────────────────────
+
+fn jpeg_smash(img: DynamicImage, block_size: u32, strength: f32, bleed: bool) -> DynamicImage {
+    let block_size = block_size.max(1);
+    let strength = strength.clamp(0.0, 1.0);
+    let rgba = img.into_rgba8();
+    let (w, h) = rgba.dimensions();
+    let src = rgba.into_raw();
+    let mut out = src.clone();
+
+    let blocks_x = w.div_ceil(block_size);
+    let blocks_y = h.div_ceil(block_size);
+
+    for by in 0..blocks_y {
+        for bx in 0..blocks_x {
+            let x0 = bx * block_size;
+            let y0 = by * block_size;
+            let x1 = (x0 + block_size).min(w);
+            let y1 = (y0 + block_size).min(h);
+            let cnt = ((x1 - x0) * (y1 - y0)) as u64;
+            if cnt == 0 {
+                continue;
+            }
+
+            // Compute average colour of the block.
+            let (mut sr, mut sg, mut sb, mut sa) = (0u64, 0u64, 0u64, 0u64);
+            for py in y0..y1 {
+                for px in x0..x1 {
+                    let idx = ((py * w + px) * 4) as usize;
+                    sr += src[idx] as u64;
+                    sg += src[idx + 1] as u64;
+                    sb += src[idx + 2] as u64;
+                    sa += src[idx + 3] as u64;
+                }
+            }
+            let avg = [
+                (sr / cnt) as u8,
+                (sg / cnt) as u8,
+                (sb / cnt) as u8,
+                (sa / cnt) as u8,
+            ];
+
+            // Deterministic seed per block.
+            let block_seed = bx.wrapping_mul(2654435761) ^ by.wrapping_mul(2246822519);
+            let dice = (block_seed & 0xFF) as f32 / 255.0;
+
+            // Decide whether to posterize (always) or bleed (if strength dice passes).
+            let do_bleed = bleed && dice < strength;
+
+            if do_bleed {
+                // Use the average of a neighbouring block.
+                let nbx = (bx + 1) % blocks_x;
+                let nby = (by + 1) % blocks_y;
+                let nx0 = nbx * block_size;
+                let ny0 = nby * block_size;
+                let nx1 = (nx0 + block_size).min(w);
+                let ny1 = (ny0 + block_size).min(h);
+                let ncnt = ((nx1 - nx0) * (ny1 - ny0)) as u64;
+                if ncnt > 0 {
+                    let (mut nr, mut ng, mut nb_val, mut na) = (0u64, 0u64, 0u64, 0u64);
+                    for py in ny0..ny1 {
+                        for px in nx0..nx1 {
+                            let idx = ((py * w + px) * 4) as usize;
+                            nr += src[idx] as u64;
+                            ng += src[idx + 1] as u64;
+                            nb_val += src[idx + 2] as u64;
+                            na += src[idx + 3] as u64;
+                        }
+                    }
+                    let navg = [
+                        (nr / ncnt) as u8,
+                        (ng / ncnt) as u8,
+                        (nb_val / ncnt) as u8,
+                        (na / ncnt) as u8,
+                    ];
+                    for py in y0..y1 {
+                        for px in x0..x1 {
+                            let idx = ((py * w + px) * 4) as usize;
+                            out[idx..idx + 4].copy_from_slice(&navg);
+                        }
+                    }
+                    continue;
+                }
+            }
+
+            // Default: fill block with its own average colour.
+            for py in y0..y1 {
+                for px in x0..x1 {
+                    let idx = ((py * w + px) * 4) as usize;
+                    out[idx..idx + 4].copy_from_slice(&avg);
+                }
+            }
+        }
+    }
+
+    let buf = ImageBuffer::<Rgba<u8>, _>::from_raw(w, h, out)
+        .expect("jpeg_smash must preserve buffer dimensions");
+    DynamicImage::ImageRgba8(buf)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -978,6 +1467,113 @@ mod tests {
             offset_y: 4.0,
             hue_sweep: 60.0,
             opacity: 0.4,
+        }
+        .apply_image(img);
+        assert_eq!(out.dimensions(), (64, 48));
+    }
+
+    #[test]
+    fn rgb_shift_preserves_dimensions() {
+        let img = solid_image(40, 30, Rgba([100, 150, 200, 255]));
+        let out = GlitchEffect::RGBShift {
+            x_r: 3,
+            y_r: 0,
+            x_g: -2,
+            y_g: 1,
+            x_b: 0,
+            y_b: -3,
+            wrap: true,
+        }
+        .apply_image(img);
+        assert_eq!(out.dimensions(), (40, 30));
+    }
+
+    #[test]
+    fn rgb_shift_zero_offsets_identity() {
+        let color = Rgba([100u8, 150, 200, 255]);
+        let img = solid_image(20, 20, color);
+        let out = GlitchEffect::RGBShift {
+            x_r: 0,
+            y_r: 0,
+            x_g: 0,
+            y_g: 0,
+            x_b: 0,
+            y_b: 0,
+            wrap: false,
+        }
+        .apply_image(img)
+        .into_rgba8();
+        for p in out.pixels() {
+            assert_eq!(*p, color);
+        }
+    }
+
+    #[test]
+    fn data_bend_preserves_dimensions() {
+        let img = solid_image(30, 30, Rgba([128, 64, 200, 255]));
+        let out = GlitchEffect::DataBend {
+            mode: 0,
+            value: 42,
+            seed: 0,
+        }
+        .apply_image(img);
+        assert_eq!(out.dimensions(), (30, 30));
+    }
+
+    #[test]
+    fn data_bend_xor_zero_identity() {
+        // XOR with 0 is identity for affected pixels.
+        let color = Rgba([128u8, 64, 200, 255]);
+        let img = solid_image(10, 10, color);
+        let out = GlitchEffect::DataBend {
+            mode: 0,
+            value: 0,
+            seed: 0,
+        }
+        .apply_image(img)
+        .into_rgba8();
+        for p in out.pixels() {
+            assert_eq!(*p, color);
+        }
+    }
+
+    #[test]
+    fn sine_warp_preserves_dimensions() {
+        let img = solid_image(50, 40, Rgba([80, 120, 180, 255]));
+        let out = GlitchEffect::SineWarp {
+            amplitude: 5.0,
+            frequency: 2.0,
+            phase: 0.0,
+            axis: 0,
+        }
+        .apply_image(img);
+        assert_eq!(out.dimensions(), (50, 40));
+    }
+
+    #[test]
+    fn sine_warp_zero_amplitude_identity() {
+        let color = Rgba([80u8, 120, 180, 255]);
+        let img = solid_image(30, 20, color);
+        let out = GlitchEffect::SineWarp {
+            amplitude: 0.0,
+            frequency: 2.0,
+            phase: 0.0,
+            axis: 0,
+        }
+        .apply_image(img)
+        .into_rgba8();
+        for p in out.pixels() {
+            assert_eq!(*p, color);
+        }
+    }
+
+    #[test]
+    fn jpeg_smash_preserves_dimensions() {
+        let img = solid_image(64, 48, Rgba([200, 100, 50, 255]));
+        let out = GlitchEffect::JpegSmash {
+            block_size: 8,
+            strength: 0.5,
+            bleed: false,
         }
         .apply_image(img);
         assert_eq!(out.dimensions(), (64, 48));

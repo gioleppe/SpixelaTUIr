@@ -4,6 +4,7 @@ use std::sync::mpsc;
 use ratatui::layout::Rect;
 use ratatui_image::{Resize, ResizeEncodeRender, picker::Picker, protocol::StatefulProtocol};
 
+use crate::config::favorites::FavoritesConfig;
 use crate::effects::Pipeline;
 use crate::engine::export::ExportFormat;
 use crate::engine::worker::{WorkerCommand, WorkerResponse};
@@ -48,8 +49,13 @@ pub struct AppState {
     pub focused_panel: FocusedPanel,
     /// Currently selected index in the active pipeline effect list.
     pub selected_effect: usize,
-    /// Currently selected index in the add-effect menu.
+    /// Currently selected index in the add-effect menu (within the active tab).
     pub add_effect_cursor: usize,
+    /// Active tab index in the add-effect menu.
+    /// 0=All, 1=Color, 2=Glitch, 3=CRT, 4=Composite, 5=★ Favorites
+    pub add_effect_tab: usize,
+    /// Persisted favorites configuration (which effect names are starred).
+    pub favorites: FavoritesConfig,
     /// Buffer for the file-path typed by the user when in PathInput mode.
     pub path_input: String,
     /// State for the interactive file-browser modal (Some when modal is open).
@@ -142,6 +148,8 @@ impl AppState {
             focused_panel: FocusedPanel::Canvas,
             selected_effect: 0,
             add_effect_cursor: 0,
+            add_effect_tab: 0,
+            favorites: FavoritesConfig::load(),
             path_input: String::new(),
             file_browser: None,
             edit_params: Vec::new(),
