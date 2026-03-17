@@ -9,13 +9,23 @@ use super::ParamDescriptor;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CrtEffect {
     /// Draw horizontal scanlines every N rows.
-    Scanlines { spacing: u32, opacity: f32 },
+    Scanlines {
+        spacing: u32,
+        opacity: f32,
+        color_r: u8,
+        color_g: u8,
+        color_b: u8,
+    },
     /// Apply barrel-distortion curvature to simulate a curved CRT screen.
     Curvature { strength: f32 },
     /// Blur and add a coloured halo to bright regions.
     PhosphorGlow { radius: u32, intensity: f32 },
     /// Add RGB or monochromatic noise.
-    Noise { intensity: f32, monochromatic: bool },
+    Noise {
+        intensity: f32,
+        monochromatic: bool,
+        seed: u32,
+    },
     /// Radial darkening towards the edges (vignette).
     Vignette { radius: f32, softness: f32 },
 }
@@ -31,17 +41,25 @@ impl CrtEffect {
         height: u32,
     ) -> Rgba<u8> {
         match self {
-            CrtEffect::Scanlines { spacing, opacity } => {
+            CrtEffect::Scanlines {
+                spacing,
+                opacity,
+                color_r,
+                color_g,
+                color_b,
+            } => {
                 if spacing == &0 {
                     return pixel;
                 }
                 if y.is_multiple_of(*spacing) {
-                    let darken =
-                        |c: u8| -> u8 { ((c as f32) * (1.0 - opacity.clamp(0.0, 1.0))) as u8 };
+                    let blend = |src: u8, tint: u8| -> u8 {
+                        let a = opacity.clamp(0.0, 1.0);
+                        ((src as f32) * (1.0 - a) + (tint as f32) * a) as u8
+                    };
                     Rgba([
-                        darken(pixel[0]),
-                        darken(pixel[1]),
-                        darken(pixel[2]),
+                        blend(pixel[0], *color_r),
+                        blend(pixel[1], *color_g),
+                        blend(pixel[2], *color_b),
                         pixel[3],
                     ])
                 } else {
@@ -67,22 +85,29 @@ impl CrtEffect {
             CrtEffect::Noise {
                 intensity,
                 monochromatic,
+                seed,
             } => {
                 // Deterministic noise seeded by pixel position.
-                let seed = (x.wrapping_mul(2654435761) ^ y.wrapping_mul(2246822519)) as f32;
-                let n = (seed.sin() * 43_758.547).fract(); // 0..1
+                let s = *seed;
+                let seed_val = (x.wrapping_mul(2654435761).wrapping_add(s)
+                    ^ y.wrapping_mul(2246822519).wrapping_add(s))
+                    as f32;
+                let n = (seed_val.sin() * 43_758.547).fract(); // 0..1
                 let delta = ((n * 2.0 - 1.0) * intensity * 255.0) as i16;
                 let add = |c: u8, d: i16| -> u8 { (c as i16 + d).clamp(0, 255) as u8 };
                 if *monochromatic {
                     let v = add(pixel[0], delta);
                     Rgba([v, v, v, pixel[3]])
                 } else {
-                    let seed_r = seed;
-                    let seed_g = (seed * 1.618).fract();
-                    let seed_b = (seed * std::f32::consts::E).fract();
-                    let dr = (((seed_r * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);
-                    let dg = (((seed_g * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);
-                    let db = (((seed_b * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);
+                    let seed_val_r = seed_val;
+                    let seed_val_g = (seed_val * 1.618).fract();
+                    let seed_val_b = (seed_val * std::f32::consts::E).fract();
+                    let dr =
+                        (((seed_val_r * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);
+                    let dg =
+                        (((seed_val_g * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);
+                    let db =
+                        (((seed_val_b * 2.0 - 1.0) * intensity * 255.0) as i16).clamp(-255, 255);
                     Rgba([
                         add(pixel[0], dr),
                         add(pixel[1], dg),
@@ -99,7 +124,13 @@ impl CrtEffect {
     /// Return descriptors for all editable numeric parameters.
     pub fn param_descriptors(&self) -> Vec<ParamDescriptor> {
         match self {
-            CrtEffect::Scanlines { spacing, opacity } => vec![
+            CrtEffect::Scanlines {
+                spacing,
+                opacity,
+                color_r,
+                color_g,
+                color_b,
+            } => vec![
                 ParamDescriptor {
                     name: "spacing",
                     value: *spacing as f32,
@@ -111,6 +142,24 @@ impl CrtEffect {
                     value: *opacity,
                     min: 0.0,
                     max: 1.0,
+                },
+                ParamDescriptor {
+                    name: "color_r",
+                    value: *color_r as f32,
+                    min: 0.0,
+                    max: 255.0,
+                },
+                ParamDescriptor {
+                    name: "color_g",
+                    value: *color_g as f32,
+                    min: 0.0,
+                    max: 255.0,
+                },
+                ParamDescriptor {
+                    name: "color_b",
+                    value: *color_b as f32,
+                    min: 0.0,
+                    max: 255.0,
                 },
             ],
             CrtEffect::Curvature { strength } => vec![ParamDescriptor {
@@ -136,6 +185,7 @@ impl CrtEffect {
             CrtEffect::Noise {
                 intensity,
                 monochromatic,
+                seed,
             } => vec![
                 ParamDescriptor {
                     name: "intensity",
@@ -148,6 +198,12 @@ impl CrtEffect {
                     value: if *monochromatic { 1.0 } else { 0.0 },
                     min: 0.0,
                     max: 1.0,
+                },
+                ParamDescriptor {
+                    name: "seed",
+                    value: *seed as f32,
+                    min: 0.0,
+                    max: 9999.0,
                 },
             ],
             CrtEffect::Vignette { radius, softness } => vec![
@@ -171,9 +227,18 @@ impl CrtEffect {
     pub fn apply_params(&self, values: &[f32]) -> CrtEffect {
         let get = |i: usize, fallback: f32| values.get(i).copied().unwrap_or(fallback);
         match self {
-            CrtEffect::Scanlines { spacing, opacity } => CrtEffect::Scanlines {
+            CrtEffect::Scanlines {
+                spacing,
+                opacity,
+                color_r,
+                color_g,
+                color_b,
+            } => CrtEffect::Scanlines {
                 spacing: get(0, *spacing as f32) as u32,
                 opacity: get(1, *opacity),
+                color_r: get(2, *color_r as f32) as u8,
+                color_g: get(3, *color_g as f32) as u8,
+                color_b: get(4, *color_b as f32) as u8,
             },
             CrtEffect::Curvature { strength } => CrtEffect::Curvature {
                 strength: get(0, *strength),
@@ -185,9 +250,11 @@ impl CrtEffect {
             CrtEffect::Noise {
                 intensity,
                 monochromatic,
+                seed,
             } => CrtEffect::Noise {
                 intensity: get(0, *intensity),
                 monochromatic: get(1, if *monochromatic { 1.0 } else { 0.0 }) >= 0.5,
+                seed: get(2, *seed as f32) as u32,
             },
             CrtEffect::Vignette { radius, softness } => CrtEffect::Vignette {
                 radius: get(0, *radius),
@@ -211,8 +278,21 @@ impl CrtEffect {
 impl fmt::Display for CrtEffect {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CrtEffect::Scanlines { spacing, opacity } => {
-                write!(f, "Scanlines {spacing}px {opacity:.0}%")
+            CrtEffect::Scanlines {
+                spacing,
+                opacity,
+                color_r,
+                color_g,
+                color_b,
+            } => {
+                if *color_r == 0 && *color_g == 0 && *color_b == 0 {
+                    write!(f, "Scanlines {spacing}px {opacity:.0}%")
+                } else {
+                    write!(
+                        f,
+                        "Scanlines {spacing}px {opacity:.0}% rgb({color_r},{color_g},{color_b})"
+                    )
+                }
             }
             CrtEffect::Curvature { strength } => write!(f, "Curvature {strength:.2}"),
             CrtEffect::PhosphorGlow { radius, intensity } => {
@@ -221,9 +301,10 @@ impl fmt::Display for CrtEffect {
             CrtEffect::Noise {
                 intensity,
                 monochromatic,
+                seed,
             } => {
                 let kind = if *monochromatic { "mono" } else { "rgb" };
-                write!(f, "Noise {kind} {intensity:.2}")
+                write!(f, "Noise {kind} {intensity:.2} s={seed}")
             }
             CrtEffect::Vignette { radius, softness } => {
                 write!(f, "Vignette r={radius:.2} s={softness:.2}")

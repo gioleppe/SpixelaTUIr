@@ -25,7 +25,7 @@
     - `export.rs`: Logic for exporting processed frames to disk.
 - `src/effects/`: Modular effect implementations. Each sub-effect type owns its own `param_descriptors()`, `apply_params()`, `variant_name()`, and `Display` impl — the `Effect` enum in `mod.rs` delegates. Categorized into:
     - `color.rs`: Pixel-level operations (Hue, Saturation, Contrast, Inversion, Quantization, GradientMap).
-    - `glitch.rs`: Spatial manipulations (Pixelate, Row Jitter, Block Shift, Pixel Sort).
+    - `glitch.rs`: Spatial manipulations (Pixelate, Row Jitter, Block Shift, Pixel Sort, Fractal Julia, Delaunay Triangulation, Ghost Displace).
     - `crt.rs`: Retro-display simulations (Scanlines, Noise, Vignette, Curvature, PhosphorGlow).
     - `composite.rs`: Image layout operations (Crop, Blend).
     - `mod.rs`: `Effect` enum (thin delegation layer), `Pipeline`, `EnabledEffect`, `ParamDescriptor`, and `apply_per_pixel` helper.

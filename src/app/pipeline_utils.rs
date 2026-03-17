@@ -7,6 +7,7 @@ use crate::effects::{
 pub type EffectEntry = (&'static str, fn() -> Effect);
 
 pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
+    // ── Color ────────────────────────────────────────────────────────────
     ("Invert", || Effect::Color(ColorEffect::Invert)),
     ("Gradient Map", || {
         Effect::Color(ColorEffect::GradientMap {
@@ -29,11 +30,15 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
     ("Quantize (4 levels)", || {
         Effect::Color(ColorEffect::ColorQuantization { levels: 4 })
     }),
+    // ── Glitch ───────────────────────────────────────────────────────────
     ("Pixelate (8px)", || {
         Effect::Glitch(GlitchEffect::Pixelate { block_size: 8 })
     }),
     ("Row Jitter", || {
-        Effect::Glitch(GlitchEffect::RowJitter { magnitude: 0.05 })
+        Effect::Glitch(GlitchEffect::RowJitter {
+            magnitude: 0.05,
+            seed: 0,
+        })
     }),
     ("Block Shift", || {
         Effect::Glitch(GlitchEffect::BlockShift {
@@ -42,18 +47,50 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
         })
     }),
     ("Pixel Sort", || {
-        Effect::Glitch(GlitchEffect::PixelSort { threshold: 0.5 })
+        Effect::Glitch(GlitchEffect::PixelSort {
+            threshold: 0.5,
+            reverse: false,
+        })
     }),
+    ("Fractal Julia", || {
+        Effect::Glitch(GlitchEffect::FractalJulia {
+            scale: 2.5,
+            cx: -0.7,
+            cy: 0.27015,
+            max_iter: 80,
+            blend: 0.5,
+        })
+    }),
+    ("Delaunay Triangulation", || {
+        Effect::Glitch(GlitchEffect::DelaunayTriangulation {
+            num_points: 200,
+            seed: 42,
+        })
+    }),
+    ("Ghost Displace", || {
+        Effect::Glitch(GlitchEffect::GhostDisplace {
+            copies: 5,
+            offset_x: 8.0,
+            offset_y: 4.0,
+            hue_sweep: 60.0,
+            opacity: 0.4,
+        })
+    }),
+    // ── CRT ──────────────────────────────────────────────────────────────
     ("Scanlines", || {
         Effect::Crt(CrtEffect::Scanlines {
             spacing: 2,
             opacity: 0.5,
+            color_r: 0,
+            color_g: 0,
+            color_b: 0,
         })
     }),
     ("Noise (RGB)", || {
         Effect::Crt(CrtEffect::Noise {
             intensity: 0.1,
             monochromatic: false,
+            seed: 0,
         })
     }),
     ("Vignette", || {
@@ -62,6 +99,7 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
             softness: 0.3,
         })
     }),
+    // ── Composite ────────────────────────────────────────────────────────
     ("Crop 50%", || {
         Effect::Composite(CompositeEffect::CropRect {
             x: 50,
@@ -121,19 +159,69 @@ pub fn randomize_pipeline(pipeline: &mut Pipeline) {
             },
             Effect::Glitch(e) => match e {
                 GlitchEffect::Pixelate { block_size } => *block_size = 2 + (next() * 20.0) as u32,
-                GlitchEffect::RowJitter { magnitude } => *magnitude = next() * 0.2,
+                GlitchEffect::RowJitter { magnitude, seed } => {
+                    *magnitude = next() * 0.2;
+                    *seed = (next() * 9999.0) as u32;
+                }
                 GlitchEffect::BlockShift { shift_x, shift_y } => {
                     *shift_x = ((next() - 0.5) * 40.0) as i32;
                     *shift_y = ((next() - 0.5) * 40.0) as i32;
                 }
-                GlitchEffect::PixelSort { threshold } => *threshold = 0.2 + next() * 0.6,
+                GlitchEffect::PixelSort { threshold, reverse } => {
+                    *threshold = 0.2 + next() * 0.6;
+                    *reverse = next() >= 0.5;
+                }
+                GlitchEffect::FractalJulia {
+                    scale,
+                    cx,
+                    cy,
+                    max_iter,
+                    blend,
+                } => {
+                    *scale = 0.5 + next() * 4.0;
+                    *cx = (next() - 0.5) * 3.0;
+                    *cy = (next() - 0.5) * 3.0;
+                    *max_iter = 20 + (next() * 180.0) as u32;
+                    *blend = 0.2 + next() * 0.6;
+                }
+                GlitchEffect::DelaunayTriangulation { num_points, seed } => {
+                    *num_points = 50 + (next() * 500.0) as u32;
+                    *seed = (next() * 9999.0) as u32;
+                }
+                GlitchEffect::GhostDisplace {
+                    copies,
+                    offset_x,
+                    offset_y,
+                    hue_sweep,
+                    opacity,
+                } => {
+                    *copies = 2 + (next() * 8.0) as u32;
+                    *offset_x = (next() - 0.5) * 40.0;
+                    *offset_y = (next() - 0.5) * 40.0;
+                    *hue_sweep = next() * 360.0;
+                    *opacity = 0.2 + next() * 0.6;
+                }
             },
             Effect::Crt(e) => match e {
-                CrtEffect::Scanlines { spacing, opacity } => {
+                CrtEffect::Scanlines {
+                    spacing,
+                    opacity,
+                    color_r,
+                    color_g,
+                    color_b,
+                } => {
                     *spacing = 2 + (next() * 4.0) as u32;
                     *opacity = 0.3 + next() * 0.7;
+                    *color_r = (next() * 64.0) as u8;
+                    *color_g = (next() * 64.0) as u8;
+                    *color_b = (next() * 64.0) as u8;
                 }
-                CrtEffect::Noise { intensity, .. } => *intensity = next() * 0.3,
+                CrtEffect::Noise {
+                    intensity, seed, ..
+                } => {
+                    *intensity = next() * 0.3;
+                    *seed = (next() * 9999.0) as u32;
+                }
                 CrtEffect::Vignette { radius, softness } => {
                     *radius = 0.3 + next() * 0.5;
                     *softness = 0.1 + next() * 0.5;
