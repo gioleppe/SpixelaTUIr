@@ -45,7 +45,7 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
 pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
     let help = match state.input_mode {
         InputMode::PathInput => "Type path  Enter: load  Esc: cancel",
-        InputMode::AddEffect => "j/k: navigate  Enter: add  Esc: cancel",
+        InputMode::AddEffect => "j/k/↑/↓:nav  Tab/←/→:tab  *:★Favs  f:★fav  Enter:add  Esc:close",
         InputMode::FileBrowser => {
             use crate::app::FileBrowserPurpose;
             match state.file_browser.as_ref().map(|fb| &fb.purpose) {
@@ -289,68 +289,93 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
 
     let total = frame.area();
 
-    let popup_width = total.width.min(62);
-    // 46 lines: 15 global + 10 effects + 16 animation + borders/blank lines.
-    let popup_height = total.height.min(46);
+    // Two-column layout — target 90 wide × 30 tall so both columns are
+    // well-balanced and the modal has good breadth on most terminals.
+    let popup_width = total.width.min(90);
+    let popup_height = total.height.min(30);
     let x = (total.width.saturating_sub(popup_width)) / 2;
     let y = (total.height.saturating_sub(popup_height)) / 2;
     let popup_area = Rect::new(x, y, popup_width, popup_height);
 
     frame.render_widget(Clear, popup_area);
 
-    let help_text = "\
+    let outer_block = Block::default()
+        .title(" Help – Keyboard Shortcuts ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(state.theme.warning_border));
+    let inner_area = outer_block.inner(popup_area);
+    frame.render_widget(outer_block, popup_area);
+
+    // Split the inner area into two equal columns.
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(inner_area);
+
+    // ── Left column: GLOBAL + EFFECTS PANEL + ADD EFFECT MENU ───────────────
+    let left_text = "\
  GLOBAL\n\
   q / Esc       Quit\n\
   o             Open image (file browser)\n\
   e             Export image (dialog)\n\
-  Ctrl+S        Save pipeline (JSON dialog)\n\
-  Ctrl+L        Load pipeline (file browser)\n\
-  Ctrl+D        Clear all effects (with confirm)\n\
-  Ctrl+Z        Undo last pipeline change\n\
-  Ctrl+Y        Redo last undone change\n\
-  r             Randomise all effect parameters\n\
-  [             Decrease preview resolution\n\
-  ]             Increase preview resolution\n\
-  v             Toggle side-by-side split view\n\
-  H             Toggle live histogram overlay\n\
-  Tab           Toggle focus: Canvas ↔ Effects ↔ Animation\n\
-  h             Open / close this help\n\
+  Ctrl+S        Save pipeline\n\
+  Ctrl+L        Load pipeline\n\
+  Ctrl+D        Clear all effects\n\
+  Ctrl+Z        Undo  |  Ctrl+Y  Redo\n\
+  r             Randomise parameters\n\
+  [  /  ]       Decrease / increase preview\n\
+  v             Toggle split view\n\
+  H             Toggle histogram overlay\n\
+  Tab           Cycle focus panel\n\
   Ctrl+N        Toggle Animation panel\n\
+  h             Open / close this help\n\
 \n\
- EFFECTS PANEL  (requires Effects panel focus)\n\
+ EFFECTS PANEL  (effects focus)\n\
   ↑ / k         Navigate up\n\
   ↓ / j         Navigate down\n\
   a             Add a new effect\n\
+  *             Add effect → ★ Favs tab\n\
   d / Delete    Delete selected effect\n\
   Enter         Edit effect parameters\n\
-  Space         Toggle selected effect on/off\n\
-  K / Shift+↑   Move effect up in pipeline\n\
-  J / Shift+↓   Move effect down in pipeline\n\
+  Space         Toggle effect on / off\n\
+  K / Shift+↑   Move effect up\n\
+  J / Shift+↓   Move effect down\n\
+\n\
+ ADD EFFECT MENU  (a or * to open)\n\
+  ↑ / k         Navigate list up\n\
+  ↓ / j         Navigate list down\n";
+
+    // ── Right column: ANIMATION PANEL ────────────────────────────────────────
+    let right_text = "\
+ ADD EFFECT MENU (cont.)\n\
+  Tab / →       Next category tab\n\
+  Shift+Tab / ← Previous category tab\n\
+  *             Jump to ★ Favs tab\n\
+  f             Toggle ★ favorite\n\
+  Enter         Add effect to pipeline\n\
+  Esc           Close menu\n\
 \n\
  ANIMATION PANEL  (Tab to focus)\n\
   ← / →         Navigate frames\n\
-  c             Capture current pipeline as frame\n\
+  c             Capture current as frame\n\
   d / Delete    Delete selected frame\n\
-  Enter         Load frame pipeline back for editing\n\
+  Enter         Load frame pipeline\n\
   Space         Play / pause\n\
   f             Set frame duration (ms)\n\
-  F             Set ALL frames duration (ms)\n\
+  F             Set ALL frames duration\n\
   L             Toggle loop mode\n\
   + / -         Increase / decrease fps\n\
   K / Shift+↑   Move frame up\n\
   J / Shift+↓   Move frame down\n\
   s             Parameter sweep dialog\n\
-  Ctrl+E        Export animation (GIF/WebP)\n\
+  Ctrl+E        Export animation\n\
   Esc           Unfocus animation panel\n\
+\n\
 \n\
   Press h or Esc to close";
 
-    let block = Block::default()
-        .title(" Help – Keyboard Shortcuts ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(state.theme.warning_border));
-    let paragraph = Paragraph::new(help_text).block(block);
-    frame.render_widget(paragraph, popup_area);
+    frame.render_widget(Paragraph::new(left_text), cols[0]);
+    frame.render_widget(Paragraph::new(right_text), cols[1]);
 }
 
 /// Render the quit-confirmation modal when the user tries to quit with unsaved pipeline changes.
