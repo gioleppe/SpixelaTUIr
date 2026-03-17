@@ -69,12 +69,25 @@ spixelatuir --batch "raw_photos/**/*.png" --pipeline cyberpunk.json --outdir gli
 
 ## 🎨 Effects Catalog
 
-| Category | Effect | Description |
-|----------|--------|-------------|
-| **Color** | `HueShift`, `GradientMap`, `Saturation`, `Contrast`, `Invert`, `ColorQuantization` | Master the palette with everything from subtle shifts to aggressive posterization. |
-| **Glitch** | `Pixelate`, `RowJitter`, `PixelSort`, `BlockShift`, `FractalJulia`, `DelaunayTriangulation`, `GhostDisplace` | Warp reality with spatial manipulations, fractal overlays, low-poly triangulation, and ghosted displacement echoes. |
-| **CRT** | `Scanlines`, `Noise`, `Vignette` | Recreate the warm, fuzzy glow of 80s hardware with colored scanline tint support. |
-| **Composite**| `CropRect` | Focus on what matters. |
+| Category | Effect | Key Parameters | Description |
+|----------|--------|---------------|-------------|
+| **Color** | `Invert` | — | Invert all pixel colors. |
+| **Color** | `GradientMap` | `preset` | Map luminance to a color gradient (several presets + custom). |
+| **Color** | `HueShift` | `degrees` | Rotate the hue wheel by any angle (0–360°). |
+| **Color** | `Contrast` | `factor` | Multiply contrast (1.0 = identity). |
+| **Color** | `Saturation` | `factor` | Scale saturation (0 = greyscale, 1.0 = identity). |
+| **Color** | `ColorQuantization` | `levels` | Posterize: reduce each channel to N discrete levels. |
+| **Glitch** | `Pixelate` | `block_size` | Mosaic-style pixelation. |
+| **Glitch** | `RowJitter` | `magnitude`, `seed` | Random horizontal row shifting. Deterministic with `seed`. |
+| **Glitch** | `BlockShift` | `shift_x`, `shift_y` | Shift a rectangular block of pixels. |
+| **Glitch** | `PixelSort` | `threshold`, `reverse` | Sort pixel runs by luminance. `reverse` flips sort order. |
+| **Glitch** | `FractalJulia` | `scale`, `cx`, `cy`, `max_iter`, `blend` | Overlay a Julia set fractal blended with the source image. |
+| **Glitch** | `DelaunayTriangulation` | `num_points`, `seed` | Low-poly mosaic via Bowyer-Watson triangulation of random sample points. |
+| **Glitch** | `GhostDisplace` | `copies`, `offset_x`, `offset_y`, `hue_sweep`, `opacity` | Create N displaced/echoed copies with progressive hue sweep. |
+| **CRT** | `Scanlines` | `spacing`, `opacity`, `color_r/g/b` | Horizontal scanline overlay with optional color tint. |
+| **CRT** | `Noise` | `intensity`, `monochromatic`, `seed` | RGB or mono noise overlay. Deterministic with `seed`. |
+| **CRT** | `Vignette` | `radius`, `softness` | Darken the image edges for a vintage look. |
+| **Composite** | `CropRect` | `x`, `y`, `width`, `height` | Crop to a rectangular region. |
 
 ---
 
@@ -89,12 +102,18 @@ spixelatuir --batch "raw_photos/**/*.png" --pipeline cyberpunk.json --outdir gli
 | `r` | **Randomize** everything! |
 | `Enter` | **Edit** parameters of the selected effect |
 | `Space` | **Toggle** effect on/off or **Play** animation |
+| `d` / `Delete` | **Delete** the selected effect |
+| `Shift+K` / `Shift+J` | **Reorder** — move effect up / down |
 | `v` | **Split View** (Before vs. After) |
 | `e` | **Export** current frame |
+| `Ctrl+Z` / `Ctrl+Y` | **Undo / Redo** pipeline edits |
 | `Ctrl+N` | Open **Animation Panel** |
 | `Ctrl+S` / `L`| **Save / Load** your pipeline preset |
+| `[` / `]` | Decrease / increase preview resolution |
 | `h` | Show full **Help** overlay |
 | `q` | Quit (with unsaved changes protection) |
+
+> **Circular navigation:** All menus and lists wrap around — pressing Up at the first item jumps to the last, and Down at the last jumps to the first.
 
 ---
 

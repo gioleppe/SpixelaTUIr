@@ -20,3 +20,5 @@ target
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 spix-debug.log
+beach_image_preset.json
+beach_image_anim.gif

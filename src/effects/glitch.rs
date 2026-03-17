@@ -157,7 +157,7 @@ impl GlitchEffect {
                     name: "num_points",
                     value: *num_points as f32,
                     min: 10.0,
-                    max: 2000.0,
+                    max: 30000.0,
                 },
                 ParamDescriptor {
                     name: "seed",
