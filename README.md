@@ -124,20 +124,22 @@ spixelatuir --batch "raw_photos/**/*.png" --pipeline cyberpunk.json --outdir gli
 
 ### Add Effect Menu shortcuts
 
-When the **Add Effect** menu is open (`a` key):
+Open with `a` (effects panel focused) **or** jump straight to Favorites with `*`.
 
 | Key | Action |
 |-----|--------|
-| `Tab` / `Shift+Tab` | Cycle **category tabs** (All → Color → Glitch → CRT → Composite → ★ Favs) |
-| `↑` / `k` | Move selection up |
-| `↓` / `j` | Move selection down |
+| `Tab` / `→` | Advance to the **next** category tab (circular — wraps from last back to first) |
+| `Shift+Tab` / `←` | Go to the **previous** category tab (circular) |
+| `*` | **Jump directly to ★ Favs** tab (no cycling needed) |
+| `↑` / `k` | Move selection up (wraps from first to last) |
+| `↓` / `j` | Move selection down (wraps from last to first) |
 | `f` | **Toggle favorite** ★ for the highlighted effect (persisted to `~/.config/spix/favorites.json`) |
 | `Enter` | **Add** the selected effect to the pipeline |
 | `Esc` | Close the menu |
 
-> **Favorites tab:** Switch to the `★ Favs` tab (Tab through categories) to see only your starred effects. Favorites are saved across sessions.
+> **Favorites shortcut:** Press `*` from the effects panel (normal mode) to open the menu already on the ★ Favs tab, or press `*` while the menu is open to jump there instantly.
 
-> **Circular navigation:** All menus and lists wrap around — pressing Up at the first item jumps to the last, and Down at the last jumps to the first.
+> **Circular navigation:** Both the category tabs and the effect list wrap around — pressing `→`/`Tab` on the last tab jumps back to the first, and `↑` at the top of the list jumps to the bottom.
 
 ---
 

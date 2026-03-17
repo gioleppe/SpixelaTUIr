@@ -121,6 +121,12 @@ pub fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifier
             state.input_mode = InputMode::AddEffect;
             state.add_effect_cursor = 0;
         }
+        // Quick jump to Favorites tab in the Add Effect menu.
+        KeyCode::Char('*') if state.focused_panel == FocusedPanel::EffectsList => {
+            state.input_mode = InputMode::AddEffect;
+            state.add_effect_tab = ADD_EFFECT_TABS.len() - 1; // ★ Favs
+            state.add_effect_cursor = 0;
+        }
         // Toggle the selected effect on/off without removing it (Space).
         KeyCode::Char(' ') if state.focused_panel == FocusedPanel::EffectsList => {
             if !state.pipeline.effects.is_empty() {
@@ -428,17 +434,22 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
         KeyCode::Esc => {
             state.input_mode = InputMode::Normal;
         }
-        KeyCode::Tab => {
-            // Cycle to the next category tab.
+        // Tab / Right arrow: advance to the next category tab (circular).
+        KeyCode::Tab | KeyCode::Right => {
             state.add_effect_tab = (state.add_effect_tab + 1) % ADD_EFFECT_TABS.len();
             state.add_effect_cursor = 0;
         }
-        KeyCode::BackTab => {
-            // Cycle to the previous category tab.
+        // Shift+Tab / Left arrow: go to the previous category tab (circular).
+        KeyCode::BackTab | KeyCode::Left => {
             state.add_effect_tab = state
                 .add_effect_tab
                 .checked_sub(1)
                 .unwrap_or(ADD_EFFECT_TABS.len() - 1);
+            state.add_effect_cursor = 0;
+        }
+        // '*' — jump directly to the Favorites tab from anywhere in the menu.
+        KeyCode::Char('*') => {
+            state.add_effect_tab = ADD_EFFECT_TABS.len() - 1; // ★ Favs is always last
             state.add_effect_cursor = 0;
         }
         KeyCode::Up | KeyCode::Char('k') => {
@@ -466,8 +477,9 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
                 let name = visible[cursor].1;
                 state.favorites.toggle(name);
                 // If we're on the Favorites tab and just un-favorited, adjust cursor.
-                if state.add_effect_tab == 5 {
-                    let new_n = visible_effects_for_tab(5, &state.favorites).len();
+                if state.add_effect_tab == ADD_EFFECT_TABS.len() - 1 {
+                    let new_n =
+                        visible_effects_for_tab(ADD_EFFECT_TABS.len() - 1, &state.favorites).len();
                     if state.add_effect_cursor >= new_n && new_n > 0 {
                         state.add_effect_cursor = new_n - 1;
                     }

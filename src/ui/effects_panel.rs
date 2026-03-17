@@ -188,7 +188,7 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
     }
 
     // ── Hint row ──────────────────────────────────────────────────────────
-    let hint = Paragraph::new("Enter:add  f:★fav  Tab:category  Esc:close")
+    let hint = Paragraph::new("Enter:add  f:★fav  ←/→/Tab:category  *:★ Favs  Esc:close")
         .style(Style::default().fg(state.theme.text_dimmed));
     frame.render_widget(hint, chunks[2]);
 }
