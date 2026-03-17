@@ -2,7 +2,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
 use crate::app::{AppState, FILE_BROWSER_HINT, InputMode, PIPELINE_BROWSER_HINT};
@@ -78,7 +78,7 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         }
     };
     let block = Block::default().title("Controls").borders(Borders::ALL);
-    let paragraph = Paragraph::new(help).block(block);
+    let paragraph = Paragraph::new(help).block(block).wrap(Wrap { trim: true });
     frame.render_widget(paragraph, area);
 }
 
@@ -321,9 +321,10 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
   Ctrl+S        Save pipeline\n\
   Ctrl+L        Load pipeline\n\
   Ctrl+D        Clear all effects\n\
-  Ctrl+Z        Undo  |  Ctrl+Y  Redo\n\
+  Ctrl+Z        Undo\n\
+  Ctrl+Y        Redo\n\
   r             Randomise parameters\n\
-  [  /  ]       Decrease / increase preview\n\
+  [ / ]         Decrease / increase preview\n\
   v             Toggle split view\n\
   H             Toggle histogram overlay\n\
   Tab           Cycle focus panel\n\
@@ -370,7 +371,6 @@ pub fn render_help_modal(frame: &mut Frame, state: &AppState) {
   s             Parameter sweep dialog\n\
   Ctrl+E        Export animation\n\
   Esc           Unfocus animation panel\n\
-\n\
 \n\
   Press h or Esc to close";
 

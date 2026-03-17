@@ -27,7 +27,7 @@ pub fn build_layout(area: Rect, animation_open: bool) -> Vec<Rect> {
     let bottom_height: u16 = if animation_open {
         ANIMATION_PANEL_HEIGHT
     } else {
-        3 // controls hint panel height
+        4 // controls hint panel height (2 border rows + 2 text rows for wrapping)
     };
 
     // Outer vertical split: status | body | bottom.
