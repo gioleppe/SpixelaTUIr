@@ -298,7 +298,8 @@ fn mirror_slice(img: DynamicImage, orientation: u8, slice_width: u32, pattern: u
                     let prev_end = (prev_start + band).min(height);
                     let prev_h = prev_end.saturating_sub(prev_start);
                     for y in start..end {
-                        let rel = ((y - start) as usize).min(prev_h.saturating_sub(1) as usize) as u32;
+                        let rel =
+                            ((y - start) as usize).min(prev_h.saturating_sub(1) as usize) as u32;
                         let src_y = prev_start + prev_h.saturating_sub(1) - rel;
                         for x in 0..width {
                             let p = *src.get_pixel(x, src_y);
@@ -334,7 +335,8 @@ fn mirror_slice(img: DynamicImage, orientation: u8, slice_width: u32, pattern: u
                     let prev_end = (prev_start + band).min(width);
                     let prev_w = prev_end.saturating_sub(prev_start);
                     for x in start..end {
-                        let rel = ((x - start) as usize).min(prev_w.saturating_sub(1) as usize) as u32;
+                        let rel =
+                            ((x - start) as usize).min(prev_w.saturating_sub(1) as usize) as u32;
                         let src_x = prev_start + prev_w.saturating_sub(1) - rel;
                         for y in 0..height {
                             let p = *src.get_pixel(src_x, y);
@@ -441,7 +443,11 @@ fn edge_glow(
         for x in 0..w {
             let source = src.get_pixel(x, y);
             let magnitude = edge_map[idx(x, y)];
-            let edge_factor = if magnitude > thresh { magnitude.clamp(0.0, 1.0) } else { 0.0 };
+            let edge_factor = if magnitude > thresh {
+                magnitude.clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
 
             let bg_factor = background_darkening + (1.0 - background_darkening) * edge_factor;
             let mut r = source[0] as f32 * bg_factor;
@@ -488,7 +494,11 @@ mod tests {
         let mut img = RgbaImage::new(7, 5);
         for y in 0..5 {
             for x in 0..7 {
-                img.put_pixel(x, y, Rgba([(x * 17) as u8, (y * 33) as u8, (x + y) as u8, 255]));
+                img.put_pixel(
+                    x,
+                    y,
+                    Rgba([(x * 17) as u8, (y * 33) as u8, (x + y) as u8, 255]),
+                );
             }
         }
         let input = DynamicImage::ImageRgba8(img.clone());
@@ -504,7 +514,8 @@ mod tests {
 
     #[test]
     fn edge_glow_preserves_dimensions() {
-        let img = DynamicImage::ImageRgba8(RgbaImage::from_pixel(18, 11, Rgba([100, 110, 120, 255])));
+        let img =
+            DynamicImage::ImageRgba8(RgbaImage::from_pixel(18, 11, Rgba([100, 110, 120, 255])));
         let out = CompositeEffect::EdgeGlow {
             edge_thresh: 0.1,
             glow_color_r: 0,

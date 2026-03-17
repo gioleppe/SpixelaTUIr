@@ -1116,6 +1116,7 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
 
 // ── RGBShift ──────────────────────────────────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 fn rgb_shift(
     img: DynamicImage,
     x_r: i32,
@@ -1214,7 +1215,13 @@ fn data_bend(img: DynamicImage, mode: u8, value: u8, seed: u32) -> DynamicImage 
 
 // ── SineWarp ──────────────────────────────────────────────────────────────────
 
-fn sine_warp(img: DynamicImage, amplitude: f32, frequency: f32, phase: f32, axis: u8) -> DynamicImage {
+fn sine_warp(
+    img: DynamicImage,
+    amplitude: f32,
+    frequency: f32,
+    phase: f32,
+    axis: u8,
+) -> DynamicImage {
     use std::f32::consts::TAU;
     let rgba = img.into_rgba8();
     let (w, h) = rgba.dimensions();
@@ -1258,8 +1265,8 @@ fn jpeg_smash(img: DynamicImage, block_size: u32, strength: f32, bleed: bool) ->
     let src = rgba.into_raw();
     let mut out = src.clone();
 
-    let blocks_x = (w + block_size - 1) / block_size;
-    let blocks_y = (h + block_size - 1) / block_size;
+    let blocks_x = w.div_ceil(block_size);
+    let blocks_y = h.div_ceil(block_size);
 
     for by in 0..blocks_y {
         for bx in 0..blocks_x {

@@ -25,7 +25,6 @@ pub mod state;
 
 pub use dialogs::{FocusedPanel, InputMode};
 pub use file_browser::{FileBrowserEntry, FileBrowserPurpose};
-pub use pipeline_utils::AVAILABLE_EFFECTS;
 pub use state::AppState;
 
 // Re-exports used only by the test module (handler functions called directly).

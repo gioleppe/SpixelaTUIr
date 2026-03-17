@@ -3,10 +3,11 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs},
 };
 
-use crate::app::{AVAILABLE_EFFECTS, AppState, FocusedPanel, InputMode};
+use crate::app::handlers::{ADD_EFFECT_TABS, visible_effects_for_tab};
+use crate::app::{AppState, FocusedPanel, InputMode};
 use crate::effects::color;
 
 /// Render the side-panel showing the active pipeline effects.
@@ -98,9 +99,15 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
         return;
     }
 
+    let visible = visible_effects_for_tab(state.add_effect_tab, &state.favorites);
+    let n = visible.len();
+
     let total = frame.area();
-    let popup_w = 34u16.min(total.width);
-    let popup_h = (AVAILABLE_EFFECTS.len() as u16 + 2).min(total.height);
+    // Width: wide enough for names + star prefix.
+    let popup_w = 40u16.min(total.width);
+    // Height: 2 border rows + 1 tab row + 1 hint row + list rows.
+    let list_rows = n.max(1) as u16;
+    let popup_h = (list_rows + 5).min(total.height);
     let x = (total.width.saturating_sub(popup_w)) / 2;
     let y = (total.height.saturating_sub(popup_h)) / 2;
     let popup_area = Rect::new(x, y, popup_w, popup_h);
@@ -108,38 +115,82 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
     frame.render_widget(Clear, popup_area);
 
     let block = Block::default()
-        .title("Add Effect (Enter / Esc)")
+        .title("Add Effect")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(state.theme.active_border));
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    let items: Vec<ListItem> = AVAILABLE_EFFECTS
+    // Split inner into [tabs row, list, hint].
+    let chunks = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Min(1),
+        Constraint::Length(1),
+    ])
+    .split(inner);
+
+    // ── Tab bar ──────────────────────────────────────────────────────────
+    let tab_titles: Vec<Line> = ADD_EFFECT_TABS
         .iter()
-        .enumerate()
-        .map(|(i, (name, _cat, _))| {
-            let selected = i == state.add_effect_cursor;
-            let style = if selected {
-                Style::default()
-                    .fg(state.theme.selection_fg)
-                    .bg(state.theme.selection_bg)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(state.theme.text_normal)
-            };
-            let prefix = if selected { "▶ " } else { "  " };
-            ListItem::new(Line::from(vec![
-                Span::styled(prefix, style),
-                Span::styled(*name, style),
-            ]))
-        })
+        .map(|t| Line::from(Span::raw(*t)))
         .collect();
+    let tabs = Tabs::new(tab_titles)
+        .select(state.add_effect_tab)
+        .highlight_style(
+            Style::default()
+                .fg(state.theme.selection_fg)
+                .bg(state.theme.accent_1)
+                .add_modifier(Modifier::BOLD),
+        )
+        .style(Style::default().fg(state.theme.text_dimmed));
+    frame.render_widget(tabs, chunks[0]);
 
-    let mut list_state = ListState::default();
-    list_state.select(Some(state.add_effect_cursor));
+    // ── Effect list ───────────────────────────────────────────────────────
+    if n == 0 {
+        let msg = if state.add_effect_tab == 5 {
+            "  No favorites yet.\n  Press 'f' to star an effect."
+        } else {
+            "  (empty)"
+        };
+        let p = Paragraph::new(msg).style(Style::default().fg(state.theme.text_dimmed));
+        frame.render_widget(p, chunks[1]);
+    } else {
+        let cursor = state.add_effect_cursor.min(n - 1);
+        let items: Vec<ListItem> = visible
+            .iter()
+            .enumerate()
+            .map(|(list_i, (_global_i, name, _cat))| {
+                let selected = list_i == cursor;
+                let is_fav = state.favorites.is_favorite(name);
+                let star = if is_fav { "★" } else { " " };
+                let style = if selected {
+                    Style::default()
+                        .fg(state.theme.selection_fg)
+                        .bg(state.theme.selection_bg)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(state.theme.text_normal)
+                };
+                let prefix = if selected { "▶" } else { " " };
+                ListItem::new(Line::from(vec![
+                    Span::styled(prefix, style),
+                    Span::styled(star, style),
+                    Span::styled(" ", style),
+                    Span::styled(*name, style),
+                ]))
+            })
+            .collect();
 
-    let list = List::new(items);
-    frame.render_stateful_widget(list, inner, &mut list_state);
+        let mut list_state = ListState::default();
+        list_state.select(Some(cursor));
+        let list = List::new(items);
+        frame.render_stateful_widget(list, chunks[1], &mut list_state);
+    }
+
+    // ── Hint row ──────────────────────────────────────────────────────────
+    let hint = Paragraph::new("Enter:add  f:★fav  Tab:category  Esc:close")
+        .style(Style::default().fg(state.theme.text_dimmed));
+    frame.render_widget(hint, chunks[2]);
 }
 
 /// Render the floating "edit effect parameters" modal overlay.

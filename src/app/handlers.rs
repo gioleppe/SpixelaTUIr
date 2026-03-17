@@ -387,28 +387,107 @@ fn handle_path_input(state: &mut AppState, code: KeyCode) {
 
 // ── Add effect menu ──────────────────────────────────────────────────────────
 
+/// Tab labels for the add-effect menu.
+pub const ADD_EFFECT_TABS: &[&str] = &["All", "Color", "Glitch", "CRT", "Composite", "★ Favs"];
+
+/// Returns the subset of `AVAILABLE_EFFECTS` visible for the given tab index.
+///
+/// Tab indices:
+/// - 0 = All
+/// - 1 = Color
+/// - 2 = Glitch
+/// - 3 = CRT
+/// - 4 = Composite
+/// - 5 = ★ Favorites
+pub fn visible_effects_for_tab(
+    tab: usize,
+    favorites: &crate::config::favorites::FavoritesConfig,
+) -> Vec<(usize, &'static str, &'static str)> {
+    AVAILABLE_EFFECTS
+        .iter()
+        .enumerate()
+        .filter_map(|(i, (name, cat, _))| {
+            let keep = match tab {
+                0 => true,
+                1 => *cat == "Color",
+                2 => *cat == "Glitch",
+                3 => *cat == "CRT",
+                4 => *cat == "Composite",
+                5 => favorites.is_favorite(name),
+                _ => true,
+            };
+            if keep { Some((i, *name, *cat)) } else { None }
+        })
+        .collect()
+}
+
 fn handle_add_effect(state: &mut AppState, code: KeyCode) {
-    let n = AVAILABLE_EFFECTS.len();
+    let visible = visible_effects_for_tab(state.add_effect_tab, &state.favorites);
+    let n = visible.len();
     match code {
         KeyCode::Esc => {
             state.input_mode = InputMode::Normal;
         }
+        KeyCode::Tab => {
+            // Cycle to the next category tab.
+            state.add_effect_tab = (state.add_effect_tab + 1) % ADD_EFFECT_TABS.len();
+            state.add_effect_cursor = 0;
+        }
+        KeyCode::BackTab => {
+            // Cycle to the previous category tab.
+            state.add_effect_tab = state
+                .add_effect_tab
+                .checked_sub(1)
+                .unwrap_or(ADD_EFFECT_TABS.len() - 1);
+            state.add_effect_cursor = 0;
+        }
         KeyCode::Up | KeyCode::Char('k') => {
-            state.add_effect_cursor = if state.add_effect_cursor == 0 {
-                n - 1
-            } else {
-                state.add_effect_cursor - 1
-            };
+            if n > 0 {
+                state.add_effect_cursor = if state.add_effect_cursor == 0 {
+                    n - 1
+                } else {
+                    state.add_effect_cursor - 1
+                };
+            }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            state.add_effect_cursor = if state.add_effect_cursor >= n - 1 {
-                0
-            } else {
-                state.add_effect_cursor + 1
-            };
+            if n > 0 {
+                state.add_effect_cursor = if state.add_effect_cursor >= n - 1 {
+                    0
+                } else {
+                    state.add_effect_cursor + 1
+                };
+            }
+        }
+        KeyCode::Char('f') => {
+            // Toggle the favorite status of the currently highlighted effect.
+            if n > 0 {
+                let cursor = state.add_effect_cursor.min(n - 1);
+                let name = visible[cursor].1;
+                state.favorites.toggle(name);
+                // If we're on the Favorites tab and just un-favorited, adjust cursor.
+                if state.add_effect_tab == 5 {
+                    let new_n = visible_effects_for_tab(5, &state.favorites).len();
+                    if state.add_effect_cursor >= new_n && new_n > 0 {
+                        state.add_effect_cursor = new_n - 1;
+                    }
+                }
+                let starred = if state.favorites.is_favorite(name) {
+                    "★"
+                } else {
+                    "☆"
+                };
+                state.status_message = format!("{starred} Favorite toggled for '{name}'");
+            }
         }
         KeyCode::Enter => {
-            let effect = AVAILABLE_EFFECTS[state.add_effect_cursor].2();
+            if n == 0 {
+                return;
+            }
+            let cursor = state.add_effect_cursor.min(n - 1);
+            let global_idx = visible[cursor].0;
+            let effect = AVAILABLE_EFFECTS[global_idx].2();
+            let name = AVAILABLE_EFFECTS[global_idx].0;
             state.push_undo();
             state.pipeline.effects.push(EnabledEffect::new(effect));
 
@@ -424,16 +503,11 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
                     .map(|d| format_param_value(d.value))
                     .collect();
                 state.input_mode = InputMode::EditEffect { field_idx: 0 };
-                state.status_message = format!(
-                    "Added '{}' – edit parameters (Enter: apply, Esc: cancel)",
-                    AVAILABLE_EFFECTS[state.add_effect_cursor].0
-                );
+                state.status_message =
+                    format!("Added '{name}' – edit parameters (Enter: apply, Esc: cancel)",);
             } else {
                 state.input_mode = InputMode::Normal;
-                state.status_message = format!(
-                    "Added '{}'. Re-processing…",
-                    AVAILABLE_EFFECTS[state.add_effect_cursor].0
-                );
+                state.status_message = format!("Added '{name}'. Re-processing…");
             }
 
             state.image_protocol = None;

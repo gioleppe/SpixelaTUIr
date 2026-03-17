@@ -139,7 +139,9 @@ impl CrtEffect {
             } => phosphor_trail(img, *length, *decay, *color_mode),
             _ => {
                 let (w, h) = (img.width(), img.height());
-                super::apply_per_pixel(img, move |p, x, y| self.apply_pixel_with_coords(p, x, y, w, h))
+                super::apply_per_pixel(img, move |p, x, y| {
+                    self.apply_pixel_with_coords(p, x, y, w, h)
+                })
             }
         }
     }

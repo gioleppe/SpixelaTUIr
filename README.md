@@ -77,6 +77,8 @@ spixelatuir --batch "raw_photos/**/*.png" --pipeline cyberpunk.json --outdir gli
 | **Color** | `Contrast` | `factor` | Multiply contrast (1.0 = identity). |
 | **Color** | `Saturation` | `factor` | Scale saturation (0 = greyscale, 1.0 = identity). |
 | **Color** | `ColorQuantization` | `levels` | Posterize: reduce each channel to N discrete levels. |
+| **Color** | `ChannelSwap` | `order` | Permute RGB channels into one of 6 orders (RGB, RBG, GRB, GBR, BRG, BGR). |
+| **Color** | `Dither` | `algorithm`, `levels` | Reduce color depth with Bayer 4×4 ordered or Floyd–Steinberg error-diffusion dithering. |
 | **Glitch** | `Pixelate` | `block_size` | Mosaic-style pixelation. |
 | **Glitch** | `RowJitter` | `magnitude`, `seed` | Random horizontal row shifting. Deterministic with `seed`. |
 | **Glitch** | `BlockShift` | `shift_x`, `shift_y` | Shift a rectangular block of pixels. |
@@ -84,10 +86,17 @@ spixelatuir --batch "raw_photos/**/*.png" --pipeline cyberpunk.json --outdir gli
 | **Glitch** | `FractalJulia` | `scale`, `cx`, `cy`, `max_iter`, `blend` | Overlay a Julia set fractal blended with the source image. |
 | **Glitch** | `DelaunayTriangulation` | `num_points`, `seed` | Low-poly mosaic via Bowyer-Watson triangulation of random sample points. |
 | **Glitch** | `GhostDisplace` | `copies`, `offset_x`, `offset_y`, `hue_sweep`, `opacity` | Create N displaced/echoed copies with progressive hue sweep. |
+| **Glitch** | `RGBShift` | `x_r/y_r`, `x_g/y_g`, `x_b/y_b`, `wrap` | Chromatic aberration: independently offset R, G, B channels on X and Y axes. |
+| **Glitch** | `DataBend` | `mode`, `value`, `seed` | Corrupt pixel data with bitwise XOR/AND or byte-swapping to simulate file corruption. |
+| **Glitch** | `SineWarp` | `amplitude`, `frequency`, `phase`, `axis` | Displace rows or columns by a sine wave for rolling/wavy distortions. |
+| **Glitch** | `JpegSmash` | `block_size`, `strength`, `bleed` | Simulate aggressive JPEG macroblocking by posterizing and bleeding 8×8 blocks. |
 | **CRT** | `Scanlines` | `spacing`, `opacity`, `color_r/g/b` | Horizontal scanline overlay with optional color tint. |
 | **CRT** | `Noise` | `intensity`, `monochromatic`, `seed` | RGB or mono noise overlay. Deterministic with `seed`. |
 | **CRT** | `Vignette` | `radius`, `softness` | Darken the image edges for a vintage look. |
+| **CRT** | `PhosphorTrail` | `length`, `decay`, `color_mode` | Simulate green/amber/white phosphor persistence by smearing bright pixels horizontally. |
 | **Composite** | `CropRect` | `x`, `y`, `width`, `height` | Crop to a rectangular region. |
+| **Composite** | `MirrorSlice` | `orientation`, `slice_width`, `pattern` | Chop image into stripes and flip/mirror alternating slices (horizontal or vertical). |
+| **Composite** | `EdgeGlow` | `edge_thresh`, `glow_r/g/b`, `glow_strength`, `blur_radius` | Sobel edge detection with neon-colored glow and darkened background. |
 
 ---
 
@@ -112,6 +121,21 @@ spixelatuir --batch "raw_photos/**/*.png" --pipeline cyberpunk.json --outdir gli
 | `[` / `]` | Decrease / increase preview resolution |
 | `h` | Show full **Help** overlay |
 | `q` | Quit (with unsaved changes protection) |
+
+### Add Effect Menu shortcuts
+
+When the **Add Effect** menu is open (`a` key):
+
+| Key | Action |
+|-----|--------|
+| `Tab` / `Shift+Tab` | Cycle **category tabs** (All → Color → Glitch → CRT → Composite → ★ Favs) |
+| `↑` / `k` | Move selection up |
+| `↓` / `j` | Move selection down |
+| `f` | **Toggle favorite** ★ for the highlighted effect (persisted to `~/.config/spix/favorites.json`) |
+| `Enter` | **Add** the selected effect to the pipeline |
+| `Esc` | Close the menu |
+
+> **Favorites tab:** Switch to the `★ Favs` tab (Tab through categories) to see only your starred effects. Favorites are saved across sessions.
 
 > **Circular navigation:** All menus and lists wrap around — pressing Up at the first item jumps to the last, and Down at the last jumps to the first.
 

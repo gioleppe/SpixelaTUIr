@@ -202,9 +202,7 @@ impl ColorEffect {
     /// [`apply_pixel`][Self::apply_pixel] via [`apply_per_pixel`][super::apply_per_pixel].
     pub fn apply_image(&self, img: DynamicImage) -> DynamicImage {
         match self {
-            ColorEffect::Dither { algorithm, levels } => {
-                dither_image(img, *algorithm, *levels)
-            }
+            ColorEffect::Dither { algorithm, levels } => dither_image(img, *algorithm, *levels),
             _ => super::apply_per_pixel(img, |p, _x, _y| self.apply_pixel(p)),
         }
     }
@@ -483,7 +481,7 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
 
 /// Apply Bayer-matrix ordered dithering or Floyd–Steinberg error diffusion.
 fn dither_image(img: DynamicImage, algorithm: u8, levels: u8) -> DynamicImage {
-    let levels = levels.max(2).min(8) as f32;
+    let levels = levels.clamp(2, 8) as f32;
     let step = 255.0 / (levels - 1.0);
     let quantize = |c: f32| -> u8 {
         let idx = (c / step).round();
@@ -492,21 +490,18 @@ fn dither_image(img: DynamicImage, algorithm: u8, levels: u8) -> DynamicImage {
 
     if algorithm == 0 {
         // Bayer 4×4 ordered dithering.
-        #[rustfmt::skip]
         let bayer: [[f32; 4]; 4] = [
-            [ 0.0, 8.0, 2.0, 10.0],
-            [12.0, 4.0, 14.0,  6.0],
-            [ 3.0, 11.0, 1.0,  9.0],
-            [15.0, 7.0, 13.0,  5.0],
+            [0.0, 8.0, 2.0, 10.0],
+            [12.0, 4.0, 14.0, 6.0],
+            [3.0, 11.0, 1.0, 9.0],
+            [15.0, 7.0, 13.0, 5.0],
         ];
-        let width = img.width();
         super::apply_per_pixel(img, move |p, x, y| {
             let threshold = bayer[(y % 4) as usize][(x % 4) as usize] / 16.0 - 0.5;
             let spread = threshold / levels;
             let r = quantize(p[0] as f32 + spread * 255.0);
             let g = quantize(p[1] as f32 + spread * 255.0);
             let b = quantize(p[2] as f32 + spread * 255.0);
-            let _ = width; // suppress unused warning
             Rgba([r, g, b, p[3]])
         })
     } else {
@@ -540,11 +535,11 @@ fn dither_image(img: DynamicImage, algorithm: u8, levels: u8) -> DynamicImage {
                         errs[ni][2] += eb * w;
                     }
                 };
-                distribute(&mut errs, x + 1, y,     7.0 / 16.0);
+                distribute(&mut errs, x + 1, y, 7.0 / 16.0);
                 if x > 0 {
                     distribute(&mut errs, x - 1, y + 1, 3.0 / 16.0);
                 }
-                distribute(&mut errs, x,     y + 1, 5.0 / 16.0);
+                distribute(&mut errs, x, y + 1, 5.0 / 16.0);
                 distribute(&mut errs, x + 1, y + 1, 1.0 / 16.0);
             }
         }
