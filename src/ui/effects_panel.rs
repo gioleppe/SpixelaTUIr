@@ -104,7 +104,7 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
 
     let total = frame.area();
     // Width: wide enough for names + star prefix.
-    let popup_w = 40u16.min(total.width);
+    let popup_w = 58u16.min(total.width);
     // Height: 2 border rows + 1 tab row + 1 hint row + list rows.
     let list_rows = n.max(1) as u16;
     let popup_h = (list_rows + 5).min(total.height);
