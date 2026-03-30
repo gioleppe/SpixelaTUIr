@@ -509,38 +509,57 @@ fn dither_image(img: DynamicImage, algorithm: u8, levels: u8) -> DynamicImage {
         let width = img.width() as usize;
         let height = img.height() as usize;
         let mut rgba = img.into_rgba8();
-        // Work on f32 error buffer (R, G, B per pixel).
-        let mut errs: Vec<[f32; 3]> = vec![[0.0; 3]; width * height];
 
-        for y in 0..height {
-            for x in 0..width {
-                let idx = y * width + x;
-                let pix = rgba.get_pixel(x as u32, y as u32);
-                let r_in = pix[0] as f32 + errs[idx][0];
-                let g_in = pix[1] as f32 + errs[idx][1];
-                let b_in = pix[2] as f32 + errs[idx][2];
-                let r_out = quantize(r_in);
-                let g_out = quantize(g_in);
-                let b_out = quantize(b_in);
-                rgba.put_pixel(x as u32, y as u32, Rgba([r_out, g_out, b_out, pix[3]]));
-                let er = r_in - r_out as f32;
-                let eg = g_in - g_out as f32;
-                let eb = b_in - b_out as f32;
-                // Distribute error to right, below-left, below, below-right.
-                let distribute = |errs: &mut Vec<[f32; 3]>, nx: usize, ny: usize, w: f32| {
-                    if nx < width && ny < height {
-                        let ni = ny * width + nx;
-                        errs[ni][0] += er * w;
-                        errs[ni][1] += eg * w;
-                        errs[ni][2] += eb * w;
-                    }
-                };
-                distribute(&mut errs, x + 1, y, 7.0 / 16.0);
+        // Convert the image into a flat f32 buffer for RGB channels.
+        // We apply errors directly into this buffer.
+        let mut buffer: Vec<[f32; 3]> = rgba
+            .pixels()
+            .map(|p| [p[0] as f32, p[1] as f32, p[2] as f32])
+            .collect();
+
+        for (idx, chunk) in rgba.chunks_mut(4).enumerate() {
+            let x = idx % width;
+            let y = idx / width;
+            let pix = buffer[idx];
+
+            let r_out = quantize(pix[0]);
+            let g_out = quantize(pix[1]);
+            let b_out = quantize(pix[2]);
+
+            let er = pix[0] - r_out as f32;
+            let eg = pix[1] - g_out as f32;
+            let eb = pix[2] - b_out as f32;
+
+            // Update the current pixel in the output RGBA buffer.
+            chunk[0] = r_out;
+            chunk[1] = g_out;
+            chunk[2] = b_out;
+            // chunk[3] (alpha) remains unchanged.
+
+            // Distribute error to right, below-left, below, below-right.
+            if x + 1 < width {
+                let i = idx + 1;
+                buffer[i][0] += er * 7.0 / 16.0;
+                buffer[i][1] += eg * 7.0 / 16.0;
+                buffer[i][2] += eb * 7.0 / 16.0;
+            }
+            if y + 1 < height {
                 if x > 0 {
-                    distribute(&mut errs, x - 1, y + 1, 3.0 / 16.0);
+                    let i = idx + width - 1;
+                    buffer[i][0] += er * 3.0 / 16.0;
+                    buffer[i][1] += eg * 3.0 / 16.0;
+                    buffer[i][2] += eb * 3.0 / 16.0;
                 }
-                distribute(&mut errs, x, y + 1, 5.0 / 16.0);
-                distribute(&mut errs, x + 1, y + 1, 1.0 / 16.0);
+                let i = idx + width;
+                buffer[i][0] += er * 5.0 / 16.0;
+                buffer[i][1] += eg * 5.0 / 16.0;
+                buffer[i][2] += eb * 5.0 / 16.0;
+                if x + 1 < width {
+                    let i = idx + width + 1;
+                    buffer[i][0] += er * 1.0 / 16.0;
+                    buffer[i][1] += eg * 1.0 / 16.0;
+                    buffer[i][2] += eb * 1.0 / 16.0;
+                }
             }
         }
         DynamicImage::ImageRgba8(rgba)
@@ -652,5 +671,32 @@ mod tests {
                 assert!(c == 0 || c == 255, "Expected 0 or 255, got {c}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod benches {
+    use super::*;
+    use std::time::Instant;
+    use image::{DynamicImage, ImageBuffer, Rgba};
+
+    #[test]
+    fn bench_dither_fs() {
+        let width = 1000;
+        let height = 1000;
+        let img = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(width as u32, height as u32, Rgba([128u8, 64, 200, 255])));
+
+        // Warmup
+        for _ in 0..3 {
+            let _ = dither_image(img.clone(), 1, 4);
+        }
+
+        let start = Instant::now();
+        let iterations = 10;
+        for _ in 0..iterations {
+            let _ = dither_image(img.clone(), 1, 4);
+        }
+        let duration = start.elapsed() / iterations as u32;
+        println!("\nBENCH_RESULT: Dither FS {}x{}: {:?}", width, height, duration);
     }
 }
