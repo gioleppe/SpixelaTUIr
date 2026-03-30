@@ -761,32 +761,29 @@ fn fractal_julia(
     let max_iter = max_iter.max(1);
     let blend = blend.clamp(0.0, 1.0);
 
-    for y in 0..h {
-        for x in 0..w {
-            // Map pixel coordinates to complex plane centred at origin.
-            let mut zr = (x as f32 / w as f32 - 0.5) * scale * aspect;
-            let mut zi = (y as f32 / h as f32 - 0.5) * scale;
+    for (src, (x, y, dst)) in rgba.pixels().zip(out.enumerate_pixels_mut()) {
+        // Map pixel coordinates to complex plane centred at origin.
+        let mut zr = (x as f32 / w as f32 - 0.5) * scale * aspect;
+        let mut zi = (y as f32 / h as f32 - 0.5) * scale;
 
-            let mut iter = 0u32;
-            while zr * zr + zi * zi <= 4.0 && iter < max_iter {
-                let tmp = zr * zr - zi * zi + cx;
-                zi = 2.0 * zr * zi + cy;
-                zr = tmp;
-                iter += 1;
-            }
-
-            let t = iter as f32 / max_iter as f32;
-            // Map iteration count to a colour via simple HSV-style ramp.
-            let fr = ((t * 6.0).sin() * 0.5 + 0.5) * 255.0;
-            let fg = ((t * 6.0 + 2.0).sin() * 0.5 + 0.5) * 255.0;
-            let fb = ((t * 6.0 + 4.0).sin() * 0.5 + 0.5) * 255.0;
-
-            let src = rgba.get_pixel(x, y);
-            let r = (src[0] as f32 * (1.0 - blend) + fr * blend) as u8;
-            let g = (src[1] as f32 * (1.0 - blend) + fg * blend) as u8;
-            let b = (src[2] as f32 * (1.0 - blend) + fb * blend) as u8;
-            out.put_pixel(x, y, Rgba([r, g, b, src[3]]));
+        let mut iter = 0u32;
+        while zr * zr + zi * zi <= 4.0 && iter < max_iter {
+            let tmp = zr * zr - zi * zi + cx;
+            zi = 2.0 * zr * zi + cy;
+            zr = tmp;
+            iter += 1;
         }
+
+        let t = iter as f32 / max_iter as f32;
+        // Map iteration count to a colour via simple HSV-style ramp.
+        let fr = ((t * 6.0).sin() * 0.5 + 0.5) * 255.0;
+        let fg = ((t * 6.0 + 2.0).sin() * 0.5 + 0.5) * 255.0;
+        let fb = ((t * 6.0 + 4.0).sin() * 0.5 + 0.5) * 255.0;
+
+        let r = (src[0] as f32 * (1.0 - blend) + fr * blend) as u8;
+        let g = (src[1] as f32 * (1.0 - blend) + fg * blend) as u8;
+        let b = (src[2] as f32 * (1.0 - blend) + fb * blend) as u8;
+        *dst = Rgba([r, g, b, src[3]]);
     }
 
     DynamicImage::ImageRgba8(out)
