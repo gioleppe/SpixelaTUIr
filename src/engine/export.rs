@@ -107,3 +107,24 @@ pub(crate) fn safe_path(mut path: PathBuf) -> PathBuf {
         n += 1;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_export_format_extension() {
+        assert_eq!(ExportFormat::Png.extension(), "png");
+        assert_eq!(ExportFormat::Jpeg { quality: 90 }.extension(), "jpg");
+        assert_eq!(ExportFormat::WebP.extension(), "webp");
+        assert_eq!(ExportFormat::Bmp.extension(), "bmp");
+    }
+
+    #[test]
+    fn test_export_format_display_name() {
+        assert_eq!(ExportFormat::Png.display_name(), "PNG");
+        assert_eq!(ExportFormat::Jpeg { quality: 90 }.display_name(), "JPEG");
+        assert_eq!(ExportFormat::WebP.display_name(), "WebP");
+        assert_eq!(ExportFormat::Bmp.display_name(), "BMP");
+    }
+}
