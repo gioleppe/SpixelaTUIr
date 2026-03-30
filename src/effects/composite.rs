@@ -439,33 +439,29 @@ fn edge_glow(
     let thresh = edge_thresh.clamp(0.0, 1.0);
     let strength = glow_strength.clamp(0.0, 1.0);
     let background_darkening = 1.0 - strength * 0.8;
-    for y in 0..h {
-        for x in 0..w {
-            let source = src.get_pixel(x, y);
-            let magnitude = edge_map[idx(x, y)];
-            let edge_factor = if magnitude > thresh {
-                magnitude.clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
 
-            let bg_factor = background_darkening + (1.0 - background_darkening) * edge_factor;
-            let mut r = source[0] as f32 * bg_factor;
-            let mut g = source[1] as f32 * bg_factor;
-            let mut b = source[2] as f32 * bg_factor;
+    for (p, (source, &magnitude)) in out.pixels_mut().zip(src.pixels().zip(edge_map.iter())) {
+        let edge_factor = if magnitude > thresh {
+            magnitude.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
 
-            if edge_factor > 0.0 {
-                let w_glow = (strength * edge_factor).clamp(0.0, 1.0);
-                r = r * (1.0 - w_glow) + glow_color_r as f32 * w_glow;
-                g = g * (1.0 - w_glow) + glow_color_g as f32 * w_glow;
-                b = b * (1.0 - w_glow) + glow_color_b as f32 * w_glow;
-            }
+        let bg_factor = background_darkening + (1.0 - background_darkening) * edge_factor;
+        let mut r = source[0] as f32 * bg_factor;
+        let mut g = source[1] as f32 * bg_factor;
+        let mut b = source[2] as f32 * bg_factor;
 
-            let p = out.get_pixel_mut(x, y);
-            p[0] = r.clamp(0.0, 255.0) as u8;
-            p[1] = g.clamp(0.0, 255.0) as u8;
-            p[2] = b.clamp(0.0, 255.0) as u8;
+        if edge_factor > 0.0 {
+            let w_glow = (strength * edge_factor).clamp(0.0, 1.0);
+            r = r * (1.0 - w_glow) + glow_color_r as f32 * w_glow;
+            g = g * (1.0 - w_glow) + glow_color_g as f32 * w_glow;
+            b = b * (1.0 - w_glow) + glow_color_b as f32 * w_glow;
         }
+
+        p[0] = r.clamp(0.0, 255.0) as u8;
+        p[1] = g.clamp(0.0, 255.0) as u8;
+        p[2] = b.clamp(0.0, 255.0) as u8;
     }
 
     DynamicImage::ImageRgba8(out)
