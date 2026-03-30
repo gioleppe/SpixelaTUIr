@@ -2435,6 +2435,7 @@ name = "spixelatuir"
 version = "1.3.0"
 dependencies = [
  "anyhow",
+ "bytemuck",
  "crossterm",
  "dirs",
  "glob",
