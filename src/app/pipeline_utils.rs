@@ -384,3 +384,24 @@ pub fn format_param_value(value: f32) -> String {
         format!("{value}")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_param_value_integers() {
+        assert_eq!(format_param_value(8.0), "8");
+        assert_eq!(format_param_value(0.0), "0");
+        assert_eq!(format_param_value(-5.0), "-5");
+        assert_eq!(format_param_value(42.0), "42");
+    }
+
+    #[test]
+    fn test_format_param_value_fractions() {
+        assert_eq!(format_param_value(1.5), "1.5");
+        assert_eq!(format_param_value(0.05), "0.05");
+        assert_eq!(format_param_value(-3.14), "-3.14");
+        assert_eq!(format_param_value(0.999), "0.999");
+    }
+}
