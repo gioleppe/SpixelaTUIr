@@ -24,6 +24,7 @@ pub struct ParamDescriptor {
     pub value: f32,
     pub min: f32,
     pub max: f32,
+    pub is_direction: bool,
 }
 
 /// Represents a single image-manipulation step in the pipeline.

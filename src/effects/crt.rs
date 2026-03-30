@@ -161,30 +161,35 @@ impl CrtEffect {
                     value: *spacing as f32,
                     min: 1.0,
                     max: 20.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "opacity",
                     value: *opacity,
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "color_r",
                     value: *color_r as f32,
                     min: 0.0,
                     max: 255.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "color_g",
                     value: *color_g as f32,
                     min: 0.0,
                     max: 255.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "color_b",
                     value: *color_b as f32,
                     min: 0.0,
                     max: 255.0,
+                    is_direction: false,
                 },
             ],
             CrtEffect::Curvature { strength } => vec![ParamDescriptor {
@@ -192,6 +197,7 @@ impl CrtEffect {
                 value: *strength,
                 min: 0.0,
                 max: 1.0,
+                is_direction: false,
             }],
             CrtEffect::PhosphorGlow { radius, intensity } => vec![
                 ParamDescriptor {
@@ -199,12 +205,14 @@ impl CrtEffect {
                     value: *radius as f32,
                     min: 1.0,
                     max: 20.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "intensity",
                     value: *intensity,
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
             ],
             CrtEffect::PhosphorTrail {
@@ -217,18 +225,21 @@ impl CrtEffect {
                     value: *length as f32,
                     min: 1.0,
                     max: 30.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "decay",
                     value: *decay,
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "color_mode",
                     value: *color_mode as f32,
                     min: 0.0,
                     max: 2.0,
+                    is_direction: false,
                 },
             ],
             CrtEffect::Noise {
@@ -241,18 +252,21 @@ impl CrtEffect {
                     value: *intensity,
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "monochromatic",
                     value: if *monochromatic { 1.0 } else { 0.0 },
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "seed",
                     value: *seed as f32,
                     min: 0.0,
                     max: 9999.0,
+                    is_direction: false,
                 },
             ],
             CrtEffect::Vignette { radius, softness } => vec![
@@ -261,12 +275,14 @@ impl CrtEffect {
                     value: *radius,
                     min: 0.0,
                     max: 2.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "softness",
                     value: *softness,
                     min: 0.0,
                     max: 2.0,
+                    is_direction: false,
                 },
             ],
         }

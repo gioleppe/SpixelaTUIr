@@ -217,6 +217,7 @@ impl ColorEffect {
                     value: *preset_idx as f32,
                     min: 0.0,
                     max: (GRADIENT_PRESETS.len() - 1) as f32,
+                    is_direction: false,
                 }];
 
                 // If it's the "Custom" preset (last one), allow editing colors.
@@ -226,36 +227,42 @@ impl ColorEffect {
                         value: stops[0].1[0] as f32,
                         min: 0.0,
                         max: 255.0,
+                        is_direction: false,
                     });
                     params.push(ParamDescriptor {
                         name: "g1",
                         value: stops[0].1[1] as f32,
                         min: 0.0,
                         max: 255.0,
+                        is_direction: false,
                     });
                     params.push(ParamDescriptor {
                         name: "b1",
                         value: stops[0].1[2] as f32,
                         min: 0.0,
                         max: 255.0,
+                        is_direction: false,
                     });
                     params.push(ParamDescriptor {
                         name: "r2",
                         value: stops[1].1[0] as f32,
                         min: 0.0,
                         max: 255.0,
+                        is_direction: false,
                     });
                     params.push(ParamDescriptor {
                         name: "g2",
                         value: stops[1].1[1] as f32,
                         min: 0.0,
                         max: 255.0,
+                        is_direction: false,
                     });
                     params.push(ParamDescriptor {
                         name: "b2",
                         value: stops[1].1[2] as f32,
                         min: 0.0,
                         max: 255.0,
+                        is_direction: false,
                     });
                 }
                 params
@@ -265,30 +272,35 @@ impl ColorEffect {
                 value: *degrees,
                 min: 0.0,
                 max: 360.0,
+                is_direction: false,
             }],
             ColorEffect::Contrast { factor } => vec![ParamDescriptor {
                 name: "factor",
                 value: *factor,
                 min: 0.1,
                 max: 3.0,
+                is_direction: false,
             }],
             ColorEffect::Saturation { factor } => vec![ParamDescriptor {
                 name: "factor",
                 value: *factor,
                 min: 0.0,
                 max: 2.0,
+                is_direction: false,
             }],
             ColorEffect::ColorQuantization { levels } => vec![ParamDescriptor {
                 name: "levels",
                 value: *levels as f32,
                 min: 2.0,
                 max: 16.0,
+                is_direction: false,
             }],
             ColorEffect::ChannelSwap { order } => vec![ParamDescriptor {
                 name: "order",
                 value: *order as f32,
                 min: 0.0,
                 max: 5.0,
+                is_direction: false,
             }],
             ColorEffect::Dither { algorithm, levels } => vec![
                 ParamDescriptor {
@@ -296,12 +308,14 @@ impl ColorEffect {
                     value: *algorithm as f32,
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "levels",
                     value: *levels as f32,
                     min: 2.0,
                     max: 8.0,
+                    is_direction: false,
                 },
             ],
         }
