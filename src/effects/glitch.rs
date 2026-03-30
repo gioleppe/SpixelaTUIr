@@ -698,50 +698,60 @@ fn block_shift(img: DynamicImage, shift_x: i32, shift_y: i32) -> DynamicImage {
 
 // ── Pixel Sort ────────────────────────────────────────────────────────────────
 
-fn luminance(p: &Rgba<u8>) -> f32 {
-    0.2126 * p[0] as f32 + 0.7152 * p[1] as f32 + 0.0722 * p[2] as f32
-}
-
 fn pixel_sort(img: DynamicImage, threshold: f32, reverse: bool) -> DynamicImage {
-    let (w, h) = img.dimensions();
-    let rgba = img.to_rgba8();
+    let w = img.width();
+    let mut rgba = img.into_rgba8();
     let thresh = threshold * 255.0;
 
     // Process each row sequentially, sorting above-threshold pixel runs by luminance.
-    let sorted_rows: Vec<Vec<Rgba<u8>>> = (0..h)
-        .map(|y| (0..w).map(|x| *rgba.get_pixel(x, y)).collect::<Vec<_>>())
-        .collect::<Vec<_>>()
-        .into_iter()
-        .map(|row| {
-            let mut sorted = row.clone();
-            let mut seg_start: Option<usize> = None;
-            let n = row.len();
-            for x in 0..=n {
-                let above = x < n && luminance(&row[x]) > thresh;
-                if above {
-                    if seg_start.is_none() {
-                        seg_start = Some(x);
-                    }
-                } else if let Some(start) = seg_start.take() {
-                    let segment = &mut sorted[start..x];
-                    if reverse {
-                        segment.sort_by(|a, b| luminance(b).partial_cmp(&luminance(a)).unwrap());
-                    } else {
-                        segment.sort_by(|a, b| luminance(a).partial_cmp(&luminance(b)).unwrap());
-                    }
+    let w_usize = w as usize;
+    for row in rgba.chunks_mut(w_usize * 4) {
+        let mut seg_start: Option<usize> = None;
+        let n = w_usize;
+        for x in 0..=n {
+            let above = if x < n {
+                let r = row[x * 4];
+                let g = row[x * 4 + 1];
+                let b = row[x * 4 + 2];
+                let lum = 0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32;
+                lum > thresh
+            } else {
+                false
+            };
+
+            if above {
+                if seg_start.is_none() {
+                    seg_start = Some(x);
+                }
+            } else if let Some(start) = seg_start.take() {
+                // We need to sort pixels in the range `start..x`.
+                // A slice of [u8] doesn't sort by 4-byte pixels automatically,
+                // so we can cast it to a slice of `Rgba<u8>` or an array `[u8; 4]`.
+                // safe because row is `&mut [u8]` and its length is a multiple of 4.
+                let segment: &mut [[u8; 4]] = bytemuck::cast_slice_mut(&mut row[start * 4..x * 4]);
+
+                if reverse {
+                    segment.sort_by(|a, b| {
+                        let luma_a =
+                            0.2126 * a[0] as f32 + 0.7152 * a[1] as f32 + 0.0722 * a[2] as f32;
+                        let luma_b =
+                            0.2126 * b[0] as f32 + 0.7152 * b[1] as f32 + 0.0722 * b[2] as f32;
+                        luma_b.partial_cmp(&luma_a).unwrap()
+                    });
+                } else {
+                    segment.sort_by(|a, b| {
+                        let luma_a =
+                            0.2126 * a[0] as f32 + 0.7152 * a[1] as f32 + 0.0722 * a[2] as f32;
+                        let luma_b =
+                            0.2126 * b[0] as f32 + 0.7152 * b[1] as f32 + 0.0722 * b[2] as f32;
+                        luma_a.partial_cmp(&luma_b).unwrap()
+                    });
                 }
             }
-            sorted
-        })
-        .collect();
-
-    let mut out = ImageBuffer::new(w, h);
-    for (y, row) in sorted_rows.iter().enumerate() {
-        for (x, pixel) in row.iter().enumerate() {
-            out.put_pixel(x as u32, y as u32, *pixel);
         }
     }
-    DynamicImage::ImageRgba8(out)
+
+    DynamicImage::ImageRgba8(rgba)
 }
 
 // ── Fractal Julia ────────────────────────────────────────────────────────────
@@ -1392,6 +1402,35 @@ mod tests {
         }
         .apply_image(img);
         assert_eq!(out.dimensions(), (30, 20));
+    }
+
+    #[test]
+    fn pixel_sort_stable_sort_preserves_order() {
+        // Create an image with a single row of 3 pixels that have the exact same luminance
+        // but different colours. (e.g. grayscale vs rgb values that happen to have same luma).
+        // Since luminance uses 0.2126*r + 0.7152*g + 0.0722*b, let's just make them identical.
+        let mut buf = ImageBuffer::new(3, 1);
+
+        // Let's create colours with the same luminance by hand.
+        // Or simpler: same colors but different alpha (which isn't sorted by but would show order).
+        // Wait, the luminance function only uses RGB.
+        // Let's use three identical RGB colors but different alphas to verify order.
+        buf.put_pixel(0, 0, Rgba([128, 128, 128, 10]));
+        buf.put_pixel(1, 0, Rgba([128, 128, 128, 20]));
+        buf.put_pixel(2, 0, Rgba([128, 128, 128, 30]));
+
+        let img = DynamicImage::ImageRgba8(buf);
+        let out = GlitchEffect::PixelSort {
+            threshold: 0.0, // Sort everything
+            reverse: false,
+        }
+        .apply_image(img);
+
+        let out_rgba = out.into_rgba8();
+        // Since their luminance is identical, their order should NOT change
+        assert_eq!(out_rgba.get_pixel(0, 0)[3], 10);
+        assert_eq!(out_rgba.get_pixel(1, 0)[3], 20);
+        assert_eq!(out_rgba.get_pixel(2, 0)[3], 30);
     }
 
     #[test]

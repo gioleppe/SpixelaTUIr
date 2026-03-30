@@ -27,6 +27,7 @@ serde_json = "1.0.149"
 # Logging
 log = { version = "0.4", features = ["std"] }
 dirs = "6.0.0"
+bytemuck = "1.25.0"
 
 [dev-dependencies]
 tempfile = "3.27"
