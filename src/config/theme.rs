@@ -60,7 +60,7 @@ impl Default for Theme {
 impl Theme {
     pub fn load_from_path(path: &Path) -> Self {
         let mut theme = Self::default();
-        if let Ok(contents) = std::fs::read_to_string(path) {
+        if let Ok(contents) = crate::config::read_to_string_limited(path, 1_000_000) {
             if let Ok(config) = serde_json::from_str::<ThemeConfig>(&contents) {
                 if let Some(c) = config.active_border.and_then(|s| Color::from_str(&s).ok()) {
                     theme.active_border = c;

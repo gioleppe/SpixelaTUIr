@@ -12,8 +12,8 @@ use crate::effects::Pipeline;
 /// Files with no recognised extension are tried as YAML first, then JSON.
 pub fn load_pipeline(path: &Path) -> Result<Pipeline> {
     log::info!("Loading pipeline from {}", path.display());
-    let contents =
-        std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+    let contents = crate::config::read_to_string_limited(path, 10_000_000)
+        .with_context(|| format!("reading {}", path.display()))?;
     let ext = path
         .extension()
         .and_then(|e| e.to_str())

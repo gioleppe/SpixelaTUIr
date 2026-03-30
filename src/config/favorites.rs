@@ -20,7 +20,7 @@ impl FavoritesConfig {
     /// Load favorites from disk, falling back to an empty list on any error.
     pub fn load() -> Self {
         if let Some(path) = Self::config_path()
-            && let Ok(data) = std::fs::read_to_string(&path)
+            && let Ok(data) = crate::config::read_to_string_limited(&path, 1_000_000)
             && let Ok(cfg) = serde_json::from_str::<Self>(&data)
         {
             return cfg;
