@@ -55,3 +55,29 @@ impl FavoritesConfig {
         self.save();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_favorite() {
+        let mut config = FavoritesConfig::default();
+
+        // Test empty favorites list
+        assert!(!config.is_favorite("fire"));
+
+        // Add some favorites
+        config.favorites = vec!["fire".to_string(), "water".to_string()];
+
+        // Test existing favorites
+        assert!(config.is_favorite("fire"));
+        assert!(config.is_favorite("water"));
+
+        // Test non-existing favorite
+        assert!(!config.is_favorite("earth"));
+
+        // Test exact string matching (case-sensitive)
+        assert!(!config.is_favorite("Fire"));
+    }
+}
