@@ -50,7 +50,7 @@ pub enum GlitchEffect {
         amplitude: f32,
         frequency: f32,
         phase: f32,
-        axis: u8,
+        angle: f32,
     },
     /// Simulate aggressive JPEG macroblocking by randomising and bleeding 8×8 blocks.
     JpegSmash {
@@ -99,8 +99,8 @@ impl GlitchEffect {
                 amplitude,
                 frequency,
                 phase,
-                axis,
-            } => sine_warp(img, *amplitude, *frequency, *phase, *axis),
+                angle,
+            } => sine_warp(img, *amplitude, *frequency, *phase, *angle),
             GlitchEffect::JpegSmash {
                 block_size,
                 strength,
@@ -117,6 +117,7 @@ impl GlitchEffect {
                 value: *block_size as f32,
                 min: 1.0,
                 max: 64.0,
+                is_direction: false,
             }],
             GlitchEffect::RowJitter { magnitude, seed } => vec![
                 ParamDescriptor {
@@ -124,12 +125,14 @@ impl GlitchEffect {
                     value: *magnitude,
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "seed",
                     value: *seed as f32,
                     min: 0.0,
                     max: 9999.0,
+                    is_direction: false,
                 },
             ],
             GlitchEffect::BlockShift { shift_x, shift_y } => vec![
@@ -138,12 +141,14 @@ impl GlitchEffect {
                     value: *shift_x as f32,
                     min: -200.0,
                     max: 200.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "shift_y",
                     value: *shift_y as f32,
                     min: -200.0,
                     max: 200.0,
+                    is_direction: false,
                 },
             ],
             GlitchEffect::PixelSort { threshold, reverse } => vec![
@@ -152,12 +157,14 @@ impl GlitchEffect {
                     value: *threshold,
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "reverse",
                     value: if *reverse { 1.0 } else { 0.0 },
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
             ],
             GlitchEffect::FractalJulia {
@@ -172,30 +179,35 @@ impl GlitchEffect {
                     value: *scale,
                     min: 0.1,
                     max: 5.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "cx",
                     value: *cx,
                     min: -2.0,
                     max: 2.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "cy",
                     value: *cy,
                     min: -2.0,
                     max: 2.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "max_iter",
                     value: *max_iter as f32,
                     min: 10.0,
                     max: 200.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "blend",
                     value: *blend,
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
             ],
             GlitchEffect::DelaunayTriangulation { num_points, seed } => vec![
@@ -204,12 +216,14 @@ impl GlitchEffect {
                     value: *num_points as f32,
                     min: 10.0,
                     max: 30000.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "seed",
                     value: *seed as f32,
                     min: 0.0,
                     max: 9999.0,
+                    is_direction: false,
                 },
             ],
             GlitchEffect::GhostDisplace {
@@ -224,30 +238,35 @@ impl GlitchEffect {
                     value: *copies as f32,
                     min: 1.0,
                     max: 12.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "offset_x",
                     value: *offset_x,
                     min: -100.0,
                     max: 100.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "offset_y",
                     value: *offset_y,
                     min: -100.0,
                     max: 100.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "hue_sweep",
                     value: *hue_sweep,
                     min: 0.0,
                     max: 360.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "opacity",
                     value: *opacity,
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
             ],
             GlitchEffect::RGBShift {
@@ -264,42 +283,49 @@ impl GlitchEffect {
                     value: *x_r as f32,
                     min: -50.0,
                     max: 50.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "y_r",
                     value: *y_r as f32,
                     min: -50.0,
                     max: 50.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "x_g",
                     value: *x_g as f32,
                     min: -50.0,
                     max: 50.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "y_g",
                     value: *y_g as f32,
                     min: -50.0,
                     max: 50.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "x_b",
                     value: *x_b as f32,
                     min: -50.0,
                     max: 50.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "y_b",
                     value: *y_b as f32,
                     min: -50.0,
                     max: 50.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "wrap",
                     value: if *wrap { 1.0 } else { 0.0 },
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
             ],
             GlitchEffect::DataBend { mode, value, seed } => vec![
@@ -308,49 +334,56 @@ impl GlitchEffect {
                     value: *mode as f32,
                     min: 0.0,
                     max: 2.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "value",
                     value: *value as f32,
                     min: 0.0,
                     max: 255.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "seed",
                     value: *seed as f32,
                     min: 0.0,
                     max: 9999.0,
+                    is_direction: false,
                 },
             ],
             GlitchEffect::SineWarp {
                 amplitude,
                 frequency,
                 phase,
-                axis,
+                angle,
             } => vec![
                 ParamDescriptor {
                     name: "amplitude",
                     value: *amplitude,
                     min: 0.0,
                     max: 50.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "frequency",
                     value: *frequency,
                     min: 0.1,
                     max: 10.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "phase",
                     value: *phase,
                     min: 0.0,
                     max: 360.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
-                    name: "axis",
-                    value: *axis as f32,
+                    name: "angle",
+                    value: *angle,
                     min: 0.0,
-                    max: 1.0,
+                    max: 360.0,
+                    is_direction: true,
                 },
             ],
             GlitchEffect::JpegSmash {
@@ -363,18 +396,21 @@ impl GlitchEffect {
                     value: *block_size as f32,
                     min: 4.0,
                     max: 32.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "strength",
                     value: *strength,
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
                 ParamDescriptor {
                     name: "bleed",
                     value: if *bleed { 1.0 } else { 0.0 },
                     min: 0.0,
                     max: 1.0,
+                    is_direction: false,
                 },
             ],
         }
@@ -457,12 +493,12 @@ impl GlitchEffect {
                 amplitude,
                 frequency,
                 phase,
-                axis,
+                angle,
             } => GlitchEffect::SineWarp {
                 amplitude: get(0, *amplitude),
                 frequency: get(1, *frequency),
                 phase: get(2, *phase),
-                axis: get(3, *axis as f32).clamp(0.0, 1.0) as u8,
+                angle: get(3, *angle),
             },
             GlitchEffect::JpegSmash {
                 block_size,
@@ -553,11 +589,10 @@ impl fmt::Display for GlitchEffect {
             GlitchEffect::SineWarp {
                 amplitude,
                 frequency,
-                axis,
+                angle,
                 ..
             } => {
-                let ax = if *axis == 0 { "rows" } else { "cols" };
-                write!(f, "SineWarp A={amplitude:.1} F={frequency:.1} {ax}")
+                write!(f, "SineWarp A={amplitude:.1} F={frequency:.1} @{angle:.0}°")
             }
             GlitchEffect::JpegSmash {
                 block_size,
@@ -1220,7 +1255,7 @@ fn sine_warp(
     amplitude: f32,
     frequency: f32,
     phase: f32,
-    axis: u8,
+    angle: f32,
 ) -> DynamicImage {
     use std::f32::consts::TAU;
     let rgba = img.into_rgba8();
@@ -1229,23 +1264,34 @@ fn sine_warp(
     let mut out = vec![0u8; src.len()];
     let phase_rad = phase * TAU / 360.0;
 
+    // Convert angle to radians for direction vector.
+    // 0 degrees = right (displace horizontally based on vertical position)
+    // 90 degrees = up (displace vertically based on horizontal position)
+    let angle_rad = angle * TAU / 360.0;
+    let dir_x = angle_rad.cos();
+    let dir_y = -angle_rad.sin(); // -y is up in image coordinates
+
     for y in 0..h {
         for x in 0..w {
-            let (src_x, src_y) = if axis == 0 {
-                // Displace rows horizontally
-                let t = y as f32 / h as f32;
-                let offset = amplitude * (TAU * frequency * t + phase_rad).sin();
-                let sx = ((x as f32 + offset) as i32).rem_euclid(w as i32) as u32;
-                (sx, y)
-            } else {
-                // Displace columns vertically
-                let t = x as f32 / w as f32;
-                let offset = amplitude * (TAU * frequency * t + phase_rad).sin();
-                let sy = ((y as f32 + offset) as i32).rem_euclid(h as i32) as u32;
-                (x, sy)
-            };
+            // Project the point's position onto the normal of the displacement direction
+            // to get the value used for the sine wave argument `t`.
+            // When angle is 0, normal is (0, 1), so t = y.
+            // When angle is 90, normal is (-1, 0), so t = -x.
+            let norm_x = -dir_y;
+            let norm_y = dir_x;
+
+            let t = (x as f32 * norm_x + y as f32 * norm_y) / w.max(h) as f32;
+            let offset = amplitude * (TAU * frequency * t + phase_rad).sin();
+
+            // Displace along the direction vector
+            let src_x = (x as f32 + offset * dir_x) as i32;
+            let src_y = (y as f32 + offset * dir_y) as i32;
+
+            let sx = src_x.rem_euclid(w as i32) as u32;
+            let sy = src_y.rem_euclid(h as i32) as u32;
+
             let dst_idx = ((y * w + x) * 4) as usize;
-            let src_idx = ((src_y * w + src_x) * 4) as usize;
+            let src_idx = ((sy * w + sx) * 4) as usize;
             out[dst_idx..dst_idx + 4].copy_from_slice(&src[src_idx..src_idx + 4]);
         }
     }
@@ -1544,7 +1590,7 @@ mod tests {
             amplitude: 5.0,
             frequency: 2.0,
             phase: 0.0,
-            axis: 0,
+            angle: 0.0,
         }
         .apply_image(img);
         assert_eq!(out.dimensions(), (50, 40));
@@ -1558,7 +1604,7 @@ mod tests {
             amplitude: 0.0,
             frequency: 2.0,
             phase: 0.0,
-            axis: 0,
+            angle: 0.0,
         }
         .apply_image(img)
         .into_rgba8();

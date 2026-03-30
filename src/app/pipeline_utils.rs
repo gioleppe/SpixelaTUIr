@@ -114,7 +114,7 @@ pub const AVAILABLE_EFFECTS: &[EffectEntry] = &[
             amplitude: 10.0,
             frequency: 2.0,
             phase: 0.0,
-            axis: 0,
+            angle: 0.0,
         })
     }),
     ("Jpeg Smash", "Glitch", || {
@@ -311,12 +311,12 @@ pub fn randomize_pipeline(pipeline: &mut Pipeline) {
                     amplitude,
                     frequency,
                     phase,
-                    axis,
+                    angle,
                 } => {
                     *amplitude = next() * 20.0;
                     *frequency = 0.5 + next() * 5.0;
                     *phase = next() * 360.0;
-                    *axis = if next() >= 0.5 { 1 } else { 0 };
+                    *angle = next() * 360.0;
                 }
                 GlitchEffect::JpegSmash {
                     block_size,
