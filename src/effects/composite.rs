@@ -379,14 +379,10 @@ fn edge_glow(
     }
 
     let idx = |x: u32, y: u32| -> usize { (y * w + x) as usize };
-    let mut gray = vec![0.0_f32; (w * h) as usize];
-    for y in 0..h {
-        for x in 0..w {
-            let p = src.get_pixel(x, y);
-            gray[idx(x, y)] =
-                (0.2126 * p[0] as f32 + 0.7152 * p[1] as f32 + 0.0722 * p[2] as f32) / 255.0;
-        }
-    }
+    let gray: Vec<f32> = src
+        .pixels()
+        .map(|p| (0.2126 * p[0] as f32 + 0.7152 * p[1] as f32 + 0.0722 * p[2] as f32) / 255.0)
+        .collect();
 
     let mut mag = vec![0.0_f32; (w * h) as usize];
     for y in 0..h {
