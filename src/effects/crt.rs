@@ -386,7 +386,6 @@ impl fmt::Display for CrtEffect {
 
 fn phosphor_trail(img: DynamicImage, length: u32, decay: f32, color_mode: u8) -> DynamicImage {
     let mut rgba = img.into_rgba8();
-    let (width, height) = rgba.dimensions();
     let decay_factor = (1.0 - decay.clamp(0.0, 1.0)).clamp(0.0, 1.0);
     let max_steps = length.max(1);
     let tint = match color_mode {
@@ -395,33 +394,32 @@ fn phosphor_trail(img: DynamicImage, length: u32, decay: f32, color_mode: u8) ->
         _ => [255.0_f32, 255.0_f32, 255.0_f32], // white
     };
 
-    for y in 0..height {
+    for row in rgba.rows_mut() {
         let mut trail = [0.0_f32; 3];
         let mut remaining = 0_u32;
-        for x in 0..width {
-            let px = rgba.get_pixel_mut(x, y);
-            let lum =
-                (0.2126 * px[0] as f32 + 0.7152 * px[1] as f32 + 0.0722 * px[2] as f32) / 255.0;
+        for px in row {
+            let lum = (0.2126 * px[0] as f32 + 0.7152 * px[1] as f32 + 0.0722 * px[2] as f32)
+                * (1.0 / 255.0);
 
             if lum > 0.5 {
                 trail[0] = tint[0] * lum;
                 trail[1] = tint[1] * lum;
                 trail[2] = tint[2] * lum;
                 remaining = max_steps;
+            } else if remaining > 0 {
+                trail[0] *= decay_factor;
+                trail[1] *= decay_factor;
+                trail[2] *= decay_factor;
+                remaining -= 1;
             } else {
-                if remaining > 0 {
-                    trail[0] *= decay_factor;
-                    trail[1] *= decay_factor;
-                    trail[2] *= decay_factor;
-                    remaining -= 1;
-                } else {
-                    trail = [0.0, 0.0, 0.0];
-                }
+                trail = [0.0; 3];
             }
 
-            px[0] = px[0].saturating_add((trail[0] * 0.5).clamp(0.0, 255.0) as u8);
-            px[1] = px[1].saturating_add((trail[1] * 0.5).clamp(0.0, 255.0) as u8);
-            px[2] = px[2].saturating_add((trail[2] * 0.5).clamp(0.0, 255.0) as u8);
+            // Since decay factor is <= 1.0 and tint is <= 255.0, trail is always <= 255.0 and >= 0.0
+            // Saturating add with u8 works because trail[i] * 0.5 is at most 127.5.
+            px[0] = px[0].saturating_add((trail[0] * 0.5) as u8);
+            px[1] = px[1].saturating_add((trail[1] * 0.5) as u8);
+            px[2] = px[2].saturating_add((trail[2] * 0.5) as u8);
         }
     }
 
