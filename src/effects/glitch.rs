@@ -638,9 +638,7 @@ fn row_jitter(img: DynamicImage, magnitude: f32, seed: u32) -> DynamicImage {
     let max_shift = (w as f32 * magnitude.abs()) as i32;
 
     // Collect all rows as independent slices.
-    let rows: Vec<Vec<image::Rgba<u8>>> = (0..h)
-        .map(|y| (0..w).map(|x| *rgba.get_pixel(x, y)).collect())
-        .collect();
+    let rows: Vec<Vec<image::Rgba<u8>>> = rgba.rows().map(|row| row.copied().collect()).collect();
 
     // Shift each row with a deterministic per-row hash.
     let shifted_rows: Vec<Vec<image::Rgba<u8>>> = rows
