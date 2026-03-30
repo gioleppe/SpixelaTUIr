@@ -106,17 +106,15 @@ mod snapshot_tests {
         AppState::new(worker_tx, resp_rx, resp_tx, picker)
     }
 
-    #[test]
-    fn render_initial_state_snapshot() {
-        let mut state = make_state();
+    fn render_to_snapshot(state: &mut AppState) -> String {
         let backend = TestBackend::new(100, 30);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal
-            .draw(|frame| crate::ui::render(frame, &mut state))
+            .draw(|frame| crate::ui::render(frame, state))
             .unwrap();
 
         let buffer = terminal.backend().buffer().clone();
-        let snapshot: String = (0..30u16)
+        (0..30u16)
             .map(|y| {
                 (0..100u16)
                     .map(|x| buffer[(x, y)].symbol().to_string())
@@ -125,7 +123,13 @@ mod snapshot_tests {
                     .to_string()
             })
             .collect::<Vec<_>>()
-            .join("\n");
+            .join("\n")
+    }
+
+    #[test]
+    fn render_initial_state_snapshot() {
+        let mut state = make_state();
+        let snapshot = render_to_snapshot(&mut state);
 
         assert!(snapshot.contains("Spix"), "Should show app name");
         assert!(snapshot.contains("Canvas"), "Should show Canvas panel");
@@ -143,23 +147,7 @@ mod snapshot_tests {
             ],
         };
 
-        let backend = TestBackend::new(100, 30);
-        let mut terminal = Terminal::new(backend).unwrap();
-        terminal
-            .draw(|frame| crate::ui::render(frame, &mut state))
-            .unwrap();
-
-        let buffer = terminal.backend().buffer().clone();
-        let snapshot: String = (0..30u16)
-            .map(|y| {
-                (0..100u16)
-                    .map(|x| buffer[(x, y)].symbol().to_string())
-                    .collect::<String>()
-                    .trim_end()
-                    .to_string()
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
+        let snapshot = render_to_snapshot(&mut state);
 
         assert!(
             snapshot.contains("Invert"),
