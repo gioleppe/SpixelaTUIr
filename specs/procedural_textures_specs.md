@@ -5,7 +5,7 @@
 This document specifies the design for a **procedural texture generation**
 system in Spix. Rather than loading an image from disk, users can generate
 images algorithmically — noise fields, fractal patterns, geometric tilings,
-and colour gradients — and feed them directly into the effect pipeline. This
+and color gradients — and feed them directly into the effect pipeline. This
 enables fully self-contained creative workflows: generate a texture, glitch it,
 animate it, and export — all without leaving Spix.
 
@@ -63,7 +63,7 @@ the Masking System (see `masking_system_specs.md`).
 
 | Texture | Description | Parameters |
 |---------|-------------|------------|
-| **Linear Gradient** | Two-colour gradient at any angle | `color_a`, `color_b`, `angle` |
+| **Linear Gradient** | Two-color gradient at any angle | `color_a`, `color_b`, `angle` |
 | **Radial Gradient** | Circular gradient from center | `color_center`, `color_edge`, `center_x`, `center_y` |
 | **Conic Gradient** | Angular sweep gradient | `colors: Vec<[u8;3]>`, `center_x`, `center_y` |
 | **Multi-Stop Gradient** | N-stop linear gradient | `stops: Vec<(f32, [u8;3])>`, `angle` |
@@ -261,7 +261,7 @@ fn fbm(x: f32, y: f32, octaves: u32, persistence: f32,
         frequency *= lacunarity;
     }
 
-    total / max_value  // normalise to [-1, 1]
+    total / max_value  // normalize to [-1, 1]
 }
 ```
 
@@ -471,7 +471,7 @@ the saved parameters — the texture itself is not stored in the file.
    functions.
 
 4. **Colour mapping for noise:** Noise generators produce grayscale by default.
-   Should there be a built-in colour mapping option (e.g., fire, ice, rainbow)?
+   Should there be a built-in color mapping option (e.g., fire, ice, rainbow)?
    Recommendation: yes — reuse the `ColorMapPreset` enum from the Mandelbrot
    generator for all noise types.
 

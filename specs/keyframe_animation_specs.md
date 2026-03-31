@@ -118,6 +118,10 @@ impl EasingCurve {
                 else { 1.0 - (-2.0 * t + 2.0).powi(3) / 2.0 }
             },
             Self::EaseInElastic => {
+                // Standard elastic easing coefficients:
+                // 10.0 controls the exponential decay rate
+                // 10.75 and 0.75 offset the sine wave to start/end at zero
+                // c = 2π/3 sets the oscillation period
                 if t == 0.0 || t == 1.0 { return t; }
                 let c = (2.0 * std::f32::consts::PI) / 3.0;
                 -(2.0_f32.powf(10.0 * t - 10.0) * ((t * 10.0 - 10.75) * c).sin())

@@ -21,7 +21,7 @@ overlays with per-layer effects.
 | Single source image | Cannot combine two differently glitched versions of the same image |
 | `ImageBlend` effect is pipeline-global | Blending a secondary image affects the entire pipeline output, not a specific stage |
 | No isolation of effect regions | Cannot apply CRT effects to one area and glitch effects to another |
-| No generated layers (solid colour, gradient, noise) | Must create these externally and load as secondary images |
+| No generated layers (solid color, gradient, noise) | Must create these externally and load as secondary images |
 
 ---
 
@@ -87,7 +87,7 @@ pub enum LayerSource {
     Image(PathBuf),
     /// A clone/reference to the same source as another layer.
     CloneOf(u32),
-    /// A procedurally generated solid colour.
+    /// A procedurally generated solid color.
     SolidColor { r: u8, g: u8, b: u8 },
     /// A procedurally generated gradient.
     Gradient { start: [u8; 3], end: [u8; 3], angle: f32 },
@@ -379,6 +379,7 @@ composition automatically, maintaining backward compatibility.
 | Delete last layer | Prevented — at least one layer must exist |
 | Layer source file changed on disk | No auto-reload; user must re-open |
 | Circular `CloneOf` reference | Prevented at creation time; UI disallows cloning a clone |
+| `CloneOf` references a deleted layer | Resolve at deletion time: convert `CloneOf(id)` to `Image(path)` using the deleted layer's source, or prompt user |
 | Very large composition (10+ layers) | Status bar warns about memory; proxy resolution auto-reduces |
 
 ---

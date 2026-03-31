@@ -4,7 +4,7 @@
 
 This document specifies the design and implementation plan for adding an
 optional **GPU compute backend** to Spix's effect pipeline. The goal is to
-offload pixel-heavy operations (per-pixel colour transforms, convolutions,
+offload pixel-heavy operations (per-pixel color transforms, convolutions,
 sorting) to the GPU via `wgpu` compute shaders, achieving 5–50× speedups on
 large images while keeping the CPU-only path as the zero-dependency fallback.
 

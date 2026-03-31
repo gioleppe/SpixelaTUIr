@@ -15,7 +15,7 @@ overlays, and creative experimentation.
 
 | Use Case | Description |
 |----------|-------------|
-| **Live glitch performance** | Apply real-time pixel sort, CRT, and colour effects to a webcam feed for live visuals |
+| **Live glitch performance** | Apply real-time pixel sort, CRT, and color effects to a webcam feed for live visuals |
 | **Creative exploration** | Quickly preview how effects look on a human face or moving scene |
 | **Stream overlays** | Use Spix as a glitch filter for OBS virtual camera input |
 | **Photobooth mode** | Capture glitched stills from the live feed with a single keypress |
@@ -332,13 +332,10 @@ image mode) before being sent to the UI thread. This ensures:
 default = ["webcam"]
 webcam = ["dep:nokhwa"]
 
-[dependencies]
-nokhwa = { version = "0.10", optional = true, features = ["input-native"] }
-```
+# Platform-specific camera backend features.
+# Only the platform-specific dependency block is used at build time — they
+# are mutually exclusive via cfg gates, not additive.
 
-Platform-specific features:
-
-```toml
 [target.'cfg(target_os = "linux")'.dependencies]
 nokhwa = { version = "0.10", optional = true, features = ["input-v4l"] }
 

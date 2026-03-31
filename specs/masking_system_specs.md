@@ -65,7 +65,8 @@ impl Mask {
     pub fn empty(width: u32, height: u32) -> Self { ... }
 
     /// Sample the mask at (x, y). Returns 0.0–1.0.
-    /// Coordinates outside bounds return 0.0 (no effect).
+    /// Coordinates outside bounds return 0.0 (no effect applied), which is
+    /// the safe default: out-of-bounds pixels are left untouched by the effect.
     pub fn sample(&self, x: u32, y: u32) -> f32 {
         if x >= self.width || y >= self.height { return 0.0; }
         self.data[(y * self.width + x) as usize] as f32 / 255.0

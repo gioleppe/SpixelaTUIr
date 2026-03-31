@@ -159,7 +159,8 @@ world spix-effect {
    cargo build --target wasm32-wasip1 --release
    ```
 
-4. Drop the `.wasm` file into `~/.config/spix/plugins/`.
+4. Drop the `.wasm` file into `~/.config/spix/plugins/` (Spix creates this
+   directory automatically on first launch if it doesn't exist).
 
 5. Launch Spix → the plugin appears under **Custom** in the Add Effect menu.
 
