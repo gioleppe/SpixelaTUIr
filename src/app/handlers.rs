@@ -404,6 +404,12 @@ pub const ADD_EFFECT_TABS: &[&str] = &[
     "★ Favs",
 ];
 
+/// Tab index for the WASM plugins category.
+pub const WASM_TAB_INDEX: usize = 5;
+
+/// Tab index for the ★ Favorites category (always last).
+pub const FAVS_TAB_INDEX: usize = 6;
+
 /// An item in the add-effect menu — either a built-in effect or a WASM plugin.
 #[derive(Debug, Clone)]
 pub enum EffectListing {
@@ -451,8 +457,8 @@ pub fn visible_effects_for_tab(
 ) -> Vec<EffectListing> {
     let mut results: Vec<EffectListing> = Vec::new();
 
-    // Built-in effects (all tabs except WASM-only tab 5).
-    if tab != 5 {
+    // Built-in effects (all tabs except the WASM-only tab).
+    if tab != WASM_TAB_INDEX {
         for (i, (name, cat, _)) in AVAILABLE_EFFECTS.iter().enumerate() {
             let keep = match tab {
                 0 => true,
@@ -460,7 +466,7 @@ pub fn visible_effects_for_tab(
                 2 => *cat == "Glitch",
                 3 => *cat == "CRT",
                 4 => *cat == "Composite",
-                6 => favorites.is_favorite(name),
+                t if t == FAVS_TAB_INDEX => favorites.is_favorite(name),
                 _ => false,
             };
             if keep {
@@ -474,13 +480,14 @@ pub fn visible_effects_for_tab(
     }
 
     // WASM plugins (All tab, WASM tab, and Favorites tab).
-    if matches!(tab, 0 | 5 | 6)
+    if matches!(tab, 0 | WASM_TAB_INDEX | FAVS_TAB_INDEX)
         && let Some(registry) = crate::effects::wasm::registry::get_registry()
     {
         for plugin_name in registry.list_plugins() {
             let keep = match tab {
-                0 | 5 => true,
-                6 => favorites.is_favorite(plugin_name),
+                0 => true,
+                t if t == WASM_TAB_INDEX => true,
+                t if t == FAVS_TAB_INDEX => favorites.is_favorite(plugin_name),
                 _ => false,
             };
             if keep {

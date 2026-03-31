@@ -65,10 +65,14 @@ pub struct WasmPluginRegistry {
     plugin_order: Vec<String>,
 }
 
-// Engine and Module are Send+Sync. HashMap of them is too.
-// This is safe because after init the registry is read-only.
-unsafe impl Send for WasmPluginRegistry {}
-unsafe impl Sync for WasmPluginRegistry {}
+// Compile-time verification that wasmer's Engine and Module are Send + Sync.
+// This is required for safe storage in the global OnceLock registry.
+// If wasmer ever removes Send/Sync from these types, this will fail to compile.
+const _: fn() = || {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<Engine>();
+    assert_send_sync::<Module>();
+};
 
 impl std::fmt::Debug for WasmPluginRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

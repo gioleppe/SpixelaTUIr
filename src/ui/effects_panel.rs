@@ -6,7 +6,9 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs},
 };
 
-use crate::app::handlers::{ADD_EFFECT_TABS, EffectListing, visible_effects_for_tab};
+use crate::app::handlers::{
+    ADD_EFFECT_TABS, EffectListing, WASM_TAB_INDEX, visible_effects_for_tab,
+};
 use crate::app::{AppState, FocusedPanel, InputMode};
 use crate::effects::color;
 
@@ -149,7 +151,7 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
     if n == 0 {
         let msg = if state.add_effect_tab == ADD_EFFECT_TABS.len() - 1 {
             "  No favorites yet.\n  Press 'f' to star an effect."
-        } else if state.add_effect_tab == 5 {
+        } else if state.add_effect_tab == WASM_TAB_INDEX {
             "  No WASM plugins found.\n  Place .wasm files in:\n  ~/.config/spix/plugins/"
         } else {
             "  (empty)"

@@ -6,6 +6,9 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 use wasmer::{Engine, Imports, Instance, Memory, Module, Store, TypedFunction};
 
+/// Maximum length for strings read from WASM linear memory (safety cap).
+const MAX_WASM_STRING_LEN: usize = 4096;
+
 /// Cached metadata for one tunable parameter of a WASM plugin.
 #[derive(Debug, Clone)]
 pub struct WasmParamMeta {
@@ -57,6 +60,10 @@ pub fn compile_plugin(engine: &Engine, path: &Path) -> Result<(Module, WasmPlugi
     let name_str = read_wasm_string(&instance, &store, name_ptr)
         .context("reading name string from WASM memory")?;
     // Leak to 'static for use in variant_name() / ParamDescriptor.
+    // This is intentional: plugins are loaded once at startup and never
+    // unloaded, so the leaked strings live for the program's entire lifetime.
+    // The total leaked memory is bounded by (plugin count × name length),
+    // which is negligible for any realistic number of plugins.
     let name: &'static str = Box::leak(name_str.into_boxed_str());
 
     // Read parameter count.
@@ -232,7 +239,7 @@ fn read_wasm_string(instance: &Instance, store: &Store, ptr: i32) -> Result<Stri
 
     // Read bytes until null terminator or end of memory.
     let max_len = (mem_size - ptr) as usize;
-    let max_len = max_len.min(4096); // Safety cap: 4 KiB max string length.
+    let max_len = max_len.min(MAX_WASM_STRING_LEN);
     let mut bytes = vec![0u8; max_len];
     mem_view
         .read(ptr as u64, &mut bytes)
