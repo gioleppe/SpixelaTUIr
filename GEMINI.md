@@ -8,6 +8,7 @@
 - **TUI Framework:** [ratatui](https://github.com/ratatui-org/ratatui) with [crossterm](https://github.com/crossterm-rs/crossterm)
 - **Image Rendering:** [ratatui-image](https://github.com/ratatui-org/ratatui-image) (supports Sixel, Kitty, and half-blocks)
 - **Image Processing:** `image` and `imageproc` crates
+- **WASM Plugin Runtime:** [wasmer](https://wasmer.io/) for loading user-supplied `.wasm` effect plugins
 - **Serialization:** `serde`, `serde_json`, and `serde_yml` for pipeline save/load
 - **Architecture:** Multi-threaded worker-thread model for responsive UI (60 FPS)
 
@@ -29,6 +30,10 @@
     - `crt.rs`: Retro-display simulations (Scanlines, Noise, Vignette, Curvature, PhosphorGlow).
     - `composite.rs`: Image layout operations (Crop, Blend).
     - `mod.rs`: `Effect` enum (thin delegation layer), `Pipeline`, `EnabledEffect`, `ParamDescriptor`, and `apply_per_pixel` helper.
+    - `wasm/`: WASM plugin system for user-supplied effects.
+        - `mod.rs`: `WasmEffect` struct with Effect-compatible interface methods.
+        - `runtime.rs`: Low-level wasmer interactions (compile, instantiate, execute, string read).
+        - `registry.rs`: Global plugin discovery (`~/.config/spix/plugins/`), `OnceLock<WasmPluginRegistry>`.
 - `src/ui/`: Ratatui-based rendering components (Canvas, Effects Panel, Modals, Widgets). No input handling or state mutation.
 - `src/config/`: Pipeline serialization logic.
 
@@ -65,3 +70,10 @@ Refer to [`.github/copilot-instructions.md`](.github/copilot-instructions.md) fo
 4. Add the variant to the `Effect` enum in `src/effects/mod.rs` (delegation is automatic via the existing match arms).
 5. Register the effect in `AVAILABLE_EFFECTS` within `src/app/pipeline_utils.rs` to make it appear in the "Add Effect" menu.
 6. Update `randomize_pipeline` in `src/app/pipeline_utils.rs` if the effect has parameters.
+
+### WASM Plugin System
+- User-supplied WASM plugins are discovered from `~/.config/spix/plugins/` at startup.
+- The `WasmPluginRegistry` (in `src/effects/wasm/registry.rs`) compiles and caches modules in a global `OnceLock`.
+- `WasmEffect` (in `src/effects/wasm/mod.rs`) implements the same interface as built-in effects.
+- Plugins appear in the add-effect menu under the "WASM" tab.
+- See `README.md` for the full WASM plugin API contract and a Rust example.

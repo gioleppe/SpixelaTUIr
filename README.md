@@ -97,6 +97,7 @@ spixelatuir --batch "raw_photos/**/*.png" --pipeline cyberpunk.json --outdir gli
 | **Composite** | `CropRect` | `x`, `y`, `width`, `height` | Crop to a rectangular region. |
 | **Composite** | `MirrorSlice` | `orientation`, `slice_width`, `pattern` | Chop image into stripes and flip/mirror alternating slices (horizontal or vertical). |
 | **Composite** | `EdgeGlow` | `edge_thresh`, `glow_r/g/b`, `glow_strength`, `blur_radius` | Sobel edge detection with neon-colored glow and darkened background. |
+| **WASM** | *(user-defined)* | *(plugin-defined)* | Custom effects loaded from `.wasm` plugins in `~/.config/spix/plugins/`. |
 
 ---
 
@@ -148,13 +149,141 @@ Open with `a` (effects panel focused) **or** jump straight to Favorites with `*`
 Spix is built for responsiveness. It uses a **multi-threaded architecture** where the UI remains buttery smooth while a dedicated worker thread handles the heavy image processing math.
 
 - **Main Thread:** Handles input, state management, and Sixel rendering.
-- **Worker Thread:** Executes the effect pipeline and exports high-res assets.
+- **Worker Thread:** Executes the effect pipeline (including WASM plugins) and exports high-res assets.
+- **WASM Runtime:** Compiled plugins are cached at startup via `wasmer`. Each execution gets a fresh sandboxed instance.
 
 ```mermaid
 flowchart LR
   UI[UI Thread] <--> |Channels| Worker[Worker Thread]
   Worker --> |Processed Frames| UI
+  Worker -.-> |execute| WASM[WASM Plugin Sandbox]
+  Registry[Plugin Registry] -.-> |compiled modules| Worker
 ```
+
+---
+
+## 🧩 WASM Plugin System
+
+Extend Spix with your own custom effects by writing WebAssembly plugins! Drop `.wasm` files into your plugins directory and they appear alongside built-in effects.
+
+### Quick Start
+
+1. Place your `.wasm` plugin file in `~/.config/spix/plugins/`
+2. Launch Spix — plugins are auto-discovered at startup
+3. Press `a` to open the Add Effect menu, navigate to the **WASM** tab
+4. Select your plugin and add it to the pipeline
+
+### Plugin API Contract
+
+A valid WASM plugin must export these functions:
+
+| Export | Signature | Description |
+|--------|-----------|-------------|
+| `name` | `() → i32` | Pointer to null-terminated UTF-8 effect name |
+| `num_params` | `() → i32` | Number of tunable parameters |
+| `param_name` | `(i32) → i32` | Pointer to null-terminated name for param at index |
+| `param_default` | `(i32) → f32` | Default value for param at index |
+| `param_min` | `(i32) → f32` | Minimum value for param at index |
+| `param_max` | `(i32) → f32` | Maximum value for param at index |
+| `set_param` | `(i32, f32) → ()` | Set a param value before processing |
+| `process` | `(i32, i32, i32, i32) → i32` | Process RGBA data (width, height, ptr, len). Return 0 on success. |
+| `alloc` | `(i32) → i32` | Allocate bytes in WASM linear memory |
+| `dealloc` | `(i32, i32) → ()` | Free previously allocated bytes |
+| `memory` | *(memory export)* | WASM linear memory |
+
+### Memory Model
+
+1. The host calls `alloc(len)` to get a pointer in WASM linear memory
+2. The host writes raw RGBA pixel bytes (`width × height × 4`) at that pointer
+3. The host calls `process(width, height, ptr, len)` — the plugin modifies pixels in-place
+4. The host reads the modified pixels back from the same pointer
+5. The host calls `dealloc(ptr, len)` to free the memory
+
+### Security & Sandboxing
+
+- Plugins run in a **sandboxed WebAssembly runtime** (wasmer) with no access to the filesystem, network, or host APIs
+- Each plugin execution gets a fresh isolated memory space
+- No WASI imports are provided — plugins can only manipulate the pixel buffer they receive
+- Malformed plugins are skipped at startup with a warning
+
+### Writing a Plugin (Rust Example)
+
+```rust
+// Build with: cargo build --target wasm32-unknown-unknown --release
+
+static mut PARAMS: [f32; 1] = [1.0]; // brightness
+
+#[unsafe(no_mangle)]
+pub extern "C" fn name() -> *const u8 {
+    b"Brightness\0".as_ptr()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn num_params() -> i32 { 1 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn param_name(index: i32) -> *const u8 {
+    match index {
+        0 => b"factor\0".as_ptr(),
+        _ => b"\0".as_ptr(),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn param_default(_index: i32) -> f32 { 1.0 }
+#[unsafe(no_mangle)]
+pub extern "C" fn param_min(_index: i32) -> f32 { 0.0 }
+#[unsafe(no_mangle)]
+pub extern "C" fn param_max(_index: i32) -> f32 { 3.0 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn set_param(index: i32, value: f32) {
+    unsafe { if index == 0 { PARAMS[0] = value; } }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn alloc(size: i32) -> i32 {
+    let layout = std::alloc::Layout::from_size_align(size as usize, 1).unwrap();
+    unsafe { std::alloc::alloc(layout) as i32 }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn dealloc(ptr: i32, size: i32) {
+    let layout = std::alloc::Layout::from_size_align(size as usize, 1).unwrap();
+    unsafe { std::alloc::dealloc(ptr as *mut u8, layout); }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn process(_w: i32, _h: i32, ptr: i32, len: i32) -> i32 {
+    let factor = unsafe { PARAMS[0] };
+    let data = unsafe { std::slice::from_raw_parts_mut(ptr as *mut u8, len as usize) };
+    for chunk in data.chunks_mut(4) {
+        chunk[0] = (chunk[0] as f32 * factor).min(255.0) as u8;
+        chunk[1] = (chunk[1] as f32 * factor).min(255.0) as u8;
+        chunk[2] = (chunk[2] as f32 * factor).min(255.0) as u8;
+        // chunk[3] is alpha — leave unchanged
+    }
+    0 // success
+}
+```
+
+### Pipeline Serialization
+
+WASM effects are automatically saved/loaded with pipelines. The serialized form uses the plugin name (not file path) for portability:
+
+```json
+{
+  "enabled": true,
+  "effect": {
+    "Wasm": {
+      "plugin": "Brightness",
+      "params": [1.5]
+    }
+  }
+}
+```
+
+If a pipeline references a WASM plugin that isn't installed, the effect passes images through unchanged.
 
 ---
 
