@@ -87,10 +87,13 @@ Query the terminal's palette size (via `XTGETTCAP` / `XTSMGRAPHICS`) and
 dynamically select the optimal number of Sixel colours to maximise
 perceived quality while staying within terminal limits.
 
-### 17. Plugin / scripting support via WASM
-Load user-written WebAssembly modules as custom effect nodes.  The module
-exports a single `apply(width, height, pixels: &mut [u8])` function.  This
-keeps the core binary small while allowing unlimited extensibility.
+### 17. ✅ Plugin / scripting support via WASM
+Load user-written WebAssembly modules as custom effect nodes.  Plugins are
+discovered from `~/.config/spix/plugins/` at startup and appear in the
+add-effect menu under a "WASM" tab.  Each plugin exports `name`, parameter
+metadata, `alloc`/`dealloc`, and a `process(width, height, ptr, len)` function
+that operates on raw RGBA pixel data in-place.  The wasmer runtime provides
+sandboxed execution with no filesystem or network access.
 
 ### 18. Real-time Webcam Input
 Use a crate like `nokhwa` or `v4l` to capture live video frames from a webcam and feed them into the effect pipeline in real-time. Render the live, glitched output directly to the terminal using Sixel.

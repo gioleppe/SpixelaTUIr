@@ -6,7 +6,9 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs},
 };
 
-use crate::app::handlers::{ADD_EFFECT_TABS, visible_effects_for_tab};
+use crate::app::handlers::{
+    ADD_EFFECT_TABS, EffectListing, WASM_TAB_INDEX, visible_effects_for_tab,
+};
 use crate::app::{AppState, FocusedPanel, InputMode};
 use crate::effects::color;
 
@@ -147,8 +149,10 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
 
     // ── Effect list ───────────────────────────────────────────────────────
     if n == 0 {
-        let msg = if state.add_effect_tab == 5 {
+        let msg = if state.add_effect_tab == ADD_EFFECT_TABS.len() - 1 {
             "  No favorites yet.\n  Press 'f' to star an effect."
+        } else if state.add_effect_tab == WASM_TAB_INDEX {
+            "  No WASM plugins found.\n  Place .wasm files in:\n  ~/.config/spix/plugins/"
         } else {
             "  (empty)"
         };
@@ -159,7 +163,9 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
         let items: Vec<ListItem> = visible
             .iter()
             .enumerate()
-            .map(|(list_i, (_global_i, name, _cat))| {
+            .map(|(list_i, listing)| {
+                let name = listing.name();
+                let is_wasm = matches!(listing, EffectListing::Wasm { .. });
                 let selected = list_i == cursor;
                 let is_fav = state.favorites.is_favorite(name);
                 let star = if is_fav { "★" } else { " " };
@@ -172,11 +178,16 @@ pub fn render_add_effect_menu(frame: &mut Frame, state: &AppState) {
                     Style::default().fg(state.theme.text_normal)
                 };
                 let prefix = if selected { "▶" } else { " " };
+                let label = if is_wasm {
+                    format!("[W] {name}")
+                } else {
+                    name.to_string()
+                };
                 ListItem::new(Line::from(vec![
                     Span::styled(prefix, style),
                     Span::styled(star, style),
                     Span::styled(" ", style),
-                    Span::styled(*name, style),
+                    Span::styled(label, style),
                 ]))
             })
             .collect();

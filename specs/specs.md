@@ -151,3 +151,64 @@ Color/Tonal: Adjust raw pixel values.
 Composition: Blend secondary images.
 
 CRT/Post-Processing: Apply finishing screens and static.
+
+## 12. WASM Plugin System
+
+### 12.1 Overview
+Users can extend Spix with custom image effects by supplying WebAssembly (`.wasm`) plugins. Plugins are discovered from `~/.config/spix/plugins/` at startup and integrated into the pipeline as first-class effects alongside built-in ones.
+
+### 12.2 Runtime
+* **Engine:** `wasmer` (Cranelift compiler backend, pure-Rust, cross-platform).
+* **Registry:** A global `OnceLock<WasmPluginRegistry>` initialized at startup. After initialization, the registry is read-only (no locking).
+* **Sandboxing:** Plugins run in isolated WASM linear memory with no WASI imports — they cannot access the filesystem, network, or host APIs.
+* **Lifecycle:** Each `process()` call creates a fresh `Store` + `Instance`, ensuring no cross-call memory contamination.
+
+### 12.3 Plugin API Contract
+Every `.wasm` plugin must export the following functions:
+
+| Export | Signature | Purpose |
+|---|---|---|
+| `name` | `() → i32` | Pointer to null-terminated UTF-8 effect name |
+| `num_params` | `() → i32` | Number of tunable parameters |
+| `param_name` | `(i32) → i32` | Pointer to null-terminated name for param at index |
+| `param_default` | `(i32) → f32` | Default value for parameter at index |
+| `param_min` | `(i32) → f32` | Minimum value for parameter at index |
+| `param_max` | `(i32) → f32` | Maximum value for parameter at index |
+| `set_param` | `(i32, f32) → ()` | Set parameter value before processing |
+| `process` | `(i32, i32, i32, i32) → i32` | Process RGBA data in-place (width, height, ptr, len). Return 0 on success. |
+| `alloc` | `(i32) → i32` | Allocate bytes in WASM linear memory |
+| `dealloc` | `(i32, i32) → ()` | Free previously allocated bytes |
+| `memory` | *(memory export)* | WASM linear memory |
+
+### 12.4 Memory Protocol
+1. Host calls `alloc(width × height × 4)` to get a pointer in WASM memory.
+2. Host writes raw RGBA pixel bytes at that pointer.
+3. Host calls `set_param(i, value)` for each parameter.
+4. Host calls `process(width, height, ptr, len)` — the plugin modifies pixels in-place.
+5. Host reads the modified bytes back from the same pointer.
+6. Host calls `dealloc(ptr, len)` to free the memory.
+
+### 12.5 Data Structures
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WasmEffect {
+    pub plugin: String,       // Plugin name (not file path — portable)
+    pub params: Vec<f32>,     // Current parameter values
+}
+```
+
+### 12.6 Integration Points
+* **Effect enum:** `Effect::Wasm(WasmEffect)` variant delegates to `WasmEffect` methods.
+* **Pipeline:** WASM effects participate in `Pipeline::apply_image()` like any built-in effect.
+* **Serialization:** Automatic via serde derives. Uses plugin name for portability across machines.
+* **Add-Effect menu:** WASM plugins appear under a dedicated "WASM" tab (tab index 5).
+* **Batch mode:** WASM registry is initialized before batch processing.
+
+### 12.7 Error Handling
+| Failure | Behavior |
+|---|---|
+| `.wasm` fails to compile | Plugin skipped at startup, warning logged |
+| Plugin missing required export | Plugin skipped at startup, warning logged |
+| `process()` returns non-zero | Image unchanged, error logged |
+| WASM trap (OOB memory, etc.) | Image unchanged, error logged |
+| Pipeline references missing plugin | Effect passes through unchanged, name still displayed |

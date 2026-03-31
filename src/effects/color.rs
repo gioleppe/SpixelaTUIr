@@ -677,14 +677,18 @@ mod tests {
 #[cfg(test)]
 mod benches {
     use super::*;
-    use std::time::Instant;
     use image::{DynamicImage, ImageBuffer, Rgba};
+    use std::time::Instant;
 
     #[test]
     fn bench_dither_fs() {
         let width = 1000;
         let height = 1000;
-        let img = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(width as u32, height as u32, Rgba([128u8, 64, 200, 255])));
+        let img = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(
+            width as u32,
+            height as u32,
+            Rgba([128u8, 64, 200, 255]),
+        ));
 
         // Warmup
         for _ in 0..3 {
@@ -697,6 +701,9 @@ mod benches {
             let _ = dither_image(img.clone(), 1, 4);
         }
         let duration = start.elapsed() / iterations as u32;
-        println!("\nBENCH_RESULT: Dither FS {}x{}: {:?}", width, height, duration);
+        println!(
+            "\nBENCH_RESULT: Dither FS {}x{}: {:?}",
+            width, height, duration
+        );
     }
 }
