@@ -368,6 +368,7 @@ pub fn randomize_pipeline(pipeline: &mut Pipeline) {
                 }
             },
             Effect::Composite(_) => {}
+            Effect::Wasm(_) => {}
         }
     }
 }

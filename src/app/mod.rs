@@ -57,6 +57,9 @@ pub fn run<B: Backend>(terminal: &mut Terminal<B>) -> Result<()>
 where
     <B as Backend>::Error: Send + Sync + 'static,
 {
+    // Initialize WASM plugin registry (scans ~/.config/spix/plugins/).
+    crate::effects::wasm::registry::init_registry();
+
     let (worker_tx, worker_cmd_rx) = mpsc::channel::<WorkerCommand>();
     let (worker_resp_tx, worker_rx) = mpsc::channel::<WorkerResponse>();
 

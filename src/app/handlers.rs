@@ -394,9 +394,48 @@ fn handle_path_input(state: &mut AppState, code: KeyCode) {
 // ── Add effect menu ──────────────────────────────────────────────────────────
 
 /// Tab labels for the add-effect menu.
-pub const ADD_EFFECT_TABS: &[&str] = &["All", "Color", "Glitch", "CRT", "Composite", "★ Favs"];
+pub const ADD_EFFECT_TABS: &[&str] = &[
+    "All",
+    "Color",
+    "Glitch",
+    "CRT",
+    "Composite",
+    "WASM",
+    "★ Favs",
+];
 
-/// Returns the subset of `AVAILABLE_EFFECTS` visible for the given tab index.
+/// An item in the add-effect menu — either a built-in effect or a WASM plugin.
+#[derive(Debug, Clone)]
+pub enum EffectListing {
+    /// Built-in effect at index `i` in `AVAILABLE_EFFECTS`.
+    Builtin {
+        index: usize,
+        name: &'static str,
+        category: &'static str,
+    },
+    /// WASM plugin identified by name.
+    Wasm { name: String },
+}
+
+impl EffectListing {
+    /// Display name for this listing.
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Builtin { name, .. } => name,
+            Self::Wasm { name } => name,
+        }
+    }
+
+    /// Category label for this listing.
+    pub fn category(&self) -> &str {
+        match self {
+            Self::Builtin { category, .. } => category,
+            Self::Wasm { .. } => "WASM",
+        }
+    }
+}
+
+/// Returns the effect listings visible for the given tab index.
 ///
 /// Tab indices:
 /// - 0 = All
@@ -404,27 +443,55 @@ pub const ADD_EFFECT_TABS: &[&str] = &["All", "Color", "Glitch", "CRT", "Composi
 /// - 2 = Glitch
 /// - 3 = CRT
 /// - 4 = Composite
-/// - 5 = ★ Favorites
+/// - 5 = WASM
+/// - 6 = ★ Favorites
 pub fn visible_effects_for_tab(
     tab: usize,
     favorites: &crate::config::favorites::FavoritesConfig,
-) -> Vec<(usize, &'static str, &'static str)> {
-    AVAILABLE_EFFECTS
-        .iter()
-        .enumerate()
-        .filter_map(|(i, (name, cat, _))| {
+) -> Vec<EffectListing> {
+    let mut results: Vec<EffectListing> = Vec::new();
+
+    // Built-in effects (all tabs except WASM-only tab 5).
+    if tab != 5 {
+        for (i, (name, cat, _)) in AVAILABLE_EFFECTS.iter().enumerate() {
             let keep = match tab {
                 0 => true,
                 1 => *cat == "Color",
                 2 => *cat == "Glitch",
                 3 => *cat == "CRT",
                 4 => *cat == "Composite",
-                5 => favorites.is_favorite(name),
-                _ => true,
+                6 => favorites.is_favorite(name),
+                _ => false,
             };
-            if keep { Some((i, *name, *cat)) } else { None }
-        })
-        .collect()
+            if keep {
+                results.push(EffectListing::Builtin {
+                    index: i,
+                    name,
+                    category: cat,
+                });
+            }
+        }
+    }
+
+    // WASM plugins (All tab, WASM tab, and Favorites tab).
+    if matches!(tab, 0 | 5 | 6)
+        && let Some(registry) = crate::effects::wasm::registry::get_registry()
+    {
+        for plugin_name in registry.list_plugins() {
+            let keep = match tab {
+                0 | 5 => true,
+                6 => favorites.is_favorite(plugin_name),
+                _ => false,
+            };
+            if keep {
+                results.push(EffectListing::Wasm {
+                    name: plugin_name.clone(),
+                });
+            }
+        }
+    }
+
+    results
 }
 
 fn handle_add_effect(state: &mut AppState, code: KeyCode) {
@@ -474,8 +541,8 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
             // Toggle the favorite status of the currently highlighted effect.
             if n > 0 {
                 let cursor = state.add_effect_cursor.min(n - 1);
-                let name = visible[cursor].1;
-                state.favorites.toggle(name);
+                let name = visible[cursor].name().to_string();
+                state.favorites.toggle(&name);
                 // If we're on the Favorites tab and just un-favorited, adjust cursor.
                 if state.add_effect_tab == ADD_EFFECT_TABS.len() - 1 {
                     let new_n =
@@ -484,7 +551,7 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
                         state.add_effect_cursor = new_n - 1;
                     }
                 }
-                let starred = if state.favorites.is_favorite(name) {
+                let starred = if state.favorites.is_favorite(&name) {
                     "★"
                 } else {
                     "☆"
@@ -497,9 +564,15 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
                 return;
             }
             let cursor = state.add_effect_cursor.min(n - 1);
-            let global_idx = visible[cursor].0;
-            let effect = AVAILABLE_EFFECTS[global_idx].2();
-            let name = AVAILABLE_EFFECTS[global_idx].0;
+            let (effect, name) = match &visible[cursor] {
+                EffectListing::Builtin { index, name, .. } => {
+                    (AVAILABLE_EFFECTS[*index].2(), name.to_string())
+                }
+                EffectListing::Wasm { name } => {
+                    let wasm_effect = crate::effects::wasm::WasmEffect::with_defaults(name);
+                    (Effect::Wasm(wasm_effect), name.clone())
+                }
+            };
             state.push_undo();
             state.pipeline.effects.push(EnabledEffect::new(effect));
 
@@ -509,7 +582,7 @@ fn handle_add_effect(state: &mut AppState, code: KeyCode) {
 
             let descriptors = state.pipeline.effects[last_idx].effect.param_descriptors();
             if !descriptors.is_empty() {
-                // If the effect has parameters (like GradientMap), open the edit modal immediately.
+                // If the effect has parameters, open the edit modal immediately.
                 state.edit_params = descriptors
                     .iter()
                     .map(|d| format_param_value(d.value))

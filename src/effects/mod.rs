@@ -2,6 +2,7 @@ pub mod color;
 pub mod composite;
 pub mod crt;
 pub mod glitch;
+pub mod wasm;
 
 use std::fmt;
 
@@ -12,6 +13,7 @@ use color::ColorEffect;
 use composite::CompositeEffect;
 use crt::CrtEffect;
 use glitch::GlitchEffect;
+use wasm::WasmEffect;
 
 /// Descriptor for a single editable parameter of an effect.
 ///
@@ -33,6 +35,7 @@ pub enum Effect {
     Color(ColorEffect),
     Crt(CrtEffect),
     Composite(CompositeEffect),
+    Wasm(WasmEffect),
 }
 
 impl Effect {
@@ -48,6 +51,8 @@ impl Effect {
             Effect::Glitch(e) => e.apply_image(img),
             // Composite effects pass through here (blend needs secondary image).
             Effect::Composite(e) => e.apply_image(img),
+            // WASM plugin effects.
+            Effect::Wasm(e) => e.apply_image(img),
         }
     }
 
@@ -62,6 +67,7 @@ impl Effect {
             Effect::Glitch(e) => e.param_descriptors(),
             Effect::Crt(e) => e.param_descriptors(),
             Effect::Composite(e) => e.param_descriptors(),
+            Effect::Wasm(e) => e.param_descriptors(),
         }
     }
 
@@ -75,16 +81,18 @@ impl Effect {
             Effect::Glitch(e) => Effect::Glitch(e.apply_params(values)),
             Effect::Crt(e) => Effect::Crt(e.apply_params(values)),
             Effect::Composite(e) => Effect::Composite(e.apply_params(values)),
+            Effect::Wasm(e) => Effect::Wasm(e.apply_params(values)),
         }
     }
 
     /// Returns the variant name (e.g. `"HueShift"`, `"Pixelate"`) for UI titles.
-    pub fn variant_name(&self) -> &'static str {
+    pub fn variant_name(&self) -> &str {
         match self {
             Effect::Color(e) => e.variant_name(),
             Effect::Glitch(e) => e.variant_name(),
             Effect::Crt(e) => e.variant_name(),
             Effect::Composite(e) => e.variant_name(),
+            Effect::Wasm(e) => e.variant_name(),
         }
     }
 }
@@ -96,6 +104,7 @@ impl fmt::Display for Effect {
             Effect::Glitch(e) => e.fmt(f),
             Effect::Crt(e) => e.fmt(f),
             Effect::Composite(e) => e.fmt(f),
+            Effect::Wasm(e) => e.fmt(f),
         }
     }
 }

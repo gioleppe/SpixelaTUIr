@@ -29,6 +29,9 @@ pub struct BatchArgs {
 /// 4. Processes every input image sequentially.
 /// 5. Prints a summary and returns an error if any file failed.
 pub fn run_batch(args: &BatchArgs) -> Result<()> {
+    // Initialize WASM plugin registry so WASM effects work in batch mode.
+    crate::effects::wasm::registry::init_registry();
+
     let pipeline = load_pipeline(&args.pipeline_path)
         .with_context(|| format!("loading pipeline from {}", args.pipeline_path.display()))?;
 

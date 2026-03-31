@@ -24,9 +24,13 @@ anyhow = "1.0"
 thiserror = "2.0"
 serde_json = "1.0.149"
 
+# WASM Plugin Runtime
+wasmer = "7.1"
+
 # Logging
 log = { version = "0.4", features = ["std"] }
 dirs = "6.0.0"
 
 [dev-dependencies]
 tempfile = "3.27"
+wat = "1.246"
