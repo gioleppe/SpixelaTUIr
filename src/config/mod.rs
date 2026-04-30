@@ -1,3 +1,4 @@
+pub mod app_config;
 pub mod favorites;
 pub mod parser;
 pub mod theme;
@@ -40,10 +41,18 @@ mod tests {
     #[test]
     fn test_read_to_string_limited_too_large() -> io::Result<()> {
         let mut file = NamedTempFile::new()?;
-        writeln!(file, "This is a long sentence that should exceed the limit.")?;
+        writeln!(
+            file,
+            "This is a long sentence that should exceed the limit."
+        )?;
         let result = read_to_string_limited(file.path(), 10);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("File exceeds size limit"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("File exceeds size limit")
+        );
         Ok(())
     }
 }

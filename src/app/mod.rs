@@ -48,9 +48,15 @@ pub const FILE_BROWSER_HINT: &str = "↑↓/jk: navigate  Enter: open  Backspace
 pub const PIPELINE_BROWSER_HINT: &str =
     "↑↓/jk: navigate  Enter: load  Backspace/-: up  Esc: cancel";
 
-/// Available proxy resolution tiers (max pixels on the long edge).
+/// Default preview-resolution tiers (max pixels on the long edge).
+///
 /// Index 1 (512 px) is the default — matches the previous hardcoded value.
-pub const PROXY_RESOLUTIONS: &[u32] = &[256, 512, 768, 1024];
+/// At runtime, `AppState::proxy_resolutions` is seeded from the user's
+/// `~/.config/spix/config.json` (see [`crate::config::app_config`]) and may
+/// override this list. This re-export exists for documentation and so older
+/// code paths that still want the built-in defaults can reference them.
+#[allow(unused_imports)]
+pub use crate::config::app_config::DEFAULT_PROXY_RESOLUTIONS;
 
 /// Entry point for the application event loop.
 pub fn run<B: Backend>(terminal: &mut Terminal<B>) -> Result<()>
@@ -542,5 +548,67 @@ mod tests {
                 .unwrap_or(false),
             "file browser should have OpenImage purpose"
         );
+    }
+
+    // ── Export resolution ────────────────────────────────────────────────────
+
+    #[test]
+    fn export_resolution_cycle_next_and_prev() {
+        use dialogs::ExportResolution;
+        // next() cycles through Source → Preview → Custom → Source.
+        let mut r = ExportResolution::Source;
+        r = r.next();
+        assert_eq!(r, ExportResolution::Preview);
+        r = r.next();
+        assert_eq!(r, ExportResolution::Custom);
+        r = r.next();
+        assert_eq!(r, ExportResolution::Source);
+
+        // prev() is the inverse.
+        let mut r = ExportResolution::Source;
+        r = r.prev();
+        assert_eq!(r, ExportResolution::Custom);
+        r = r.prev();
+        assert_eq!(r, ExportResolution::Preview);
+        r = r.prev();
+        assert_eq!(r, ExportResolution::Source);
+    }
+
+    #[test]
+    fn export_dialog_default_resolution_is_source() {
+        let dlg = dialogs::ExportDialogState::default();
+        assert_eq!(dlg.resolution, dialogs::ExportResolution::Source);
+        assert!(dlg.custom_resolution.is_empty());
+    }
+
+    #[test]
+    fn export_dialog_custom_resolution_value_parses() {
+        let dlg = dialogs::ExportDialogState {
+            custom_resolution: "1920".to_string(),
+            ..dialogs::ExportDialogState::default()
+        };
+        assert_eq!(dlg.custom_resolution_value(), Some(1920));
+
+        let dlg = dialogs::ExportDialogState {
+            custom_resolution: "  ".to_string(),
+            ..dialogs::ExportDialogState::default()
+        };
+        assert_eq!(dlg.custom_resolution_value(), None);
+
+        let dlg = dialogs::ExportDialogState {
+            custom_resolution: "abc".to_string(),
+            ..dialogs::ExportDialogState::default()
+        };
+        assert_eq!(dlg.custom_resolution_value(), None);
+    }
+
+    #[test]
+    fn proxy_resolutions_seeded_from_defaults() {
+        // No config file exists in the test environment, so the state must
+        // fall back to the built-in defaults and pick the index closest to
+        // 512 px (preserving prior behaviour).
+        let state = make_state_empty();
+        assert_eq!(state.proxy_resolutions, DEFAULT_PROXY_RESOLUTIONS);
+        assert_eq!(state.proxy_resolutions[state.proxy_resolution_index], 512);
     }
 }

@@ -11,7 +11,7 @@ use crate::engine::export::EXPORT_FORMATS;
 /// Render the status bar at the top of the screen.
 pub fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
     let res_label = if state.image_path.is_some() {
-        let size = crate::app::PROXY_RESOLUTIONS[state.proxy_resolution_index];
+        let size = state.proxy_resolutions[state.proxy_resolution_index];
         format!(" [{size}px]")
     } else {
         String::new()
@@ -55,7 +55,7 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         }
         InputMode::EditEffect { .. } => "j/k: next field  Type value  Enter: apply  Esc: cancel",
         InputMode::ExportDialog => {
-            "j/k: navigate fields  ←/→/Space: cycle format  Enter: export  Esc: cancel"
+            "j/k: navigate fields  ←/→/Space: cycle  Type: edit  Enter: export  Esc: cancel"
         }
         InputMode::SavePipelineDialog => "j/k: navigate fields  Enter: save as JSON  Esc: cancel",
         InputMode::HelpModal => "h / Esc: close help",
@@ -118,11 +118,15 @@ pub fn render_export_dialog(frame: &mut Frame, state: &AppState) {
         return;
     }
 
+    use crate::app::dialogs::ExportResolution;
+
     let total = frame.area();
 
-    // Centre a 60-wide, 10-tall popup.
-    let popup_width = total.width.min(60);
-    let popup_height = 10u16;
+    // Centre a 64-wide popup. Height grows by one row when the Custom
+    // resolution edit field is shown so it doesn't overlap other rows.
+    let custom_active = state.export_dialog.resolution == ExportResolution::Custom;
+    let popup_width = total.width.min(64);
+    let popup_height: u16 = if custom_active { 13 } else { 12 };
     let x = (total.width.saturating_sub(popup_width)) / 2;
     let y = (total.height.saturating_sub(popup_height)) / 2;
     let popup_area = Rect::new(x, y, popup_width, popup_height);
@@ -143,17 +147,26 @@ pub fn render_export_dialog(frame: &mut Frame, state: &AppState) {
         popup_area.height.saturating_sub(2),
     );
 
-    // Split inner into rows: Directory, Filename, Format, (blank), Preview.
+    // Split inner into rows: Directory, Filename, Format, Resolution,
+    // (optional) Custom, blank, Source-dims hint, Preview path.
+    let mut constraints: Vec<Constraint> = vec![
+        Constraint::Length(1), // Directory
+        Constraint::Length(1), // Filename
+        Constraint::Length(1), // Format
+        Constraint::Length(1), // Resolution
+    ];
+    if custom_active {
+        constraints.push(Constraint::Length(1)); // Custom resolution input
+    }
+    constraints.extend_from_slice(&[
+        Constraint::Length(1), // blank
+        Constraint::Length(1), // Source-dims hint
+        Constraint::Length(1), // Preview path
+        Constraint::Min(0),    // padding
+    ]);
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1), // Directory
-            Constraint::Length(1), // Filename
-            Constraint::Length(1), // Format
-            Constraint::Length(1), // blank
-            Constraint::Length(1), // Preview path
-            Constraint::Min(0),    // padding
-        ])
+        .constraints(constraints)
         .split(inner);
 
     let dialog = &state.export_dialog;
@@ -172,18 +185,78 @@ pub fn render_export_dialog(frame: &mut Frame, state: &AppState) {
 
     // Directory row.
     let dir_cursor = if dialog.focused_field == 0 { "_" } else { "" };
-    let dir_text = format!("  Directory  {}{}", dialog.directory, dir_cursor);
+    let dir_text = format!("  Directory   {}{}", dialog.directory, dir_cursor);
     frame.render_widget(Paragraph::new(dir_text).style(field_style(0)), rows[0]);
 
     // Filename row.
     let fn_cursor = if dialog.focused_field == 1 { "_" } else { "" };
-    let fn_text = format!("  Filename   {}{}", dialog.filename, fn_cursor);
+    let fn_text = format!("  Filename    {}{}", dialog.filename, fn_cursor);
     frame.render_widget(Paragraph::new(fn_text).style(field_style(1)), rows[1]);
 
     // Format row.
     let format_name = EXPORT_FORMATS[dialog.format_index].display_name();
-    let fmt_text = format!("  Format     [ {format_name} ]  (←/→ to change)");
+    let fmt_text = format!("  Format      [ {format_name} ]  (←/→ to change)");
     frame.render_widget(Paragraph::new(fmt_text).style(field_style(2)), rows[2]);
+
+    // Resolution row.
+    let res_label = dialog.resolution.label();
+    let res_text = format!("  Resolution  [ {res_label} ]  (←/→ to change)");
+    frame.render_widget(Paragraph::new(res_text).style(field_style(3)), rows[3]);
+
+    // Custom-resolution input row (only when Custom is selected).
+    let mut row_idx = 4;
+    if custom_active {
+        let cursor = if dialog.focused_field == 4 { "_" } else { "" };
+        let custom_text = format!("  Long edge   {}{}  px", dialog.custom_resolution, cursor);
+        frame.render_widget(Paragraph::new(custom_text).style(field_style(4)), rows[4]);
+        row_idx = 5;
+    }
+
+    // Blank row at row_idx; source-dims hint at row_idx + 1.
+    let dims_row = row_idx + 1;
+    let preview_row = row_idx + 2;
+
+    // Source-dims hint.
+    let dims_hint = match (&state.source_asset, dialog.resolution) {
+        (Some(src), ExportResolution::Source) => format!(
+            "  Source:    {}x{}  (saved at full resolution)",
+            src.width(),
+            src.height()
+        ),
+        (Some(src), ExportResolution::Preview) => {
+            let (pw, ph) = state
+                .preview_buffer
+                .as_ref()
+                .map(|p| (p.width(), p.height()))
+                .unwrap_or((0, 0));
+            format!(
+                "  Source:    {}x{}   Preview: {}x{}",
+                src.width(),
+                src.height(),
+                pw,
+                ph
+            )
+        }
+        (Some(src), ExportResolution::Custom) => {
+            let long_edge = src.width().max(src.height());
+            let target = dialog
+                .custom_resolution_value()
+                .map(|v| v.min(long_edge).to_string())
+                .unwrap_or_else(|| "?".to_string());
+            format!(
+                "  Source:    {}x{}   Custom long edge: {} px (cap: {})",
+                src.width(),
+                src.height(),
+                target,
+                long_edge
+            )
+        }
+        (None, _) => "  Source:    (none loaded)".to_string(),
+    };
+    frame.render_widget(
+        Paragraph::new(dims_hint).style(Style::default().fg(state.theme.text_dimmed)),
+        rows[dims_row],
+    );
 
     // Preview path row.
     let ext = EXPORT_FORMATS[dialog.format_index].extension();
@@ -195,7 +268,7 @@ pub fn render_export_dialog(frame: &mut Frame, state: &AppState) {
     let preview = format!("  Output:    {preview_path}");
     frame.render_widget(
         Paragraph::new(preview).style(Style::default().fg(state.theme.text_dimmed)),
-        rows[4],
+        rows[preview_row],
     );
 }
 

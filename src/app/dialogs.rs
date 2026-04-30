@@ -1,3 +1,48 @@
+/// Output-resolution selector for the export dialog.
+///
+/// * [`Source`](Self::Source) — re-render the pipeline against the original
+///   full-resolution source image, so the saved file matches the input
+///   resolution. This is the default and matches the behaviour of `--batch`.
+/// * [`Preview`](Self::Preview) — save the current proxy preview as-is
+///   (faster, but capped to the live-preview proxy resolution).
+/// * [`Custom`](Self::Custom) — re-render against the source downscaled to a
+///   user-specified longest edge (in pixels).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportResolution {
+    Source,
+    Preview,
+    Custom,
+}
+
+impl ExportResolution {
+    /// Short label shown in the dialog and in status messages.
+    pub fn label(self) -> &'static str {
+        match self {
+            ExportResolution::Source => "Source",
+            ExportResolution::Preview => "Preview",
+            ExportResolution::Custom => "Custom",
+        }
+    }
+
+    /// Cycle to the next variant (used when the user presses → / Space).
+    pub fn next(self) -> Self {
+        match self {
+            ExportResolution::Source => ExportResolution::Preview,
+            ExportResolution::Preview => ExportResolution::Custom,
+            ExportResolution::Custom => ExportResolution::Source,
+        }
+    }
+
+    /// Cycle to the previous variant (used when the user presses ←).
+    pub fn prev(self) -> Self {
+        match self {
+            ExportResolution::Source => ExportResolution::Custom,
+            ExportResolution::Preview => ExportResolution::Source,
+            ExportResolution::Custom => ExportResolution::Preview,
+        }
+    }
+}
+
 /// State for the export dialog modal.
 #[derive(Debug, Clone)]
 pub struct ExportDialogState {
@@ -7,7 +52,14 @@ pub struct ExportDialogState {
     pub filename: String,
     /// Index into `EXPORT_FORMATS`.
     pub format_index: usize,
-    /// Which field has focus: 0 = Directory, 1 = Filename, 2 = Format.
+    /// Output-resolution mode.
+    pub resolution: ExportResolution,
+    /// Editable text buffer for the custom longest-edge value (px).
+    /// Only meaningful when [`Self::resolution`] is [`ExportResolution::Custom`].
+    pub custom_resolution: String,
+    /// Which field has focus: 0 = Directory, 1 = Filename, 2 = Format,
+    /// 3 = Resolution, 4 = Custom resolution (only reachable when the
+    /// resolution mode is `Custom`).
     pub focused_field: usize,
 }
 
@@ -20,6 +72,12 @@ impl ExportDialogState {
             &self.filename
         }
     }
+
+    /// Parse the custom-resolution buffer to a `u32`, returning `None` on
+    /// blank input or parse failure (caller should treat as "use default").
+    pub fn custom_resolution_value(&self) -> Option<u32> {
+        self.custom_resolution.trim().parse::<u32>().ok()
+    }
 }
 
 impl Default for ExportDialogState {
@@ -31,6 +89,8 @@ impl Default for ExportDialogState {
                 .into_owned(),
             filename: String::new(),
             format_index: 0,
+            resolution: ExportResolution::Source,
+            custom_resolution: String::new(),
             focused_field: 1,
         }
     }

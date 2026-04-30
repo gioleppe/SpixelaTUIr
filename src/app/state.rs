@@ -4,12 +4,12 @@ use std::sync::mpsc;
 use ratatui::layout::Rect;
 use ratatui_image::{Resize, ResizeEncodeRender, picker::Picker, protocol::StatefulProtocol};
 
+use crate::config::app_config::AppConfig;
 use crate::config::favorites::FavoritesConfig;
 use crate::effects::Pipeline;
 use crate::engine::export::ExportFormat;
 use crate::engine::worker::{WorkerCommand, WorkerResponse};
 
-use super::PROXY_RESOLUTIONS;
 use super::animation::{
     AnimationExportDialogState, AnimationFrame, AnimationPlaybackState, AnimationTimeline,
     SweepDialogState,
@@ -66,8 +66,14 @@ pub struct AppState {
     pub export_dialog: ExportDialogState,
     /// State for the save-pipeline dialog when in SavePipelineDialog mode.
     pub save_pipeline_dialog: SavePipelineDialogState,
-    /// Index into `PROXY_RESOLUTIONS` – controls live-preview quality.
+    /// Index into [`Self::proxy_resolutions`] – controls live-preview quality.
     pub proxy_resolution_index: usize,
+    /// Effective list of proxy-resolution tiers (max px on the long edge),
+    /// sorted ascending. **Invariant:** non-empty — `AppConfig::load_default`
+    /// always returns at least one entry, falling back to
+    /// [`DEFAULT_PROXY_RESOLUTIONS`](crate::app::DEFAULT_PROXY_RESOLUTIONS)
+    /// when the user-supplied list is missing or all-invalid.
+    pub proxy_resolutions: Vec<u32>,
     /// True while the user is actively moving an effect with K / J (drag-to-reorder).
     pub dragging_effect: bool,
     /// Set whenever the pipeline is modified; cleared when the pipeline is saved.
@@ -131,6 +137,21 @@ impl AppState {
         worker_resp_tx: mpsc::Sender<WorkerResponse>,
         picker: Picker,
     ) -> Self {
+        let app_config = AppConfig::load_default();
+        debug_assert!(
+            !app_config.proxy_resolutions.is_empty(),
+            "AppConfig::load_default must return at least one proxy resolution"
+        );
+        // Pick the index closest to 512 px (the historical default) so the
+        // initial preview quality matches prior behaviour even if the user
+        // configured a custom list that omits 512.
+        let proxy_resolution_index = app_config
+            .proxy_resolutions
+            .iter()
+            .enumerate()
+            .min_by_key(|&(_, &v)| v.abs_diff(512))
+            .map(|(i, _)| i)
+            .unwrap_or(0);
         Self {
             should_quit: false,
             pipeline: Pipeline::default(),
@@ -155,8 +176,8 @@ impl AppState {
             edit_params: Vec::new(),
             export_dialog: ExportDialogState::default(),
             save_pipeline_dialog: SavePipelineDialogState::default(),
-            // Default to index 1 (512 px) — preserves prior behaviour.
-            proxy_resolution_index: 1,
+            proxy_resolution_index,
+            proxy_resolutions: app_config.proxy_resolutions,
             dragging_effect: false,
             pipeline_dirty: false,
             undo_stack: VecDeque::new(),
@@ -185,7 +206,7 @@ impl AppState {
         log::info!("Loading image: {}", path.display());
         match image::open(&path) {
             Ok(img) => {
-                let size = PROXY_RESOLUTIONS[self.proxy_resolution_index];
+                let size = self.proxy_resolutions[self.proxy_resolution_index];
                 log::debug!(
                     "Image loaded ({}x{}), creating proxy at {size}px",
                     img.width(),
@@ -233,8 +254,13 @@ impl AppState {
     /// immediately so stale images are never shown while the new one loads.
     pub fn dispatch_file_browser_preview(&mut self, path: std::path::PathBuf) {
         self.file_browser_preview = None;
-        // Pick the smallest PROXY_RESOLUTION that is >= the preview pane's pixel
-        // dimensions so the thumbnail fills the box without unnecessary overhead.
+        // Pick the smallest configured proxy resolution that is >= the preview
+        // pane's pixel dimensions so the thumbnail fills the box without
+        // unnecessary overhead. `proxy_resolutions` is non-empty by invariant
+        // (see field doc on `AppState`), so the inner fallback is unreachable
+        // in practice.
+        let resolutions = &self.proxy_resolutions;
+        let fallback = resolutions[self.proxy_resolution_index];
         let target_size = self
             .file_browser_padded_area
             .map(|area| {
@@ -242,12 +268,13 @@ impl AppState {
                 let px_w = (area.width as u32) * (cw as u32);
                 let px_h = (area.height as u32) * (ch as u32);
                 let need = px_w.max(px_h);
-                *PROXY_RESOLUTIONS
+                resolutions
                     .iter()
                     .find(|&&r| r >= need)
-                    .unwrap_or(PROXY_RESOLUTIONS.last().unwrap())
+                    .copied()
+                    .unwrap_or_else(|| resolutions.last().copied().unwrap_or(fallback))
             })
-            .unwrap_or(512);
+            .unwrap_or(fallback);
         let _ = self.worker_tx.send(
             crate::engine::worker::WorkerCommand::LoadFileBrowserPreview {
                 path,
@@ -261,7 +288,7 @@ impl AppState {
     /// re-dispatch the pipeline.  Called from keyboard shortcuts `[` / `]`.
     pub fn reload_proxy(&mut self) {
         if let Some(source) = self.source_asset.take() {
-            let size = PROXY_RESOLUTIONS[self.proxy_resolution_index];
+            let size = self.proxy_resolutions[self.proxy_resolution_index];
             log::debug!("Reloading proxy at {size}px");
             let proxy = source.thumbnail(size, size);
             self.source_asset = Some(source);
@@ -306,21 +333,39 @@ impl AppState {
         }
     }
 
-    /// Dispatch an export of the current preview buffer with the given path and format.
-    pub fn dispatch_export(&self, output_path: std::path::PathBuf, format: ExportFormat) {
-        if let Some(ref img) = self.preview_buffer {
-            log::info!(
-                "Dispatching export: {} as {}",
-                output_path.display(),
-                format.display_name()
-            );
-            let _ = self.worker_tx.send(WorkerCommand::Export {
-                image: img.clone(),
-                output_path,
-                format,
-                response_tx: self.worker_resp_tx.clone(),
-            });
-        }
+    /// Dispatch an export with the given path and format.
+    ///
+    /// `image` is the image to be saved; `pipeline` (when `Some`) is applied
+    /// by the worker before writing — used for source/custom-resolution
+    /// exports that re-render the user's effects at a higher resolution than
+    /// the live preview. When `pipeline` is `None`, `image` is written
+    /// verbatim (used by the "Preview" export mode).
+    pub fn dispatch_export(
+        &self,
+        image: image::DynamicImage,
+        pipeline: Option<Pipeline>,
+        output_path: std::path::PathBuf,
+        format: ExportFormat,
+    ) {
+        log::info!(
+            "Dispatching export: {} as {} ({}x{}{})",
+            output_path.display(),
+            format.display_name(),
+            image.width(),
+            image.height(),
+            if pipeline.is_some() {
+                ", with pipeline re-render"
+            } else {
+                ""
+            }
+        );
+        let _ = self.worker_tx.send(WorkerCommand::Export {
+            image,
+            pipeline,
+            output_path,
+            format,
+            response_tx: self.worker_resp_tx.clone(),
+        });
     }
 
     /// Push the current pipeline onto the undo stack before a mutation, clearing redo.

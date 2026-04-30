@@ -13,9 +13,16 @@ pub enum WorkerCommand {
         /// Channel on which to deliver the processed frame.
         response_tx: Sender<WorkerResponse>,
     },
-    /// Export the given image to a file.
+    /// Export an image to a file.
+    ///
+    /// When `pipeline` is `Some`, the worker first applies it to `image`
+    /// before saving — used to produce a high-resolution export by re-running
+    /// the user's effects against the source asset (or a freshly downscaled
+    /// version of it). When `pipeline` is `None`, `image` is written verbatim
+    /// (used by the "Preview" export mode, which simply re-saves the proxy).
     Export {
         image: image::DynamicImage,
+        pipeline: Option<Pipeline>,
         output_path: std::path::PathBuf,
         format: ExportFormat,
         response_tx: Sender<WorkerResponse>,
@@ -139,12 +146,32 @@ pub fn run(rx: Receiver<WorkerCommand>) {
             }
             WorkerCommand::Export {
                 image,
+                pipeline,
                 output_path,
                 format,
                 response_tx,
             } => {
-                log::info!("Worker: exporting to {}", output_path.display());
-                match crate::engine::export::export_image(&image, output_path, &format) {
+                log::info!(
+                    "Worker: exporting to {} ({}x{}{})",
+                    output_path.display(),
+                    image.width(),
+                    image.height(),
+                    if pipeline.is_some() {
+                        ", re-rendering pipeline"
+                    } else {
+                        ""
+                    }
+                );
+                let final_image = match pipeline {
+                    Some(p) => {
+                        let start = std::time::Instant::now();
+                        let rendered = p.apply_image(image);
+                        log::debug!("Worker: export re-render took {:?}", start.elapsed());
+                        rendered
+                    }
+                    None => image,
+                };
+                match crate::engine::export::export_image(&final_image, output_path, &format) {
                     Ok(saved_path) => {
                         log::info!("Worker: export succeeded → {}", saved_path.display());
                         let _ = response_tx.send(WorkerResponse::Exported(saved_path));

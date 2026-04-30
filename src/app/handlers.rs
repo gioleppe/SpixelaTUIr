@@ -3,11 +3,10 @@ use crossterm::event::{KeyCode, KeyModifiers};
 use crate::effects::{Effect, EnabledEffect, color, color::ColorEffect};
 use crate::engine::export::EXPORT_FORMATS;
 
-use super::PROXY_RESOLUTIONS;
 use super::animation::{
     ANIM_EXPORT_FORMATS, AnimationPlaybackState, SWEEP_EASINGS, SweepDialogState, apply_easing,
 };
-use super::dialogs::{FocusedPanel, InputMode};
+use super::dialogs::{ExportResolution, FocusedPanel, InputMode};
 use super::file_browser::{FileBrowserEntry, FileBrowserPurpose, FileBrowserState};
 use super::pipeline_utils::{AVAILABLE_EFFECTS, format_param_value, randomize_pipeline};
 use super::state::AppState;
@@ -194,6 +193,16 @@ pub fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifier
                     .unwrap_or_else(|| "output".to_string());
                 state.export_dialog.filename = default_filename;
                 state.export_dialog.format_index = 0;
+                state.export_dialog.resolution = ExportResolution::Source;
+                // Pre-fill the custom buffer with the source's longest edge
+                // so the user gets a sensible starting value when they cycle
+                // to Custom.
+                if let Some(src) = &state.source_asset {
+                    state.export_dialog.custom_resolution =
+                        src.width().max(src.height()).to_string();
+                } else {
+                    state.export_dialog.custom_resolution.clear();
+                }
                 state.export_dialog.focused_field = 1;
                 state.input_mode = InputMode::ExportDialog;
             } else {
@@ -210,7 +219,7 @@ pub fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifier
         // Increase preview resolution.
         KeyCode::Char(']') => {
             if state.source_asset.is_some()
-                && state.proxy_resolution_index < PROXY_RESOLUTIONS.len() - 1
+                && state.proxy_resolution_index < state.proxy_resolutions.len() - 1
             {
                 state.proxy_resolution_index += 1;
                 state.reload_proxy();
@@ -810,7 +819,16 @@ fn handle_export_dialog(state: &mut AppState, code: KeyCode) {
     const FIELD_DIRECTORY: usize = 0;
     const FIELD_FILENAME: usize = 1;
     const FIELD_FORMAT: usize = 2;
-    const FIELD_COUNT: usize = 3;
+    const FIELD_RESOLUTION: usize = 3;
+    const FIELD_CUSTOM: usize = 4;
+
+    // Number of selectable fields depends on whether Custom is the current
+    // resolution mode (only then is the Custom-resolution edit row shown).
+    let field_count = if state.export_dialog.resolution == ExportResolution::Custom {
+        5
+    } else {
+        4
+    };
 
     match code {
         KeyCode::Esc => {
@@ -824,9 +842,60 @@ fn handle_export_dialog(state: &mut AppState, code: KeyCode) {
             let dir = std::path::PathBuf::from(&state.export_dialog.directory);
             let filename = state.export_dialog.effective_filename().to_string();
             let output_path = dir.join(format!("{filename}.{ext}"));
-            state.dispatch_export(output_path, format);
-            state.input_mode = InputMode::Normal;
-            state.status_message = "Exporting…".to_string();
+
+            // Choose what to send to the worker based on the resolution mode.
+            let dispatch = match state.export_dialog.resolution {
+                ExportResolution::Preview => {
+                    state.preview_buffer.as_ref().map(|img| (img.clone(), None))
+                }
+                ExportResolution::Source => state
+                    .source_asset
+                    .as_ref()
+                    .map(|img| (img.clone(), Some(state.pipeline.clone()))),
+                ExportResolution::Custom => state.source_asset.as_ref().and_then(|src| {
+                    let raw = state.export_dialog.custom_resolution_value()?;
+                    if raw == 0 {
+                        return None;
+                    }
+                    // Cap at the source's longest edge — upscaling adds no
+                    // information and only inflates the output file size.
+                    // `DynamicImage` is guaranteed to have non-zero dimensions
+                    // by the `image` crate, so no further saturation is needed.
+                    let long_edge = src.width().max(src.height());
+                    let target = raw.min(long_edge);
+                    let scaled = if target == long_edge {
+                        src.clone()
+                    } else {
+                        src.thumbnail(target, target)
+                    };
+                    Some((scaled, Some(state.pipeline.clone())))
+                }),
+            };
+
+            match dispatch {
+                Some((image, pipeline)) => {
+                    let (w, h) = (image.width(), image.height());
+                    state.dispatch_export(image, pipeline, output_path, format);
+                    state.input_mode = InputMode::Normal;
+                    state.status_message = format!(
+                        "Exporting {} ({w}x{h})…",
+                        state.export_dialog.resolution.label()
+                    );
+                }
+                None => {
+                    // Stay in the dialog so the user can fix the input.
+                    state.status_message = match state.export_dialog.resolution {
+                        ExportResolution::Custom => {
+                            "Custom resolution must be a positive integer.".to_string()
+                        }
+                        ExportResolution::Source => {
+                            "No source image loaded — cannot export at source resolution."
+                                .to_string()
+                        }
+                        ExportResolution::Preview => "No processed preview to export.".to_string(),
+                    };
+                }
+            }
         }
         KeyCode::Up | KeyCode::Char('k') => {
             if state.export_dialog.focused_field > 0 {
@@ -834,7 +903,7 @@ fn handle_export_dialog(state: &mut AppState, code: KeyCode) {
             }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if state.export_dialog.focused_field < FIELD_COUNT - 1 {
+            if state.export_dialog.focused_field + 1 < field_count {
                 state.export_dialog.focused_field += 1;
             }
         }
@@ -854,13 +923,32 @@ fn handle_export_dialog(state: &mut AppState, code: KeyCode) {
                 _ => (state.export_dialog.format_index + 1) % n,
             };
         }
-        // Text editing for Directory and Filename fields.
+        // Resolution cycling.
+        KeyCode::Left | KeyCode::Right | KeyCode::Char(' ')
+            if state.export_dialog.focused_field == FIELD_RESOLUTION =>
+        {
+            state.export_dialog.resolution = match code {
+                KeyCode::Left => state.export_dialog.resolution.prev(),
+                _ => state.export_dialog.resolution.next(),
+            };
+            // If we just cycled away from Custom while the Custom row was
+            // focused, pull focus back to the Resolution row.
+            if state.export_dialog.resolution != ExportResolution::Custom
+                && state.export_dialog.focused_field == FIELD_CUSTOM
+            {
+                state.export_dialog.focused_field = FIELD_RESOLUTION;
+            }
+        }
+        // Text editing for Directory / Filename / Custom-resolution fields.
         KeyCode::Backspace => match state.export_dialog.focused_field {
             FIELD_DIRECTORY => {
                 state.export_dialog.directory.pop();
             }
             FIELD_FILENAME => {
                 state.export_dialog.filename.pop();
+            }
+            FIELD_CUSTOM => {
+                state.export_dialog.custom_resolution.pop();
             }
             _ => {}
         },
@@ -870,6 +958,12 @@ fn handle_export_dialog(state: &mut AppState, code: KeyCode) {
             }
             FIELD_FILENAME => {
                 state.export_dialog.filename.push(c);
+            }
+            FIELD_CUSTOM => {
+                // Only accept ASCII digits — keeps the buffer parseable as u32.
+                if c.is_ascii_digit() {
+                    state.export_dialog.custom_resolution.push(c);
+                }
             }
             _ => {}
         },

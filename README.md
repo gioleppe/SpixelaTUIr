@@ -114,11 +114,11 @@ spixelatuir --batch "raw_photos/**/*.png" --pipeline cyberpunk.json --outdir gli
 | `d` / `Delete` | **Delete** the selected effect |
 | `Shift+K` / `Shift+J` | **Reorder** — move effect up / down |
 | `v` | **Split View** (Before vs. After) |
-| `e` | **Export** current frame |
+| `e` | **Export** current frame (Source / Preview / Custom resolution — see below) |
 | `Ctrl+Z` / `Ctrl+Y` | **Undo / Redo** pipeline edits |
 | `Ctrl+N` | Open **Animation Panel** |
 | `Ctrl+S` / `L`| **Save / Load** your pipeline preset |
-| `[` / `]` | Decrease / increase preview resolution |
+| `[` / `]` | Decrease / increase preview resolution (tiers configurable in `~/.config/spix/config.json`) |
 | `h` | Show full **Help** overlay |
 | `q` | Quit (with unsaved changes protection) |
 
@@ -140,6 +140,30 @@ Open with `a` (effects panel focused) **or** jump straight to Favorites with `*`
 > **Favorites shortcut:** Press `*` from the effects panel (normal mode) to open the menu already on the ★ Favs tab, or press `*` while the menu is open to jump there instantly.
 
 > **Circular navigation:** Both the category tabs and the effect list wrap around — pressing `→`/`Tab` on the last tab jumps back to the first, and `↑` at the top of the list jumps to the bottom.
+
+### 🖼️ Export resolution
+
+The **Export** dialog (`e`) exposes a **Resolution** field that controls how big the saved file is. Cycle between the three modes with `←` / `→` / `Space`:
+
+| Mode | What it saves |
+|------|---------------|
+| **Source** *(default)* | The full-resolution source image, with the entire pipeline re-applied to it on the worker thread. A 1920×1920 input is exported at 1920×1920. This is what `--batch` mode has always done. |
+| **Preview** | The current proxy preview (≤ the active preview tier — 256/512/768/1024 px by default). Faster, but capped to the live-preview proxy size. |
+| **Custom** | The source image downscaled to a user-specified longest edge (in pixels), with the full pipeline re-applied. The value is automatically capped at the source's longest edge — upscaling adds no information. |
+
+> **Note on randomized effects:** effects with internal randomness (e.g. *Noise*, *Row Jitter*, *Pixel Sort*, *Block Shift*) won't reproduce the exact preview pixel-for-pixel at higher resolutions, but the visual character is preserved. This is the same trade-off `--batch` mode has always made.
+
+### ⚙️ Application config (`~/.config/spix/config.json`)
+
+The list of preview-resolution tiers cycled with `[` / `]` is overridable. Drop a JSON file at `~/.config/spix/config.json` (Linux/macOS — Windows uses the platform-equivalent location):
+
+```json
+{
+  "proxy_resolutions": [384, 768, 1536, 2048]
+}
+```
+
+Values are clamped to `[64, 16384]` px on the long edge, deduplicated, and sorted ascending. An empty or all-invalid list silently falls back to the built-in defaults (`[256, 512, 768, 1024]`). The initial selected tier is the one closest to 512 px so prior behaviour is preserved.
 
 ---
 
