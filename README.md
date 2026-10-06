@@ -114,7 +114,7 @@ spixelatuir --batch "raw_photos/**/*.png" --pipeline cyberpunk.json --outdir gli
 | `d` / `Delete` | **Delete** the selected effect |
 | `Shift+K` / `Shift+J` | **Reorder** — move effect up / down |
 | `v` | **Split View** (Before vs. After) |
-| `e` | **Export** current frame |
+| `e` | **Export** current frame; choose original image resolution (default) or preview resolution in the export dialog |
 | `Ctrl+Z` / `Ctrl+Y` | **Undo / Redo** pipeline edits |
 | `Ctrl+N` | Open **Animation Panel** |
 | `Ctrl+S` / `L`| **Save / Load** your pipeline preset |

@@ -16,6 +16,8 @@ pub enum WorkerCommand {
     /// Export the given image to a file.
     Export {
         image: image::DynamicImage,
+        /// Process the full-size source before saving; preview exports are already processed.
+        pipeline: Option<Pipeline>,
         output_path: std::path::PathBuf,
         format: ExportFormat,
         response_tx: Sender<WorkerResponse>,
@@ -139,11 +141,16 @@ pub fn run(rx: Receiver<WorkerCommand>) {
             }
             WorkerCommand::Export {
                 image,
+                pipeline,
                 output_path,
                 format,
                 response_tx,
             } => {
                 log::info!("Worker: exporting to {}", output_path.display());
+                let image = match pipeline {
+                    Some(pipeline) => pipeline.apply_image(image),
+                    None => image,
+                };
                 match crate::engine::export::export_image(&image, output_path, &format) {
                     Ok(saved_path) => {
                         log::info!("Worker: export succeeded → {}", saved_path.display());

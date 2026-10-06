@@ -280,6 +280,60 @@ mod tests {
     }
 
     #[test]
+    fn export_resolution_uses_original_or_preview_with_effects() {
+        let (worker_tx, worker_rx) = mpsc::channel();
+        let (resp_tx, resp_rx) = mpsc::channel();
+        let mut state = AppState::new(
+            worker_tx,
+            resp_rx,
+            resp_tx,
+            ratatui_image::picker::Picker::halfblocks(),
+        );
+        let source = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+            640,
+            600,
+            image::Rgb([10, 20, 30]),
+        ));
+        state.proxy_asset = Some(source.thumbnail(512, 512));
+        state.preview_buffer = Some(
+            Pipeline {
+                effects: vec![EnabledEffect::new(Effect::Color(ColorEffect::Invert))],
+            }
+            .apply_image(state.proxy_asset.as_ref().unwrap().clone()),
+        );
+        state.pipeline = Pipeline {
+            effects: vec![EnabledEffect::new(Effect::Color(ColorEffect::Invert))],
+        };
+        state.source_asset = Some(source);
+        let dir = tempfile::tempdir().unwrap();
+
+        handle_normal(&mut state, KeyCode::Char('e'), KeyModifiers::NONE);
+        assert!(state.export_dialog.full_resolution);
+        state.export_dialog.directory = dir.path().to_string_lossy().into_owned();
+        state.export_dialog.filename = "full".to_string();
+        handlers::handle_key(&mut state, KeyCode::Down, KeyModifiers::NONE);
+        handlers::handle_key(&mut state, KeyCode::Down, KeyModifiers::NONE);
+        assert_eq!(state.export_dialog.focused_field, 3);
+        handlers::handle_key(&mut state, KeyCode::Enter, KeyModifiers::NONE);
+
+        handle_normal(&mut state, KeyCode::Char('e'), KeyModifiers::NONE);
+        handlers::handle_key(&mut state, KeyCode::Down, KeyModifiers::NONE);
+        handlers::handle_key(&mut state, KeyCode::Down, KeyModifiers::NONE);
+        handlers::handle_key(&mut state, KeyCode::Right, KeyModifiers::NONE);
+        assert!(!state.export_dialog.full_resolution);
+        state.export_dialog.filename = "preview".to_string();
+        handlers::handle_key(&mut state, KeyCode::Enter, KeyModifiers::NONE);
+        state.worker_tx.send(WorkerCommand::Quit).unwrap();
+        crate::engine::worker::run(worker_rx);
+
+        let full = image::open(dir.path().join("full.png")).unwrap().to_rgb8();
+        assert_eq!(full.dimensions(), (640, 600));
+        assert_eq!(full.get_pixel(0, 0).0, [245, 235, 225]);
+        let preview = image::open(dir.path().join("preview.png")).unwrap();
+        assert_eq!((preview.width(), preview.height()), (512, 480));
+    }
+
+    #[test]
     fn move_effect_up_with_k() {
         let mut state = make_state_with_effects();
         handle_normal(&mut state, KeyCode::Char('K'), KeyModifiers::NONE);
