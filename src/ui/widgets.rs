@@ -55,7 +55,7 @@ pub fn render_controls(frame: &mut Frame, area: Rect, state: &AppState) {
         }
         InputMode::EditEffect { .. } => "j/k: next field  Type value  Enter: apply  Esc: cancel",
         InputMode::ExportDialog => {
-            "j/k: navigate fields  ←/→/Space: cycle format  Enter: export  Esc: cancel"
+            "j/k: navigate fields  ←/→/Space: change format/resolution  Enter: export  Esc: cancel"
         }
         InputMode::SavePipelineDialog => "j/k: navigate fields  Enter: save as JSON  Esc: cancel",
         InputMode::HelpModal => "h / Esc: close help",
@@ -143,14 +143,14 @@ pub fn render_export_dialog(frame: &mut Frame, state: &AppState) {
         popup_area.height.saturating_sub(2),
     );
 
-    // Split inner into rows: Directory, Filename, Format, (blank), Preview.
+    // Split inner into rows: Directory, Filename, Format, Resolution, Preview.
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1), // Directory
             Constraint::Length(1), // Filename
             Constraint::Length(1), // Format
-            Constraint::Length(1), // blank
+            Constraint::Length(1), // Resolution
             Constraint::Length(1), // Preview path
             Constraint::Min(0),    // padding
         ])
@@ -184,6 +184,22 @@ pub fn render_export_dialog(frame: &mut Frame, state: &AppState) {
     let format_name = EXPORT_FORMATS[dialog.format_index].display_name();
     let fmt_text = format!("  Format     [ {format_name} ]  (←/→ to change)");
     frame.render_widget(Paragraph::new(fmt_text).style(field_style(2)), rows[2]);
+
+    let resolution = if dialog.full_resolution {
+        state
+            .source_asset
+            .as_ref()
+            .map(|img| format!("Original ({}×{})", img.width(), img.height()))
+            .unwrap_or_else(|| "Original".to_string())
+    } else {
+        state
+            .preview_buffer
+            .as_ref()
+            .map(|img| format!("Preview ({}×{})", img.width(), img.height()))
+            .unwrap_or_else(|| "Preview".to_string())
+    };
+    let res_text = format!("  Resolution [ {resolution} ]  (←/→ to change)");
+    frame.render_widget(Paragraph::new(res_text).style(field_style(3)), rows[3]);
 
     // Preview path row.
     let ext = EXPORT_FORMATS[dialog.format_index].extension();

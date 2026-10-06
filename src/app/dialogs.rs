@@ -7,7 +7,9 @@ pub struct ExportDialogState {
     pub filename: String,
     /// Index into `EXPORT_FORMATS`.
     pub format_index: usize,
-    /// Which field has focus: 0 = Directory, 1 = Filename, 2 = Format.
+    /// Export the full-size source instead of the processed preview.
+    pub full_resolution: bool,
+    /// Which field has focus: 0 = Directory, 1 = Filename, 2 = Format, 3 = Resolution.
     pub focused_field: usize,
 }
 
@@ -31,6 +33,7 @@ impl Default for ExportDialogState {
                 .into_owned(),
             filename: String::new(),
             format_index: 0,
+            full_resolution: true,
             focused_field: 1,
         }
     }

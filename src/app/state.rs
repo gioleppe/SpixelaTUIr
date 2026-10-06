@@ -306,9 +306,16 @@ impl AppState {
         }
     }
 
-    /// Dispatch an export of the current preview buffer with the given path and format.
+    /// Dispatch an export of the source at full resolution or the current preview.
     pub fn dispatch_export(&self, output_path: std::path::PathBuf, format: ExportFormat) {
-        if let Some(ref img) = self.preview_buffer {
+        let image_and_pipeline = if self.export_dialog.full_resolution {
+            self.source_asset
+                .as_ref()
+                .map(|img| (img, Some(self.pipeline.clone())))
+        } else {
+            self.preview_buffer.as_ref().map(|img| (img, None))
+        };
+        if let Some((img, pipeline)) = image_and_pipeline {
             log::info!(
                 "Dispatching export: {} as {}",
                 output_path.display(),
@@ -316,6 +323,7 @@ impl AppState {
             );
             let _ = self.worker_tx.send(WorkerCommand::Export {
                 image: img.clone(),
+                pipeline,
                 output_path,
                 format,
                 response_tx: self.worker_resp_tx.clone(),

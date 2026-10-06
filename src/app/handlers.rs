@@ -194,6 +194,7 @@ pub fn handle_normal(state: &mut AppState, code: KeyCode, modifiers: KeyModifier
                     .unwrap_or_else(|| "output".to_string());
                 state.export_dialog.filename = default_filename;
                 state.export_dialog.format_index = 0;
+                state.export_dialog.full_resolution = true;
                 state.export_dialog.focused_field = 1;
                 state.input_mode = InputMode::ExportDialog;
             } else {
@@ -810,7 +811,8 @@ fn handle_export_dialog(state: &mut AppState, code: KeyCode) {
     const FIELD_DIRECTORY: usize = 0;
     const FIELD_FILENAME: usize = 1;
     const FIELD_FORMAT: usize = 2;
-    const FIELD_COUNT: usize = 3;
+    const FIELD_RESOLUTION: usize = 3;
+    const FIELD_COUNT: usize = 4;
 
     match code {
         KeyCode::Esc => {
@@ -853,6 +855,11 @@ fn handle_export_dialog(state: &mut AppState, code: KeyCode) {
                 }
                 _ => (state.export_dialog.format_index + 1) % n,
             };
+        }
+        KeyCode::Left | KeyCode::Right | KeyCode::Char(' ')
+            if state.export_dialog.focused_field == FIELD_RESOLUTION =>
+        {
+            state.export_dialog.full_resolution = !state.export_dialog.full_resolution;
         }
         // Text editing for Directory and Filename fields.
         KeyCode::Backspace => match state.export_dialog.focused_field {
